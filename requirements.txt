@@ -4,3 +4,4 @@ PyPDF2
 python-multipart
 python-jose
 passlib[bcrypt]
+pydantic[email]
