@@ -8,12 +8,14 @@ from deps import get_current_user
 from PyPDF2 import PdfReader
 from roth import router as roth_router
 from cap_gains import router as cap_gains_router
+from schedule_c import router as schedule_c_router
 
 db = {}  # 🔄 Temporary in-memory storage for Render (replaces replit.db)
 
 app = FastAPI()
 app.include_router(roth_router)
 app.include_router(cap_gains_router)
+app.include_router(schedule_c_router)
 
 
 @app.get("/", response_class=RedirectResponse, include_in_schema=False)
