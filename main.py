@@ -106,3 +106,41 @@ async def recommend(data: dict):
         strategies.append("Consider a Solo 401(k) or SEP IRA")
 
     return {"strategies": strategies}
+
+from fpdf import FPDF
+from fastapi.responses import StreamingResponse
+import io
+
+class PDFReport(FPDF):
+    def header(self):
+        self.set_font("Arial", "B", 16)
+        self.cell(0, 10, "Tax Planning Report", ln=True, align="C")
+
+    def add_section(self, title, content):
+        self.set_font("Arial", "B", 12)
+        self.cell(0, 10, title, ln=True)
+        self.set_font("Arial", "", 12)
+        self.multi_cell(0, 10, content)
+        self.ln()
+
+@app.post("/generate_pdf")
+def generate_pdf(data: dict):
+    pdf = PDFReport()
+    pdf.add_page()
+
+    # Example sections using sample fields
+    pdf.add_section("Filing Status", data.get("filing_status", "N/A"))
+    pdf.add_section("Adjusted Gross Income (AGI)", f"${data.get('agi', 0):,.2f}")
+    pdf.add_section("Taxable Income", f"${data.get('taxable_income', 0):,.2f}")
+    pdf.add_section("Total Tax", f"${data.get('total_tax', 0):,.2f}")
+
+    strategies = data.get("strategies", [])
+    if strategies:
+        strategy_text = "\n".join(f"- {s}" for s in strategies)
+        pdf.add_section("Recommended Strategies", strategy_text)
+
+    buffer = io.BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": "inline; filename=tax_planning_report.pdf"})
+
