@@ -9,3 +9,4 @@ pdf2image
 pydantic[email]
 email-validator
 python-dotenv
+passlib
