@@ -11,6 +11,12 @@ from cap_gains import router as cap_gains_router
 from schedule_c import router as schedule_c_router
 from rental_analysis import router as rental_router
 from year_end_planning import router as year_end_router
+from fastapi import UploadFile, File
+from fastapi.responses import JSONResponse
+import pytesseract
+from pdf2image import convert_from_bytes
+from PyPDF2 import PdfReader
+import io
 
 db = {}  # 🔄 Temporary in-memory storage for Render (replaces replit.db)
 
@@ -277,4 +283,44 @@ async def parse_excel_data(file: UploadFile = File(...)):
         "preview": df.head(5).to_dict(orient="records")
     }
     return summary
+def extract_text_with_ocr(pdf_bytes: bytes) -> str:
+    try:
+        text = ""
+        # Convert PDF to images
+        images = convert_from_bytes(pdf_bytes)
+        for image in images:
+            ocr_text = pytesseract.image_to_string(image)
+            text += ocr_text + "\n"
+        return text
+    except Exception as e:
+        return f"OCR failed: {str(e)}"
+
+@app.post("/parse_statement", summary="OCR-enhanced parsing of brokerage, 401k, or bank statement")
+async def parse_statement(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        text = ""
+        try:
+            # Try standard PDF text extraction first
+            reader = PdfReader(io.BytesIO(contents))
+            text = "".join(page.extract_text() or "" for page in reader.pages)
+        except:
+            text = ""
+
+        if not text.strip():
+            # Fallback to OCR
+            text = extract_text_with_ocr(contents)
+
+        # Simple keyword parsing
+        keywords = ["account", "interest", "dividends", "contributions", "withdrawals", "Roth", "401(k)", "IRA", "statement", "bank"]
+        found = [kw for kw in keywords if kw.lower() in text.lower()]
+        
+        summary = {
+            "length_of_text": len(text),
+            "keywords_detected": found,
+            "note": "Parsed using OCR" if not text.strip() else "Parsed using PDF text layer"
+        }
+        return JSONResponse(content=summary)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
