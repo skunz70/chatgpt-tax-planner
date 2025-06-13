@@ -1,9 +1,11 @@
 fastapi
 uvicorn
+pdfplumber
+python-multipart
 PyPDF2
 fpdf
-python-multipart
 pytesseract
 pdf2image
-Pillow
+pydantic[email]
+email-validator
 python-dotenv
