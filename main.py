@@ -17,6 +17,7 @@ import pytesseract
 from pdf2image import convert_from_bytes
 from PyPDF2 import PdfReader
 import io
+from csv_excel_keyword import router as csv_excel_router
 
 db = {}  # 🔄 Temporary in-memory storage for Render (replaces replit.db)
 
@@ -26,6 +27,7 @@ app.include_router(cap_gains_router)
 app.include_router(schedule_c_router)
 app.include_router(rental_router)
 app.include_router(year_end_router)
+app.include_router(csv_excel_router)
 
 
 @app.get("/", response_class=RedirectResponse, include_in_schema=False)
