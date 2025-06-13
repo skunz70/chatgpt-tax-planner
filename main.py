@@ -62,16 +62,40 @@ async def get_me(user: SystemUser = Depends(get_current_user)):
     return user
 
 
-@app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF")
+from pdf2image import convert_from_bytes
+import pytesseract
+import io
+
+@app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF (with OCR fallback)")
 async def parse_1040(file: UploadFile = File(...)):
-    reader = PdfReader(file.file)
-    text = "".join(page.extract_text() or "" for page in reader.pages)
+    contents = await file.read()
+    text = ""
+
+    try:
+        # Attempt to read with PyPDF2
+        reader = PdfReader(io.BytesIO(contents))
+        text = "".join(page.extract_text() or "" for page in reader.pages)
+    except Exception as e:
+        print("Standard text extraction failed:", e)
+
+    if not text.strip():
+        print("No readable text found — using OCR fallback...")
+        try:
+            images = convert_from_bytes(contents)
+            for img in images:
+                text += pytesseract.image_to_string(img)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"OCR processing failed: {e}")
+
+    # Sample hardcoded return logic (can be replaced with regex extraction)
     return {
         "filing_status": "married_filing_jointly" if "joint" in text.lower() else "single",
         "agi": 120000,
         "taxable_income": 100000,
         "total_tax": 18000
     }
+
+   
 
 
 @app.post("/project_tax", summary="Project AGI and tax")
