@@ -10,3 +10,4 @@ pydantic[email]
 email-validator
 python-dotenv
 passlib
+python-jose[cryptography]
