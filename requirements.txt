@@ -8,3 +8,5 @@ pydantic[email]
 fpdf
 pandas
 openpyxl
+pdf2image
+pytesseract
