@@ -66,34 +66,47 @@ from pdf2image import convert_from_bytes
 import pytesseract
 import io
 
-@app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF (with OCR fallback)")
+@app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF with OCR fallback")
 async def parse_1040(file: UploadFile = File(...)):
-    contents = await file.read()
-    text = ""
+    import tempfile
+    import pytesseract
+    from pdf2image import convert_from_bytes
+    import re
 
-    try:
-        # Attempt to read with PyPDF2
-        reader = PdfReader(io.BytesIO(contents))
-        text = "".join(page.extract_text() or "" for page in reader.pages)
-    except Exception as e:
-        print("Standard text extraction failed:", e)
+    def extract_values(text):
+        agi_match = re.search(r"Adjusted Gross Income\s+\$?([0-9,]+)", text, re.IGNORECASE)
+        taxable_income_match = re.search(r"Taxable Income\s+\$?([0-9,]+)", text, re.IGNORECASE)
+        total_tax_match = re.search(r"Total Tax\s+\$?([0-9,]+)", text, re.IGNORECASE)
 
-    if not text.strip():
-        print("No readable text found — using OCR fallback...")
-        try:
-            images = convert_from_bytes(contents)
-            for img in images:
-                text += pytesseract.image_to_string(img)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"OCR processing failed: {e}")
+        agi = int(agi_match.group(1).replace(',', '')) if agi_match else None
+        taxable_income = int(taxable_income_match.group(1).replace(',', '')) if taxable_income_match else None
+        total_tax = int(total_tax_match.group(1).replace(',', '')) if total_tax_match else None
 
-    # Sample hardcoded return logic (can be replaced with regex extraction)
+        return agi, taxable_income, total_tax
+
+    # Step 1: Try standard PDF text extraction
+    reader = PdfReader(file.file)
+    extracted_text = "".join(page.extract_text() or "" for page in reader.pages)
+    agi, taxable_income, total_tax = extract_values(extracted_text)
+
+    # Step 2: If no values found, use OCR
+    if not all([agi, taxable_income, total_tax]):
+        file.file.seek(0)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
+            temp_pdf.write(file.file.read())
+            temp_pdf_path = temp_pdf.name
+
+        images = convert_from_bytes(open(temp_pdf_path, 'rb').read())
+        ocr_text = "\n".join(pytesseract.image_to_string(img) for img in images)
+        agi, taxable_income, total_tax = extract_values(ocr_text)
+
     return {
-        "filing_status": "married_filing_jointly" if "joint" in text.lower() else "single",
-        "agi": 120000,
-        "taxable_income": 100000,
-        "total_tax": 18000
+        "filing_status": "married_filing_jointly" if "joint" in extracted_text.lower() else "single",
+        "agi": agi or 0,
+        "taxable_income": taxable_income or 0,
+        "total_tax": total_tax or 0
     }
+
 
    
 
