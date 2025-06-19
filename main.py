@@ -31,6 +31,84 @@ app.include_router(schedule_c_router)
 app.include_router(rental_router)
 app.include_router(year_end_router)
 app.include_router(csv_excel_router)
+class ActionRequest(BaseModel):
+    action: str
+    tax_year: Optional[int] = None
+    income: Optional[float] = None
+    filing_status: Optional[str] = None
+    additional_input: Optional[str] = None
+
+@app.post("/gpt-tax-router")
+async def tax_router(request: ActionRequest):
+    action_map = {
+        "tax_snapshot_summary": tax_snapshot_summary,
+        "roth_conversion": roth_conversion,
+        "multi_year_bracket": multi_year_bracket,
+        "capital_gains_review": capital_gains_review,
+        "withholding_review": withholding_review,
+        "ira_hsa_review": ira_hsa_review,
+        "deduction_bunching": deduction_bunching,
+        "charitable_giving": charitable_giving,
+        "business_tax_snapshot": business_tax_snapshot,
+        "self_employed_optimizer": self_employed_optimizer,
+        "social_security_planner": social_security_planner,
+        "state_tax_strategy": state_tax_strategy,
+        "aca_health_review": aca_health_review,
+        "real_estate_passive": real_estate_passive,
+        "bracket_analyzer": bracket_analyzer,
+        "year_end_moves": year_end_moves,
+        "client_specific": client_specific,
+        "doc_risk_review": doc_risk_review,
+        "dependent_credit_review": dependent_credit_review,
+        "prompt_helper": prompt_helper
+    }
+
+    if request.action not in action_map:
+        raise HTTPException(status_code=400, detail="Invalid action specified.")
+
+    return action_map[request.action](request)
+
+# === Logic for Each Action ===
+
+def tax_snapshot_summary(req): return {"summary": f"Tax summary for {req.tax_year or 'current year'}"}
+
+def roth_conversion(req): return {"conversion": f"Roth analysis for income {req.income or 'N/A'}"}
+
+def multi_year_bracket(req): return {"multi_year": "Multi-year bracket forecast"}
+
+def capital_gains_review(req): return {"gains": "Capital gains strategy"}
+
+def withholding_review(req): return {"withholding": "Check W-4 or estimated payments"}
+
+def ira_hsa_review(req): return {"ira_hsa": "IRA and HSA review"}
+
+def deduction_bunching(req): return {"bunching": "Itemized vs standard deduction analysis"}
+
+def charitable_giving(req): return {"charity": "DAF and appreciated stock strategies"}
+
+def business_tax_snapshot(req): return {"business": "QBI and entity structure analysis"}
+
+def self_employed_optimizer(req): return {"self_employed": "SEP/Solo 401(k) and deductions"}
+
+def social_security_planner(req): return {"ss": "Claiming strategy and taxability"}
+
+def state_tax_strategy(req): return {"state": "Part-year, residency, and credits"}
+
+def aca_health_review(req): return {"aca": "PTC, health insurance deduction"}
+
+def real_estate_passive(req): return {"real_estate": "Passive losses, RE pro status"}
+
+def bracket_analyzer(req): return {"bracket": "Marginal/effective tax rate"}
+
+def year_end_moves(req): return {"moves": "Year-end tax strategy checklist"}
+
+def client_specific(req): return {"client": "Customized plan based on profile"}
+
+def doc_risk_review(req): return {"risk": "Audit, estate, document checklist"}
+
+def dependent_credit_review(req): return {"credits": "CTC/ACTC multi-year eligibility"}
+
+def prompt_helper(req): return {"prompts": "Reusable prompt guidance"}
 
 
 
