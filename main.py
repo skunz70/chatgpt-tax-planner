@@ -552,4 +552,56 @@ async def compare_scenarios(data: dict):
         }
     }
     return result
+from fpdf import FPDF
+from fastapi.responses import StreamingResponse
+
+class ScenarioComparisonPDF(FPDF):
+    def header(self):
+        self.set_font("Arial", "B", 14)
+        self.cell(0, 10, "Tax Scenario Comparison", ln=True, align="C")
+        self.ln(5)
+
+    def add_scenario_row(self, label, val1, val2):
+        self.set_font("Arial", "", 12)
+        self.cell(60, 10, label, border=1)
+        self.cell(65, 10, str(val1), border=1)
+        self.cell(65, 10, str(val2), border=1)
+        self.ln()
+
+@app.post("/generate_comparison_pdf", summary="Generate side-by-side tax scenario PDF")
+def generate_comparison_pdf(data: dict):
+    scenario1 = data.get("scenario_1", {})
+    scenario2 = data.get("scenario_2", {})
+
+    pdf = ScenarioComparisonPDF()
+    pdf.add_page()
+
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(60, 10, "", border=1)
+    pdf.cell(65, 10, "Scenario 1", border=1)
+    pdf.cell(65, 10, "Scenario 2", border=1)
+    pdf.ln()
+
+    fields = [
+        ("Filing Status", "filing_status"),
+        ("AGI", "agi"),
+        ("Taxable Income", "taxable_income"),
+        ("Total Tax", "total_tax"),
+        ("Effective Rate", "effective_rate"),
+        ("Marginal Rate", "marginal_rate"),
+        ("Estimated Tax Due", "estimated_tax_due"),
+    ]
+
+    for label, key in fields:
+        val1 = scenario1.get(key, "N/A")
+        val2 = scenario2.get(key, "N/A")
+        pdf.add_scenario_row(label, val1, val2)
+
+    buffer = io.BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+
+    return StreamingResponse(buffer, media_type="application/pdf", headers={
+        "Content-Disposition": "inline; filename=scenario_comparison.pdf"
+    })
 
