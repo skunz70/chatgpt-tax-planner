@@ -528,4 +528,28 @@ async def threshold_modeling(data: dict):
         response["warnings"].append("✅ Likely eligible for ACA premium subsidies")
 
     return response
+@app.post("/compare_scenarios", summary="Compare two tax planning scenarios")
+async def compare_scenarios(data: dict):
+    baseline = data.get("baseline", {})
+    alternative = data.get("alternative", {})
+    
+    def compute_projection(inputs):
+        agi = inputs.get("agi", 0) + inputs.get("additional_income", 0)
+        taxable_income = agi - inputs.get("deductions", 0)
+        est_tax = taxable_income * 0.22  # Example marginal rate
+        return {
+            "projected_agi": agi,
+            "taxable_income": taxable_income,
+            "estimated_tax": round(est_tax, 2),
+        }
+
+    result = {
+        "baseline": compute_projection(baseline),
+        "alternative": compute_projection(alternative),
+        "difference": {
+            "agi_diff": compute_projection(alternative)["projected_agi"] - compute_projection(baseline)["projected_agi"],
+            "tax_diff": compute_projection(alternative)["estimated_tax"] - compute_projection(baseline)["estimated_tax"],
+        }
+    }
+    return result
 
