@@ -488,4 +488,44 @@ async def phaseout_checker(data: dict):
         "filing_status": filing_status,
         "phaseout_results": results
     }
+@app.post("/threshold_modeling", summary="Evaluate IRMAA, ACA, and NIIT thresholds")
+async def threshold_modeling(data: dict):
+    filing_status = data.get("filing_status", "married_filing_jointly").lower()
+    agi = data.get("agi", 0)
+    magi = data.get("magi", agi)  # fallback if MAGI isn't separately provided
+
+    response = {"warnings": [], "threshold_results": {}}
+
+    # --- NIIT Threshold ---
+    niit_thresholds = {
+        "single": 200000,
+        "married_filing_jointly": 250000,
+        "head_of_household": 200000,
+        "married_filing_separately": 125000
+    }
+    niit_base = niit_thresholds.get(filing_status, 250000)
+    if magi > niit_base:
+        response["warnings"].append("⚠️ Subject to Net Investment Income Tax (NIIT) of 3.8%")
+        response["threshold_results"]["niit_excess"] = magi - niit_base
+
+    # --- IRMAA (2025 Part B premiums based on 2023 MAGI) ---
+    irmaa_tiers = [
+        (194000, 0), (246000, 1), (306000, 2), (366000, 3), (750000, 4)
+    ] if filing_status == "married_filing_jointly" else [
+        (97000, 0), (123000, 1), (153000, 2), (183000, 3), (500000, 4)
+    ]
+    irmaa_labels = [
+        "Base Premium", "IRMAA Tier 1", "IRMAA Tier 2", "IRMAA Tier 3", "IRMAA Tier 4", "IRMAA Tier 5"
+    ]
+    tier = next((i for i, (limit, _) in enumerate(irmaa_tiers) if magi <= limit), 5)
+    response["threshold_results"]["irmaa_tier"] = irmaa_labels[tier]
+
+    # --- ACA Subsidy Eligibility (FPL guidelines simplified) ---
+    aca_fpl_cutoff = 180000 if filing_status == "married_filing_jointly" else 90000
+    if magi > aca_fpl_cutoff:
+        response["warnings"].append("⚠️ May not qualify for ACA premium subsidies")
+    else:
+        response["warnings"].append("✅ Likely eligible for ACA premium subsidies")
+
+    return response
 
