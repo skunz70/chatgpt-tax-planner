@@ -407,4 +407,29 @@ async def parse_statement(file: UploadFile = File(...)):
         return JSONResponse(content=summary)
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+from fastapi.responses import StreamingResponse
+import matplotlib.pyplot as plt
+import io
+
+@app.post("/visualize_roth_conversion", summary="Visual Roth conversion impact")
+async def visualize_roth_conversion(data: dict):
+    current_agi = data.get("current_agi", 0)
+    conversion_amount = data.get("conversion_amount", 0)
+    new_agi = current_agi + conversion_amount
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    bars = ax.bar(["AGI Before", "AGI After"], [current_agi, new_agi])
+    ax.set_title("Roth Conversion Impact on AGI")
+    ax.set_ylabel("Income ($)")
+    ax.bar_label(bars, fmt="%.0f")
+    ax.grid(axis='y', linestyle='--', alpha=0.7)
+
+    # Save the plot to a buffer
+    buf = io.BytesIO()
+    plt.tight_layout()
+    plt.savefig(buf, format="png")
+    plt.close(fig)
+    buf.seek(0)
+
+    return StreamingResponse(buf, media_type="image/png")
 
