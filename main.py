@@ -432,4 +432,60 @@ async def visualize_roth_conversion(data: dict):
     buf.seek(0)
 
     return StreamingResponse(buf, media_type="image/png")
+@app.post("/phaseout_checker", summary="Detect phaseouts for deductions and credits")
+async def phaseout_checker(data: dict):
+    income = data.get("income", 0)
+    filing_status = data.get("filing_status", "single").lower()
+
+    # 2025 phaseout ranges (simplified examples — update with full brackets as needed)
+    phaseouts = [
+        {
+            "name": "Child Tax Credit",
+            "start": 200000 if filing_status == "single" else 400000,
+            "end": 240000 if filing_status == "single" else 440000,
+        },
+        {
+            "name": "IRA Deduction (active participant)",
+            "start": 77000 if filing_status == "single" else 123000,
+            "end": 87000 if filing_status == "single" else 143000,
+        },
+        {
+            "name": "Roth IRA Contribution",
+            "start": 146000 if filing_status == "single" else 230000,
+            "end": 161000 if filing_status == "single" else 240000,
+        },
+        {
+            "name": "Student Loan Interest Deduction",
+            "start": 75000 if filing_status == "single" else 155000,
+            "end": 90000 if filing_status == "single" else 185000,
+        },
+    ]
+
+    results = []
+
+    for item in phaseouts:
+        if income >= item["start"] and income <= item["end"]:
+            results.append({
+                "item": item["name"],
+                "status": "⚠️ In Phaseout Range",
+                "detail": f"Phaseout begins at ${item['start']:,} and ends at ${item['end']:,}."
+            })
+        elif income > item["end"]:
+            results.append({
+                "item": item["name"],
+                "status": "❌ Fully Phased Out",
+                "detail": f"Income exceeds ${item['end']:,}, item fully disallowed."
+            })
+        else:
+            results.append({
+                "item": item["name"],
+                "status": "✅ Fully Allowed",
+                "detail": f"Income below ${item['start']:,}, full benefit available."
+            })
+
+    return {
+        "income": income,
+        "filing_status": filing_status,
+        "phaseout_results": results
+    }
 
