@@ -19,6 +19,8 @@ from PyPDF2 import PdfReader
 import io
 from csv_excel_keyword import router as csv_excel_router
 from csv_excel_keyword import router as csv_excel_router
+from pydantic import BaseModel
+from typing import Optional
 
 db = {}  # 🔄 Temporary in-memory storage for Render (replaces replit.db)
 
