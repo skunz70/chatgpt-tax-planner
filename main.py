@@ -21,6 +21,9 @@ from csv_excel_keyword import router as csv_excel_router
 from csv_excel_keyword import router as csv_excel_router
 from pydantic import BaseModel
 from typing import Optional
+from matplotlib import pyplot as plt
+from fpdf import FPDF
+from fastapi.responses import StreamingResponse
 
 db = {}  # 🔄 Temporary in-memory storage for Render (replaces replit.db)
 
