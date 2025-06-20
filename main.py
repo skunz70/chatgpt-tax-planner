@@ -655,4 +655,78 @@ async def generate_comparison_pdf(data: dict):
         media_type="application/pdf",
         headers={"Content-Disposition": "inline; filename=scenario_comparison.pdf"}
     )
+from matplotlib import pyplot as plt
+from fpdf import FPDF
+from fastapi.responses import StreamingResponse
+
+@app.post("/generate_comparison_pdf", summary="Generate PDF comparing two tax scenarios")
+async def generate_comparison_pdf(data: dict):
+    import io
+
+    s1 = data.get("scenario_1", {})
+    s2 = data.get("scenario_2", {})
+
+    # Build chart
+    fig, ax = plt.subplots(figsize=(6, 4))
+    labels = ['AGI', 'Tax Liability']
+    scenario1_vals = [s1.get("agi", 0), s1.get("total_tax", 0)]
+    scenario2_vals = [s2.get("agi", 0), s2.get("total_tax", 0)]
+
+    x = range(len(labels))
+    ax.bar([i - 0.2 for i in x], scenario1_vals, width=0.4, label='Scenario 1')
+    ax.bar([i + 0.2 for i in x], scenario2_vals, width=0.4, label='Scenario 2')
+    ax.set_ylabel('Dollars')
+    ax.set_title('Tax Comparison')
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.legend()
+
+    chart_buf = io.BytesIO()
+    plt.tight_layout()
+    plt.savefig(chart_buf, format='png')
+    plt.close()
+    chart_buf.seek(0)
+
+    # Build PDF
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "Tax Scenario Comparison", ln=True, align="C")
+
+    def add_scenario_block(title, s):
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 10, title, ln=True)
+        pdf.set_font("Arial", "", 11)
+        pdf.multi_cell(0, 8,
+            f"Filing Status: {s.get('filing_status', 'N/A')}\n"
+            f"AGI: ${s.get('agi', 0):,.0f}\n"
+            f"Taxable Income: ${s.get('taxable_income', 0):,.0f}\n"
+            f"Total Tax: ${s.get('total_tax', 0):,.0f}\n"
+            f"Effective Tax Rate: {s.get('effective_rate', 'N/A')}\n"
+            f"Marginal Rate: {s.get('marginal_rate', 'N/A')}\n"
+        )
+        pdf.ln(2)
+
+    add_scenario_block("Scenario 1", s1)
+    add_scenario_block("Scenario 2", s2)
+
+    # Add summary
+    delta = s2.get("total_tax", 0) - s1.get("total_tax", 0)
+    delta_txt = f"An increase of ${s2.get('agi', 0) - s1.get('agi', 0):,.0f} in AGI resulted in ${delta:,.0f} more in taxes."
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, "Key Insight", ln=True)
+    pdf.set_font("Arial", "", 11)
+    pdf.multi_cell(0, 8, delta_txt)
+    pdf.ln(3)
+
+    # Embed chart image
+    pdf.image(chart_buf, x=10, y=pdf.get_y(), w=pdf.w - 20)
+    
+    # Export
+    output = io.BytesIO()
+    pdf.output(output)
+    output.seek(0)
+    return StreamingResponse(output, media_type="application/pdf", headers={
+        "Content-Disposition": "inline; filename=comparison.pdf"
+    })
 
