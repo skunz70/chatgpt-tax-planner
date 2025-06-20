@@ -757,4 +757,34 @@ async def state_tax_estimate(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+@app.post("/generate_pdf")
+def generate_pdf(payload: dict):
+    pdf_bytes = generate_tax_plan_pdf(
+        data=payload,
+        logo_path="Valhalla Logo Eagle-Tax Services.jpg"  # Adjust path if logo is in a subfolder
+    )
+    return Response(content=pdf_bytes, media_type="application/pdf")
+@app.post("/generate_comparison_pdf")
+def generate_comparison_pdf(payload: dict):
+    chart_data = {
+        "labels": [payload["scenario_1"]["label"], payload["scenario_2"]["label"]],
+        "values": [payload["scenario_1"]["tax"], payload["scenario_2"]["tax"]]
+    }
+
+    pdf_payload = {
+        "filing_status": payload["filing_status"],
+        "agi": payload["scenario_1"]["agi"],
+        "taxable_income": payload["scenario_1"]["taxable_income"],
+        "total_tax": payload["scenario_1"]["tax"],
+        "marginal_rate": payload["scenario_1"].get("marginal_rate", "N/A"),
+        "strategies": payload.get("strategies", []),
+        "comparison_chart_data": chart_data
+    }
+
+    pdf_bytes = generate_tax_plan_pdf(
+        data=pdf_payload,
+        logo_path="Valhalla Logo Eagle-Tax Services.jpg"
+    )
+
+    return Response(content=pdf_bytes, media_type="application/pdf")
 
