@@ -604,4 +604,58 @@ def generate_comparison_pdf(data: dict):
     return StreamingResponse(buffer, media_type="application/pdf", headers={
         "Content-Disposition": "inline; filename=scenario_comparison.pdf"
     })
+from matplotlib import pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+
+@app.post("/generate_comparison_pdf", summary="Generate a PDF comparing two tax scenarios")
+async def generate_comparison_pdf(data: dict):
+    import io
+
+    s1 = data.get("scenario_1", {})
+    s2 = data.get("scenario_2", {})
+
+    # Setup PDF
+    buffer = io.BytesIO()
+    with PdfPages(buffer) as pdf:
+        fig, ax = plt.subplots(figsize=(8.5, 11))
+
+        # Title
+        ax.set_title("Tax Scenario Comparison", fontsize=16, pad=20)
+        ax.axis("off")
+
+        # Table text layout
+        lines = [
+            f"Filing Status: {s1.get('filing_status', 'N/A')}",
+            "",
+            "Scenario 1",
+            f"AGI: ${s1.get('agi', 0):,.0f}",
+            f"Taxable Income: ${s1.get('taxable_income', 0):,.0f}",
+            f"Total Tax: ${s1.get('total_tax', 0):,.0f}",
+            f"Effective Rate: {s1.get('effective_rate', 'N/A')}",
+            f"Marginal Rate: {s1.get('marginal_rate', 'N/A')}",
+            "",
+            "Scenario 2",
+            f"AGI: ${s2.get('agi', 0):,.0f}",
+            f"Taxable Income: ${s2.get('taxable_income', 0):,.0f}",
+            f"Total Tax: ${s2.get('total_tax', 0):,.0f}",
+            f"Effective Rate: {s2.get('effective_rate', 'N/A')}",
+            f"Marginal Rate: {s2.get('marginal_rate', 'N/A')}",
+            "",
+            "Key Insights:",
+            f"AGI Change: ${s2.get('agi', 0) - s1.get('agi', 0):,.0f}",
+            f"Tax Difference: ${s2.get('total_tax', 0) - s1.get('total_tax', 0):,.0f}",
+        ]
+
+        for i, line in enumerate(lines):
+            ax.text(0.1, 1 - 0.05 * i, line, fontsize=12, va="top")
+
+        pdf.savefig(fig, bbox_inches="tight")
+        plt.close(fig)
+
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline; filename=scenario_comparison.pdf"}
+    )
 
