@@ -606,6 +606,7 @@ def generate_comparison_pdf(data: dict):
     })
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+from fastapi.responses import StreamingResponse
 
 @app.post("/generate_comparison_pdf", summary="Generate a PDF comparing two tax scenarios")
 async def generate_comparison_pdf(data: dict):
@@ -614,16 +615,12 @@ async def generate_comparison_pdf(data: dict):
     s1 = data.get("scenario_1", {})
     s2 = data.get("scenario_2", {})
 
-    # Setup PDF
     buffer = io.BytesIO()
     with PdfPages(buffer) as pdf:
         fig, ax = plt.subplots(figsize=(8.5, 11))
-
-        # Title
         ax.set_title("Tax Scenario Comparison", fontsize=16, pad=20)
         ax.axis("off")
 
-        # Table text layout
         lines = [
             f"Filing Status: {s1.get('filing_status', 'N/A')}",
             "",
@@ -641,7 +638,7 @@ async def generate_comparison_pdf(data: dict):
             f"Effective Rate: {s2.get('effective_rate', 'N/A')}",
             f"Marginal Rate: {s2.get('marginal_rate', 'N/A')}",
             "",
-            "Key Insights:",
+            "Key Insight:",
             f"AGI Change: ${s2.get('agi', 0) - s1.get('agi', 0):,.0f}",
             f"Tax Difference: ${s2.get('total_tax', 0) - s1.get('total_tax', 0):,.0f}",
         ]
