@@ -24,6 +24,7 @@ from typing import Optional
 from matplotlib import pyplot as plt
 from fpdf import FPDF
 from fastapi.responses import StreamingResponse
+from arizona_tax import calculate_arizona_tax
 
 db = {}  # 🔄 Temporary in-memory storage for Render (replaces replit.db)
 
@@ -732,4 +733,9 @@ async def generate_comparison_pdf(data: dict):
     return StreamingResponse(output, media_type="application/pdf", headers={
         "Content-Disposition": "inline; filename=comparison.pdf"
     })
+@app.post("/state_tax_arizona", summary="Estimate Arizona state income tax")
+async def state_tax_arizona(data: dict):
+    agi = data.get("agi", 0)
+    filing_status = data.get("filing_status", "single")
+    return calculate_arizona_tax(agi, filing_status)
 
