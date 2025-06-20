@@ -25,6 +25,7 @@ from matplotlib import pyplot as plt
 from fpdf import FPDF
 from fastapi.responses import StreamingResponse
 from arizona_tax import calculate_arizona_tax
+from report_generator import generate_tax_plan_pdf
 
 db = {}  # 🔄 Temporary in-memory storage for Render (replaces replit.db)
 
