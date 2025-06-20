@@ -738,4 +738,22 @@ async def state_tax_arizona(data: dict):
     agi = data.get("agi", 0)
     filing_status = data.get("filing_status", "single")
     return calculate_arizona_tax(agi, filing_status)
+from fastapi import Body
+from state_tax_data import calculate_state_tax
+
+@app.post("/state_tax_estimate", summary="Estimate state tax based on income and state")
+async def state_tax_estimate(
+    income: float = Body(..., embed=True),
+    state: str = Body(..., embed=True)
+):
+    try:
+        result = calculate_state_tax(income, state)
+        return {
+            "state": state.upper(),
+            "income": income,
+            "estimated_state_tax": result["state_tax"],
+            "effective_rate": result["effective_rate"]
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
