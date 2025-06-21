@@ -787,4 +787,13 @@ def generate_comparison_pdf(payload: dict):
     )
 
     return Response(content=pdf_bytes, media_type="application/pdf")
+from fastapi.responses import Response
+
+@app.post("/generate_pdf")
+def generate_pdf(payload: dict):
+    pdf_bytes = generate_tax_plan_pdf(
+        data=payload,
+        logo_path="Valhalla Logo Eagle-Tax Services.jpg"  # Adjust path if needed
+    )
+    return Response(content=pdf_bytes, media_type="application/pdf")
 
