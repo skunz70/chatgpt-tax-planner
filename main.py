@@ -255,26 +255,20 @@ class PDFReport(FPDF):
         self.multi_cell(0, 10, content)
         self.ln()
 
+from fastapi.responses import Response
+from report_generator import generate_tax_plan_pdf
+
 @app.post("/generate_pdf")
-def generate_pdf(data: dict):
-    pdf = PDFReport()
-    pdf.add_page()
+def generate_pdf(payload: dict):
+    try:
+        pdf_bytes = generate_tax_plan_pdf(
+            data=payload,
+            logo_path="Valhalla Logo Eagle-Tax Services.jpg"  # ✅ Make sure filename matches
+        )
+        return Response(content=pdf_bytes, media_type="application/pdf")
+    except Exception as e:
+        return {"error": f"PDF generation failed: {str(e)}"}
 
-    # Example sections using sample fields
-    pdf.add_section("Filing Status", data.get("filing_status", "N/A"))
-    pdf.add_section("Adjusted Gross Income (AGI)", f"${data.get('agi', 0):,.2f}")
-    pdf.add_section("Taxable Income", f"${data.get('taxable_income', 0):,.2f}")
-    pdf.add_section("Total Tax", f"${data.get('total_tax', 0):,.2f}")
-
-    strategies = data.get("strategies", [])
-    if strategies:
-        strategy_text = "\n".join(f"- {s}" for s in strategies)
-        pdf.add_section("Recommended Strategies", strategy_text)
-
-    buffer = io.BytesIO()
-    pdf.output(buffer)
-    buffer.seek(0)
-    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": "inline; filename=tax_planning_report.pdf"})
 @app.post("/parse_bank_statement", summary="Extract data from a bank statement PDF")
 async def parse_bank_statement(file: UploadFile = File(...)):
     reader = PdfReader(file.file)
