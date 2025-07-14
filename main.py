@@ -27,17 +27,25 @@ from fastapi.responses import StreamingResponse
 from arizona_tax import calculate_arizona_tax
 from report_generator import generate_tax_plan_pdf
 
+
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+# --- CORS setup starts here ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://tax-strategy-frontend.onrender.com"],  # only frontend origin
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-) 
+)
+# --- CORS setup ends here ---
+
+# Then your routers:
+app.include_router(roth_router)
+# ... other routers
+
 
 
 db = {}  # 🔄 Temporary in-memory storage for Render (replaces replit.db)
