@@ -26,6 +26,18 @@ from fpdf import FPDF
 from fastapi.responses import StreamingResponse
 from arizona_tax import calculate_arizona_tax
 from report_generator import generate_tax_plan_pdf
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 db = {}  # 🔄 Temporary in-memory storage for Render (replaces replit.db)
 
