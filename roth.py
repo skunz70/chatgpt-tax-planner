@@ -8,7 +8,8 @@ class RothInput(BaseModel):
     conversion_amount: float
     filing_status: str
 
-@router.post("/roth_projection")
+@router.post("/roth_projection", tags=["roth"], include_in_schema=True)
+
 def roth_projection(data: RothInput):
     brackets = {
         "single": [
