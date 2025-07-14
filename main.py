@@ -35,11 +35,12 @@ app = FastAPI()
 # --- CORS setup starts here ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://tax-strategy-frontend.onrender.com"],  # only frontend origin
+    allow_origins=["*"],  # (Allows all—temporary testing only)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 # --- CORS setup ends here ---
 
 # Then your routers:
