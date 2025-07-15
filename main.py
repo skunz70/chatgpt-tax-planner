@@ -32,40 +32,30 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# --- CORS setup starts here ---
+# --- ✅ CORS setup starts here ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # (Allows all—temporary testing only)
+    allow_origins=["https://tax-strategy-frontend.onrender.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-from fastapi.responses import JSONResponse
-
-@app.options("/roth_projection")
-async def preflight_roth():
-    return JSONResponse(
-        content={},
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
-        }
-    )
+# --- ✅ CORS setup ends here ---
 
 
-# --- CORS setup ends here ---
+
+
+
 
 # Then your routers:
-app.include_router(roth_router)
+
 # ... other routers
 
 
 
 db = {}  # 🔄 Temporary in-memory storage for Render (replaces replit.db)
 
-app = FastAPI()
+
 app.include_router(roth_router)
 app.include_router(cap_gains_router)
 app.include_router(schedule_c_router)
