@@ -26,6 +26,7 @@ from fpdf import FPDF
 from fastapi.responses import StreamingResponse
 from arizona_tax import calculate_arizona_tax
 from report_generator import generate_tax_plan_pdf
+from multi_year_roth import router as multi_year_roth_router
 
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -55,6 +56,7 @@ app.add_middleware(
 
 db = {}  # 🔄 Temporary in-memory storage for Render (replaces replit.db)
 
+app.include_router(multi_year_roth_router)
 
 app.include_router(roth_router)
 app.include_router(cap_gains_router)
