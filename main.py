@@ -40,6 +40,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.options("/roth_projection")
+async def preflight_roth():
+    return {}
 
 # --- CORS setup ends here ---
 
