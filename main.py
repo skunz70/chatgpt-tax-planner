@@ -40,9 +40,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+from fastapi.responses import Response
+
 @app.options("/roth_projection")
 async def preflight_roth():
-    return {}
+    headers = {
+        "Access-Control-Allow-Origin": "*",  # or specific origin
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    }
+    return Response(status_code=204, headers=headers)
+
 
 # --- CORS setup ends here ---
 
