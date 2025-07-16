@@ -98,6 +98,65 @@ async def tax_router(request: ActionRequest):
 
     if request.action not in action_map:
         raise HTTPException(status_code=400, detail="Invalid action specified.")
+@app.post("/multi_year_roth_projection")
+async def multi_year_roth_projection(data: dict):
+    agi = data.get("current_agi", 0)
+    conversion_amount = data.get("conversion_amount", 0)
+    filing_status = data.get("filing_status", "single")
+
+    brackets = {
+        "single": [
+            (0, 11000, "10%"),
+            (11001, 44725, "12%"),
+            (44726, 95375, "22%"),
+            (95376, 182100, "24%"),
+            (182101, 231250, "32%"),
+            (231251, 578125, "35%"),
+            (578126, float("inf"), "37%"),
+        ],
+        "married_filing_jointly": [
+            (0, 22000, "10%"),
+            (22001, 89450, "12%"),
+            (89451, 190750, "22%"),
+            (190751, 364200, "24%"),
+            (364201, 462500, "32%"),
+            (462501, 693750, "35%"),
+            (693751, float("inf"), "37%"),
+        ]
+    }
+
+    selected = brackets.get(filing_status.lower(), brackets["single"])
+    converted_agi = agi + conversion_amount
+
+    for start, end, rate in selected:
+        if start <= converted_agi <= end:
+            return {
+                "original_agi": agi,
+                "new_agi": converted_agi,
+                "marginal_rate": rate,
+                "bracket": f"${start:,} – ${end:,}",
+            }
+
+    return {"error": "Could not determine bracket"}
+
+
+    selected = brackets.get(filing_status.lower(), brackets["single"])
+    converted_agi = agi + conversion_amount
+
+    for start, end, rate in selected:
+        if start <= converted_agi <= end:
+            return {
+                "original_agi": agi,
+                "new_agi": converted_agi,
+                "marginal_rate": rate,
+                "bracket": f"${start:,} – ${end:,}",
+            }
+
+    return {"error": "Could not determine bracket"}
+}
+
+    if request.action not in action_map:
+        raise HTTPException(status_code=400, detail="Invalid action specified.")
 
     return action_map[request.action](request)
 
