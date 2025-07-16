@@ -99,6 +99,9 @@ async def tax_router(request: ActionRequest):
     if request.action not in action_map:
         raise HTTPException(status_code=400, detail="Invalid action specified.")
 
+    return action_map[request.action](request)
+
+
 
     selected = brackets.get(filing_status.lower(), brackets["single"])
     converted_agi = agi + conversion_amount
