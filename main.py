@@ -131,7 +131,6 @@ async def tax_router(request: ActionRequest):
             }
 
     return {"error": "Could not determine bracket"}
-}
 
     if request.action not in action_map:
         raise HTTPException(status_code=400, detail="Invalid action specified.")
