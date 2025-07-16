@@ -901,4 +901,30 @@ async def multi_year_roth_projection(data: dict):
                 break
 
     return {"projection": results}
+@app.post("/capital_gains_projection")
+async def capital_gains_projection(data: dict):
+    filing_status = data.get("filing_status", "single")
+    ordinary_income = data.get("ordinary_income", 0)
+    capital_gains = data.get("capital_gains", 0)
+
+    # Example 2025 capital gains brackets
+    thresholds = {
+        "single": [(0, 44725, "0%"), (44726, 492300, "15%"), (492301, float("inf"), "20%")],
+        "married_filing_jointly": [(0, 89450, "0%"), (89451, 553850, "15%"), (553851, float("inf"), "20%")]
+    }
+
+    selected = thresholds.get(filing_status.lower(), thresholds["single"])
+    taxable = ordinary_income + capital_gains
+
+    for start, end, rate in selected:
+        if start <= taxable <= end:
+            return {
+                "filing_status": filing_status,
+                "ordinary_income": ordinary_income,
+                "capital_gains": capital_gains,
+                "estimated_tax": capital_gains * float(rate.strip('%')) / 100,
+                "capital_gains_rate": rate
+            }
+
+    return {"error": "Could not determine capital gains tax rate"}
 
