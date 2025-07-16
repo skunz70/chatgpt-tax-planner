@@ -56,7 +56,7 @@ app.add_middleware(
 
 db = {}  # 🔄 Temporary in-memory storage for Render (replaces replit.db)
 
-app.include_router(multi_year_roth_router)
+
 
 app.include_router(roth_router)
 app.include_router(cap_gains_router)
@@ -98,32 +98,7 @@ async def tax_router(request: ActionRequest):
 
     if request.action not in action_map:
         raise HTTPException(status_code=400, detail="Invalid action specified.")
-@app.post("/multi_year_roth_projection")
-async def multi_year_roth_projection(data: dict):
-    agi = data.get("current_agi", 0)
-    conversion_amount = data.get("conversion_amount", 0)
-    filing_status = data.get("filing_status", "single")
 
-    brackets = {
-        "single": [
-            (0, 11000, "10%"),
-            (11001, 44725, "12%"),
-            (44726, 95375, "22%"),
-            (95376, 182100, "24%"),
-            (182101, 231250, "32%"),
-            (231251, 578125, "35%"),
-            (578126, float("inf"), "37%"),
-        ],
-        "married_filing_jointly": [
-            (0, 22000, "10%"),
-            (22001, 89450, "12%"),
-            (89451, 190750, "22%"),
-            (190751, 364200, "24%"),
-            (364201, 462500, "32%"),
-            (462501, 693750, "35%"),
-            (693751, float("inf"), "37%"),
-        ]
-    }
 
     selected = brackets.get(filing_status.lower(), brackets["single"])
     converted_agi = agi + conversion_amount
@@ -877,4 +852,51 @@ def generate_pdf(payload: dict):
         logo_path="Valhalla Logo Eagle-Tax Services.jpg"  # Adjust path if needed
     )
     return Response(content=pdf_bytes, media_type="application/pdf")
+@app.post("/multi_year_roth_projection")
+async def multi_year_roth_projection(data: dict):
+    agi = data.get("current_agi", 0)
+    contributions = data.get("roth_contributions", [])
+    filing_status = data.get("filing_status", "single")
+
+    brackets = {
+        "single": [
+            (0, 11000, "10%"),
+            (11001, 44725, "12%"),
+            (44726, 95375, "22%"),
+            (95376, 182100, "24%"),
+            (182101, 231250, "32%"),
+            (231251, 578125, "35%"),
+            (578126, float("inf"), "37%"),
+        ],
+        "married_filing_jointly": [
+            (0, 22000, "10%"),
+            (22001, 89450, "12%"),
+            (89451, 190750, "22%"),
+            (190751, 364200, "24%"),
+            (364201, 462500, "32%"),
+            (462501, 693750, "35%"),
+            (693751, float("inf"), "37%"),
+        ]
+    }
+
+    selected = brackets.get(filing_status.lower(), brackets["single"])
+    results = []
+
+    for i, amount in enumerate(contributions):
+        year = 2025 + i
+        new_agi = agi + amount
+
+        for start, end, rate in selected:
+            if start <= new_agi <= end:
+                results.append({
+                    "year": year,
+                    "original_agi": agi,
+                    "conversion_amount": amount,
+                    "new_agi": new_agi,
+                    "marginal_rate": rate,
+                    "bracket": f"${start:,} – ${end:,}",
+                })
+                break
+
+    return {"projection": results}
 
