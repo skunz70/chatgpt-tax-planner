@@ -975,6 +975,53 @@ def rental_analysis(data: dict):
         "annual_depreciation": annual_depreciation,
         "passive_loss_warning": passive_loss_warning
     }
+from fastapi import Body
+
+@app.post("/retirement_contribution_projection")
+def retirement_contribution_projection(
+    current_agi: float = Body(...),
+    contribution_amount: float = Body(...),
+    filing_status: str = Body(...)
+):
+    # Assume contributions are fully deductible
+    new_agi = current_agi - contribution_amount
+
+    # Simplified bracket ranges (2025 estimates)
+    brackets = {
+        "single": [
+            (0, 11000, 0.10),
+            (11001, 44725, 0.12),
+            (44726, 95375, 0.22),
+            (95376, 182100, 0.24),
+        ],
+        "married_filing_jointly": [
+            (0, 22000, 0.10),
+            (22001, 89450, 0.12),
+            (89451, 190750, 0.22),
+            (190751, 364200, 0.24),
+        ]
+    }
+
+    def find_bracket(agi):
+        for low, high, rate in brackets.get(filing_status, []):
+            if low <= agi <= high:
+                return f"${low:,} – ${high:,}", rate
+        return "Over highest bracket", 0.32
+
+    original_bracket, original_rate = find_bracket(current_agi)
+    new_bracket, new_rate = find_bracket(new_agi)
+
+    tax_savings = contribution_amount * original_rate  # Approximate
+
+    return {
+        "original_agi": current_agi,
+        "new_agi": new_agi,
+        "contribution": contribution_amount,
+        "tax_savings": tax_savings,
+        "original_bracket": original_bracket,
+        "new_bracket": new_bracket,
+        "marginal_rate": f"{int(original_rate * 100)}%",
+    }
 
     return {"error": "Could not determine capital gains tax rate"}
 
