@@ -27,6 +27,17 @@ from fastapi.responses import StreamingResponse
 from arizona_tax import calculate_arizona_tax
 from report_generator import generate_tax_plan_pdf
 from multi_year_roth import router as multi_year_roth_router
+from pydantic import BaseModel
+
+class YearEndPlanInput(BaseModel):
+    filing_status: str
+    w2_income: float = 0
+    business_income: float = 0
+    capital_gains: float = 0
+    itemized_deductions: float = 0
+    retirement_contributions: float = 0
+    hsa_contributions: float = 0
+    estimated_payments: float = 0
 
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -1022,6 +1033,38 @@ def retirement_contribution_projection(
         "new_bracket": new_bracket,
         "marginal_rate": f"{int(original_rate * 100)}%",
     }
+@app.post("/year_end_plan")
+async def year_end_plan(input: YearEndPlanInput):
+    try:
+        agi = (
+            input.w2_income
+            + input.business_income
+            + input.capital_gains
+            - input.retirement_contributions
+            - input.hsa_contributions
+        )
+        taxable_income = max(0, agi - input.itemized_deductions)
+        estimated_tax = round(taxable_income * 0.22, 2)  # Simplified estimate
 
-    return {"error": "Could not determine capital gains tax rate"}
+        strategies = []
+        if input.retirement_contributions < 23000:
+            strategies.append("Increase 401(k) contributions to reduce taxable income.")
+        if input.hsa_contributions < 8300:
+            strategies.append("Maximize HSA contributions for additional deduction.")
+        if input.itemized_deductions < 13000:
+            strategies.append("Explore bunching deductions before year-end.")
+        if input.estimated_payments < estimated_tax:
+            strategies.append("Make an estimated tax payment to avoid penalties.")
+
+        return {
+            "agi": round(agi, 2),
+            "taxable_income": round(taxable_income, 2),
+            "estimated_tax": estimated_tax,
+            "strategies": strategies,
+            "year_end_deadline": "December 31, 2025",
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+   
 
