@@ -902,10 +902,10 @@ async def multi_year_roth_projection(data: dict):
 
     return {"projection": results}
 @app.post("/capital_gains_projection")
-async def capital_gains_projection(data: dict):
-    filing_status = data.get("filing_status", "single")
+def capital_gains_projection(data: dict):
     ordinary_income = data.get("ordinary_income", 0)
     capital_gains = data.get("capital_gains", 0)
+    filing_status = data.get("filing_status", "single")
 
     # Example 2025 capital gains brackets
     thresholds = {
