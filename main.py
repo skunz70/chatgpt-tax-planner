@@ -925,6 +925,23 @@ def capital_gains_projection(data: dict):
                 "estimated_tax": capital_gains * float(rate.strip('%')) / 100,
                 "capital_gains_rate": rate
             }
+@app.post("/schedule_c_projection")
+async def schedule_c_projection(data: dict):
+    revenue = data.get("revenue", 0)
+    expenses = data.get("expenses", 0)
+    profit = revenue - expenses
+
+    # Simple self-employment tax + income tax example
+    se_tax = profit * 0.153  # ~15.3% FICA
+    income_tax = profit * 0.22  # assume 22% rate
+    total_tax = round(se_tax + income_tax, 2)
+
+    return {
+        "profit": profit,
+        "self_employment_tax": round(se_tax, 2),
+        "estimated_income_tax": round(income_tax, 2),
+        "total_tax": total_tax
+    }
 
     return {"error": "Could not determine capital gains tax rate"}
 
