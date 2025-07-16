@@ -53,6 +53,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # --- ✅ CORS setup ends here ---
+from fastapi.responses import Response
+from report_generator import generate_tax_plan_pdf
 
 
 
@@ -1065,6 +1067,47 @@ async def year_end_plan(input: YearEndPlanInput):
         }
     except Exception as e:
         return {"error": str(e)}
+@app.post("/quick_entry_plan", summary="Generate a full tax plan from basic inputs")
+async def quick_entry_plan(data: dict):
+    filing_status = data.get("filing_status", "single")
+    agi = data.get("w2_income", 0) + data.get("business_income", 0) + data.get("dividend_income", 0)
+    
+    # Step 1 – Threshold analysis
+    threshold_result = await threshold_modeling({
+        "filing_status": filing_status,
+        "agi": agi,
+        "magi": agi
+    })
+
+    # Step 2 – Recommend strategies
+    strategy_result = await recommend({
+        "agi": agi,
+        "filing_status": filing_status,
+        "business_income": data.get("business_income", 0),
+        "retirement_plan_type": "401k"
+    })
+
+    # Step 3 – Build PDF payload
+    taxable_income = max(0, agi - data.get("itemized_deductions", 0))
+    estimated_tax = round(taxable_income * 0.22, 2)
+    pdf_payload = {
+        "filing_status": filing_status,
+        "agi": agi,
+        "taxable_income": taxable_income,
+        "total_tax": estimated_tax,
+        "marginal_rate": "22%",
+        "strategies": strategy_result["strategies"],
+        "comparison_chart_data": {
+            "labels": ["AGI", "Est. Tax"],
+            "values": [agi, estimated_tax]
+        }
+    }
+
+    from report_generator import generate_tax_plan_pdf
+    pdf_bytes = generate_tax_plan_pdf(data=pdf_payload, logo_path="Valhalla Logo Eagle-Tax Services.jpg")
+
+    from fastapi.responses import Response
+    return Response(content=pdf_bytes, media_type="application/pdf")
 
    
 
