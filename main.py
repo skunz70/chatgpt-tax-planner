@@ -942,6 +942,39 @@ async def schedule_c_projection(data: dict):
         "estimated_income_tax": round(income_tax, 2),
         "total_tax": total_tax
     }
+@app.post("/rental_analysis")
+def rental_analysis(data: dict):
+    rental_income = data.get("rental_income", 0) or 0
+    expenses = data.get("expenses", 0) or 0
+    mortgage_interest = data.get("mortgage_interest", 0) or 0
+    property_tax = data.get("property_tax", 0) or 0
+    insurance = data.get("insurance", 0) or 0
+    repairs = data.get("repairs", 0) or 0
+    purchase_price = data.get("purchase_price", 0) or 0
+    land_value = data.get("land_value", 0) or 0
+    filing_status = data.get("filing_status", "single")
+    active_participation = data.get("active_participation", True)
+
+    # Depreciation
+    depreciable_basis = purchase_price - land_value
+    annual_depreciation = depreciable_basis / 27.5 if depreciable_basis > 0 else 0
+
+    total_expenses = expenses + mortgage_interest + property_tax + insurance + repairs + annual_depreciation
+    cash_flow = rental_income - (expenses + mortgage_interest + property_tax + insurance + repairs)
+    taxable_income = rental_income - total_expenses
+
+    # Passive loss warning logic
+    passive_loss_warning = ""
+    if taxable_income < 0 and not active_participation:
+        passive_loss_warning = "Loss may be limited due to passive activity rules."
+
+    return {
+        "rental_income": rental_income,
+        "cash_flow": cash_flow,
+        "taxable_income": taxable_income,
+        "annual_depreciation": annual_depreciation,
+        "passive_loss_warning": passive_loss_warning
+    }
 
     return {"error": "Could not determine capital gains tax rate"}
 
