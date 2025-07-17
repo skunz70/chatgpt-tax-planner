@@ -86,6 +86,8 @@ class ActionRequest(BaseModel):
 
 @app.post("/gpt-tax-router")
 async def tax_router(request: ActionRequest):
+    data = request.dict()
+
     action_map = {
         "tax_snapshot_summary": tax_snapshot_summary,
         "roth_conversion": roth_conversion,
