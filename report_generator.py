@@ -79,3 +79,49 @@ def generate_tax_plan_pdf(data, logo_path=None):
 
     # Output as binary
     return pdf.output(dest="S").encode("latin1")
+from fpdf import FPDF
+
+def generate_smart_strategy_pdf(payload: dict) -> bytes:
+    pdf = FPDF(orientation="P", unit="mm", format="Letter")
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    # Logo
+    try:
+        pdf.image("Valhalla Logo Eagle-Tax Services.jpg", x=160, y=10, w=40)
+    except:
+        pass  # Fails silently if logo missing
+
+    # Title
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 20, "Smart Strategy Report", ln=True)
+
+    # Section: Summary
+    pdf.set_font("Helvetica", "", 12)
+    pdf.cell(0, 10, f"Filing Status: {payload['filing_status'].title()}", ln=True)
+    pdf.cell(0, 10, f"Adjusted Gross Income (AGI): ${payload['agi']:,.2f}", ln=True)
+    pdf.cell(0, 10, f"Taxable Income: ${payload['taxable_income']:,.2f}", ln=True)
+    pdf.cell(0, 10, f"Estimated Tax: ${payload['estimated_tax']:,.2f}", ln=True)
+
+    # Section: Strategy Summary
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.cell(0, 10, "Suggested Strategies", ln=True)
+    pdf.set_font("Helvetica", "", 11)
+    for strategy in payload["strategy_summary"]:
+        pdf.multi_cell(0, 8, f"- {strategy}")
+
+    # Section: Phaseout Thresholds
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.cell(0, 10, "Phaseout/Threshold Alerts", ln=True)
+    pdf.set_font("Helvetica", "", 11)
+    for flag in payload["threshold_flags"]:
+        pdf.multi_cell(0, 8, f"⚠️ {flag}")
+
+    # Footer
+    pdf.set_y(-30)
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.cell(0, 10, "Valhalla Tax Services | www.valhallataxservice.com | (623) 887-7921", ln=True, align="C")
+
+    return pdf.output(dest="S").encode("latin-1")
