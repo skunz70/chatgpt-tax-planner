@@ -1204,33 +1204,32 @@ async def quick_entry_plan(data: dict):
 async def smart_strategy_report(data):
     agi = data.get("agi", 0)
     filing_status = data.get("filing_status", "single")
-    business_income = data.get("business_income", 0)
-    retirement_contributions = data.get("retirement_contributions", 0)
 
-    strategy_bundle = await generate_smart_strategies({
+    strategy_result = await recommend({
         "agi": agi,
         "filing_status": filing_status,
-        "business_income": business_income,
-        "retirement_contributions": retirement_contributions
+        "business_income": data.get("business_income", 0),
+        "retirement_plan_type": "401k"
     })
 
-    taxable_income = max(0, agi - data.get("itemized_deductions", 0))
-    estimated_tax = round(taxable_income * 0.22, 2)
+    threshold_result = await threshold_modeling({
+        "agi": agi,
+        "magi": agi,
+        "filing_status": filing_status
+    })
 
+    # 📄 Step 3 – Build PDF payload
     pdf_payload = {
         "filing_status": filing_status,
         "agi": agi,
-        "taxable_income": taxable_income,
-        "total_tax": estimated_tax,
-        "marginal_rate": "22%",
-        "strategies": strategy_bundle["strategies"],
-        "comparison_chart_data": {
-            "labels": ["AGI", "Est. Tax"],
-            "values": [agi, estimated_tax]
-        }
+        "taxable_income": agi - 13000,  # TODO: refine logic for deductions
+        "estimated_tax": threshold_result.get("estimated_tax", 0),
+        "strategy_summary": strategy_result.get("strategies", []),
+        "threshold_flags": threshold_result.get("threshold_flags", [])
     }
 
-    pdf_bytes = generate_tax_plan_pdf(pdf_payload)
+    # 📄 Step 4 – Generate PDF file
+    pdf_bytes = generate_smart_strategy_pdf(pdf_payload)
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
 
 
