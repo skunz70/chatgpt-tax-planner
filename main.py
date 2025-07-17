@@ -1067,27 +1067,39 @@ async def year_end_plan(input: YearEndPlanInput):
         }
     except Exception as e:
         return {"error": str(e)}
-@app.post("/quick_entry_plan", summary="Generate a full tax plan from basic inputs")
+@app.post("/quick_entry_plan")
 async def quick_entry_plan(data: dict):
     filing_status = data.get("filing_status", "single")
-    agi = data.get("w2_income", 0) + data.get("business_income", 0) + data.get("dividend_income", 0)
-    
-    # Step 1 – Threshold analysis
+    w2_income = data.get("w2_income", 0)
+    business_income = data.get("business_income", 0)
+    capital_gains = data.get("capital_gains", 0)
+    dividend_income = data.get("dividend_income", 0)
+    retirement_contributions = data.get("retirement_contributions", 0)
+
+    agi = (
+        w2_income
+        + business_income
+        + capital_gains
+        + dividend_income
+        - retirement_contributions
+    )
+
+    # Step 1 – Run threshold modeling
     threshold_result = threshold_modeling({
-    "filing_status": filing_status,
-    "agi": agi,
-    "magi": agi
-})
+        "filing_status": filing_status,
+        "agi": agi,
+        "magi": agi
+    })
 
-strategy_result = recommend({
-    "agi": agi,
-    "filing_status": filing_status,
-    "business_income": data.get("business_income", 0),
-    "retirement_plan_type": "401k"
-})
+    # Step 2 – Recommend strategies
+    strategy_result = recommend({
+        "agi": agi,
+        "filing_status": filing_status,
+        "business_income": data.get("business_income", 0),
+        "retirement_plan_type": "401k"
+    })
 
-
-        # Step 3 – Build PDF payload
+    # Step 3 – Build PDF payload
     taxable_income = max(0, agi - data.get("itemized_deductions", 0))
     estimated_tax = round(taxable_income * 0.22, 2)
     pdf_payload = {
@@ -1103,12 +1115,7 @@ strategy_result = recommend({
         }
     }
 
+    # Step 4 – Generate PDF
+    pdf_bytes = generate_tax_plan_pdf(pdf_payload)
 
-    from report_generator import generate_tax_plan_pdf
-    pdf_bytes = generate_tax_plan_pdf(data=pdf_payload, logo_path="Valhalla Logo Eagle-Tax Services.jpg")
-
-    from fastapi.responses import Response
-    return Response(content=pdf_bytes, media_type="application/pdf")
-
-   
-
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
