@@ -167,7 +167,7 @@ async def tax_router(request: ActionRequest):
         "doc_risk_review": doc_risk_review,
         "dependent_credit_review": dependent_credit_review,
         "prompt_helper": prompt_helper,
-        "quick_entry_plan": quick_entry_plan  # ✅ NEW shortcut action
+        "quick_entry_plan": quick_entry_plan,  # ✅ NEW shortcut action
         "smart_strategy_report": smart_strategy_report,
 
     }
