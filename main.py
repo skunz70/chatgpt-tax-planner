@@ -168,6 +168,8 @@ async def tax_router(request: ActionRequest):
         "dependent_credit_review": dependent_credit_review,
         "prompt_helper": prompt_helper,
         "quick_entry_plan": quick_entry_plan  # ✅ NEW shortcut action
+        "smart_strategy_report": smart_strategy_report,
+
     }
 
     if request.action not in action_map:
@@ -1179,6 +1181,38 @@ async def quick_entry_plan(data: dict):
     # Step 4 – Generate PDF
     pdf_bytes = generate_tax_plan_pdf(pdf_payload)
 
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
+# === Smart Strategy PDF Report Handler ===
+async def smart_strategy_report(data):
+    agi = data.get("agi", 0)
+    filing_status = data.get("filing_status", "single")
+    business_income = data.get("business_income", 0)
+    retirement_contributions = data.get("retirement_contributions", 0)
+
+    strategy_bundle = await generate_smart_strategies({
+        "agi": agi,
+        "filing_status": filing_status,
+        "business_income": business_income,
+        "retirement_contributions": retirement_contributions
+    })
+
+    taxable_income = max(0, agi - data.get("itemized_deductions", 0))
+    estimated_tax = round(taxable_income * 0.22, 2)
+
+    pdf_payload = {
+        "filing_status": filing_status,
+        "agi": agi,
+        "taxable_income": taxable_income,
+        "total_tax": estimated_tax,
+        "marginal_rate": "22%",
+        "strategies": strategy_bundle["strategies"],
+        "comparison_chart_data": {
+            "labels": ["AGI", "Est. Tax"],
+            "values": [agi, estimated_tax]
+        }
+    }
+
+    pdf_bytes = generate_tax_plan_pdf(pdf_payload)
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
 
 
