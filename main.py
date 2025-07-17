@@ -28,6 +28,12 @@ from arizona_tax import calculate_arizona_tax
 from report_generator import generate_tax_plan_pdf
 from multi_year_roth import router as multi_year_roth_router
 from pydantic import BaseModel
+class ActionRequest(BaseModel):
+    action: str
+    income: float | None = None
+    filing_status: str | None = None
+    tax_year: str | None = "2025"
+    additional_input: str | None = None
 
 class YearEndPlanInput(BaseModel):
     filing_status: str
