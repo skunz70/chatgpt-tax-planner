@@ -1073,19 +1073,19 @@ async def quick_entry_plan(data: dict):
     agi = data.get("w2_income", 0) + data.get("business_income", 0) + data.get("dividend_income", 0)
     
     # Step 1 – Threshold analysis
-    threshold_result = await threshold_modeling({
-        "filing_status": filing_status,
-        "agi": agi,
-        "magi": agi
-    })
+    threshold_result = threshold_modeling({
+    "filing_status": filing_status,
+    "agi": agi,
+    "magi": agi
+})
 
-    # Step 2 – Recommend strategies
-    strategy_result = await recommend({
-        "agi": agi,
-        "filing_status": filing_status,
-        "business_income": data.get("business_income", 0),
-        "retirement_plan_type": "401k"
-    })
+strategy_result = recommend({
+    "agi": agi,
+    "filing_status": filing_status,
+    "business_income": data.get("business_income", 0),
+    "retirement_plan_type": "401k"
+})
+
 
     # Step 3 – Build PDF payload
     taxable_income = max(0, agi - data.get("itemized_deductions", 0))
