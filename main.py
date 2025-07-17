@@ -1,32 +1,35 @@
 from fastapi import FastAPI, status, HTTPException, Depends, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.responses import RedirectResponse
-from schemas import UserOut, UserAuth, TokenSchema, SystemUser
+from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+
 from uuid import uuid4
+import pytesseract
+from pdf2image import convert_from_bytes
+from PyPDF2 import PdfReader
+import io
+from matplotlib import pyplot as plt
+from fpdf import FPDF
+from typing import Optional
+
+from schemas import UserOut, UserAuth, TokenSchema, SystemUser
 from utils import get_hashed_password, create_access_token, create_refresh_token, verify_password
 from deps import get_current_user
-from PyPDF2 import PdfReader
+
+# Custom routers
 from roth import router as roth_router
 from cap_gains import router as cap_gains_router
 from schedule_c import router as schedule_c_router
 from rental_analysis import router as rental_router
 from year_end_planning import router as year_end_router
-from fastapi import UploadFile, File
-from fastapi.responses import JSONResponse
-import pytesseract
-from pdf2image import convert_from_bytes
-from PyPDF2 import PdfReader
-import io
 from csv_excel_keyword import router as csv_excel_router
-from csv_excel_keyword import router as csv_excel_router
-from pydantic import BaseModel
-from typing import Optional
-from matplotlib import pyplot as plt
-from fpdf import FPDF
-from fastapi.responses import StreamingResponse
-from arizona_tax import calculate_arizona_tax
-from report_generator import generate_tax_plan_pdf
 from multi_year_roth import router as multi_year_roth_router
+
+# Tax logic and PDF generation
+from arizona_tax import calculate_arizona_tax
+from report_generator import generate_tax_plan_pdf, generate_smart_strategy_pdf
+
+
 from pydantic import BaseModel
 class ActionRequest(BaseModel):
     action: str
