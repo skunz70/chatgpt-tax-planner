@@ -77,12 +77,36 @@ app.include_router(schedule_c_router)
 app.include_router(rental_router)
 app.include_router(year_end_router)
 app.include_router(csv_excel_router)
-class ActionRequest(BaseModel):
-    action: str
-    tax_year: Optional[int] = None
-    income: Optional[float] = None
-    filing_status: Optional[str] = None
-    additional_input: Optional[str] = None
+async def quick_entry_plan(data):
+    w2_income = data.get("w2_income", 0)
+    business_income = data.get("business_income", 0)
+    capital_gains = data.get("capital_gains", 0)
+    dividend_income = data.get("dividend_income", 0)
+    retirement_contributions = data.get("retirement_contributions", 0)
+    itemized_deductions = data.get("itemized_deductions", 0)
+    estimated_payments = data.get("estimated_payments", 0)
+    filing_status = data.get("filing_status", "single")
+
+    agi = w2_income + business_income + capital_gains + dividend_income - retirement_contributions
+
+    threshold_result = await threshold_modeling({
+        "filing_status": filing_status,
+        "agi": agi,
+        "magi": agi
+    })
+
+    strategy_result = await recommend({
+        "agi": agi,
+        "filing_status": filing_status,
+        "business_income": business_income,
+        "retirement_plan_type": "401k"
+    })
+
+    return {
+        "agi": agi,
+        "thresholds": threshold_result,
+        "strategies": strategy_result
+    }
 
 @app.post("/gpt-tax-router")
 async def tax_router(request: ActionRequest):
@@ -108,15 +132,14 @@ async def tax_router(request: ActionRequest):
         "client_specific": client_specific,
         "doc_risk_review": doc_risk_review,
         "dependent_credit_review": dependent_credit_review,
-        "prompt_helper": prompt_helper
-        "quick_entry_plan": quick_entry_plan
-
+        "prompt_helper": prompt_helper,
+        "quick_entry_plan": quick_entry_plan  # ✅ NEW shortcut action
     }
 
     if request.action not in action_map:
         raise HTTPException(status_code=400, detail="Invalid action specified.")
 
-    return action_map[request.action](request)
+    return await action_map[request.action](data)
 
 
 
@@ -1124,34 +1147,4 @@ async def quick_entry_plan(data: dict):
 
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
 
-async def quick_entry_plan(data):
-    w2_income = data.get("w2_income", 0)
-    business_income = data.get("business_income", 0)
-    capital_gains = data.get("capital_gains", 0)
-    dividend_income = data.get("dividend_income", 0)
-    retirement_contributions = data.get("retirement_contributions", 0)
-    itemized_deductions = data.get("itemized_deductions", 0)
-    estimated_payments = data.get("estimated_payments", 0)
-    filing_status = data.get("filing_status", "single")
-
-    agi = w2_income + business_income + capital_gains + dividend_income - retirement_contributions
-
-    threshold_result = await threshold_modeling({
-        "filing_status": filing_status,
-        "agi": agi,
-        "magi": agi
-    })
-
-    strategy_result = await recommend({
-        "agi": agi,
-        "filing_status": filing_status,
-        "business_income": business_income,
-        "retirement_plan_type": "401k"
-    })
-
-    return {
-        "agi": agi,
-        "thresholds": threshold_result,
-        "strategies": strategy_result
-    }
 
