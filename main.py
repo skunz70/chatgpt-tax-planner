@@ -61,6 +61,34 @@ app.add_middleware(
 # --- ✅ CORS setup ends here ---
 from fastapi.responses import Response
 from report_generator import generate_tax_plan_pdf
+# === Smart Strategy Generator ===
+async def generate_smart_strategies(data):
+    agi = data.get("agi", 0)
+    filing_status = data.get("filing_status", "single")
+    business_income = data.get("business_income", 0)
+    retirement_contributions = data.get("retirement_contributions", 0)
+
+    # Phaseout + threshold modeling
+    threshold_result = await threshold_modeling({
+        "filing_status": filing_status,
+        "agi": agi,
+        "magi": agi
+    })
+
+    # Strategy recommendations
+    strategy_result = await recommend({
+        "agi": agi,
+        "filing_status": filing_status,
+        "business_income": business_income,
+        "retirement_plan_type": "401k"
+    })
+
+    return {
+        "agi": agi,
+        "filing_status": filing_status,
+        "thresholds": threshold_result,
+        "strategies": strategy_result
+    }
 
 
 
