@@ -1123,3 +1123,35 @@ async def quick_entry_plan(data: dict):
     pdf_bytes = generate_tax_plan_pdf(pdf_payload)
 
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
+
+async def quick_entry_plan(data):
+    w2_income = data.get("w2_income", 0)
+    business_income = data.get("business_income", 0)
+    capital_gains = data.get("capital_gains", 0)
+    dividend_income = data.get("dividend_income", 0)
+    retirement_contributions = data.get("retirement_contributions", 0)
+    itemized_deductions = data.get("itemized_deductions", 0)
+    estimated_payments = data.get("estimated_payments", 0)
+    filing_status = data.get("filing_status", "single")
+
+    agi = w2_income + business_income + capital_gains + dividend_income - retirement_contributions
+
+    threshold_result = await threshold_modeling({
+        "filing_status": filing_status,
+        "agi": agi,
+        "magi": agi
+    })
+
+    strategy_result = await recommend({
+        "agi": agi,
+        "filing_status": filing_status,
+        "business_income": business_income,
+        "retirement_plan_type": "401k"
+    })
+
+    return {
+        "agi": agi,
+        "thresholds": threshold_result,
+        "strategies": strategy_result
+    }
+
