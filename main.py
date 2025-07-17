@@ -1087,7 +1087,7 @@ strategy_result = recommend({
 })
 
 
-    # Step 3 – Build PDF payload
+        # Step 3 – Build PDF payload
     taxable_income = max(0, agi - data.get("itemized_deductions", 0))
     estimated_tax = round(taxable_income * 0.22, 2)
     pdf_payload = {
@@ -1102,6 +1102,7 @@ strategy_result = recommend({
             "values": [agi, estimated_tax]
         }
     }
+
 
     from report_generator import generate_tax_plan_pdf
     pdf_bytes = generate_tax_plan_pdf(data=pdf_payload, logo_path="Valhalla Logo Eagle-Tax Services.jpg")
