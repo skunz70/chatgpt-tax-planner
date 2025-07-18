@@ -1260,36 +1260,14 @@ class StrategyROIInput(BaseModel):
     ]
 
 from fastapi.responses import FileResponse
-import tempfile
 from fpdf import FPDF
+import tempfile
 
-class LandscapePDF(FPDF):
-    def __init__(self):
-        super().__init__(orientation='L', unit='mm', format='A4')
-        self.set_auto_page_break(auto=True, margin=15)
-
-    def header(self):
-        self.set_font("Helvetica", "B", 16)
-        self.cell(0, 10, "ROI-Based Tax Strategy Report", ln=True, align="C")
-        self.ln(5)
-
-    def add_section_title(self, title):
-        self.set_font("Helvetica", "B", 14)
-        self.cell(0, 10, title, ln=True)
-        self.set_draw_color(0, 0, 0)
-        self.line(10, self.get_y(), 285, self.get_y())
-        self.ln(4)
-
-    def add_key_value(self, label, value):
-        self.set_font("Helvetica", "", 12)
-        self.cell(70, 10, label, border=0)
-        self.cell(0, 10, str(value), ln=True)
-
-    def add_paragraph(self, text):
-        self.set_font("Helvetica", "", 12)
-        self.multi_cell(0, 8, str(text))
-        self.ln(2)
-
+def safe_text(value):
+    try:
+        return str(value).encode('latin-1', errors='replace').decode('latin-1')
+    except Exception:
+        return str(value)
 
 @app.post("/generate_strategy_with_roi")
 def generate_strategy_with_roi(data: StrategyROIInput):
@@ -1303,8 +1281,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     standard_deduction = 15000 if data.filing_status == "single" else 30000
     deduction = max(standard_deduction, data.itemized_deductions)
     taxable_income = max(0, agi - deduction)
-
-    tax_liability = round(taxable_income * 0.22, 2)
+    estimated_tax = round(taxable_income * 0.22, 2)
 
     strategies = [
         {
@@ -1317,19 +1294,15 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         },
         {
             "title": "Max out HSA if eligible",
-            "description": "If enrolled in a high-deductible health plan, you can contribute up to $8,300 (family) pre-tax. HSAs are triple tax-advantaged and lower AGI."
+            "description": "If enrolled in a high-deductible health plan, you can contribute up to $8,300 (family) pre-tax. HSAs are triple-tax advantaged."
         },
         {
             "title": "S Corporation Election",
-            "description": "Shifting $40,000 of business income to an S-Corp could reduce self-employment tax liability significantly. Consider a reasonable salary split to capture savings."
+            "description": "Switching to an S Corp can save self-employment tax on profits above a reasonable salary. Typical savings for $40,000 profit: ~$4,000+."
         },
         {
-            "title": "Roth IRA Conversion",
-            "description": "Consider converting $10,000 of traditional IRA to Roth at a 22% marginal rate. Long-term tax-free growth may outweigh the upfront tax cost."
-        },
-        {
-            "title": "Capital Loss Harvesting",
-            "description": "Offset $5,000 in capital gains with realized losses in your brokerage account. Use this before year-end for tax efficiency."
+            "title": "Roth Conversion",
+            "description": "Consider converting part of pre-tax funds to Roth while in a lower tax bracket. Pay tax now, enjoy tax-free growth later."
         }
     ]
 
@@ -1337,33 +1310,48 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         return {
             "agi": round(agi, 2),
             "taxable_income": round(taxable_income, 2),
-            "estimated_tax": tax_liability,
+            "estimated_federal_tax": estimated_tax,
             "strategies": strategies
         }
 
-    # Generate styled PDF
-    pdf = LandscapePDF()
+    # ✅ Begin styled PDF generation
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
     pdf.add_page()
-    pdf.add_section_title("Summary")
-    pdf.add_key_value("Filing Status:", data.filing_status.replace("_", " ").title())
-    pdf.add_key_value("W-2 Income:", f"${data.w2_income:,.0f}")
-    pdf.add_key_value("Business Income:", f"${data.business_income:,.0f}")
-    pdf.add_key_value("Capital Gains:", f"${data.capital_gains:,.0f}")
-    pdf.add_key_value("Dividend Income:", f"${data.dividend_income:,.0f}")
-    pdf.add_key_value("Retirement Contributions:", f"${data.retirement_contributions:,.0f}")
-    pdf.add_key_value("Itemized Deductions:", f"${data.itemized_deductions:,.0f}")
-    pdf.add_key_value("Adjusted Gross Income (AGI):", f"${agi:,.0f}")
-    pdf.add_key_value("Taxable Income:", f"${taxable_income:,.0f}")
-    pdf.add_key_value("Estimated Federal Tax:", f"${tax_liability:,.0f}")
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, safe_text("ROI-Based Tax Strategy Report"), ln=True, align="C")
 
-    pdf.ln(5)
-    pdf.add_section_title("Strategy Recommendations with ROI Rationale")
+    pdf.set_font("Helvetica", "", 12)
+    pdf.ln(8)
 
-    for idx, strat in enumerate(strategies, start=1):
+    summary_lines = [
+        f"Filing Status: {data.filing_status}",
+        f"W-2 Income: ${data.w2_income:,.0f}",
+        f"Business Income: ${data.business_income:,.0f}",
+        f"Capital Gains: ${data.capital_gains:,.0f}",
+        f"Dividend Income: ${data.dividend_income:,.0f}",
+        f"Retirement Contributions: ${data.retirement_contributions:,.0f}",
+        f"Itemized Deductions: ${data.itemized_deductions:,.0f}",
+        f"Adjusted Gross Income (AGI): ${agi:,.0f}",
+        f"Taxable Income: ${taxable_income:,.0f}",
+        f"Estimated Federal Tax: ${estimated_tax:,.0f}"
+    ]
+
+    for line in summary_lines:
+        pdf.cell(0, 8, safe_text(line), ln=True)
+
+    pdf.ln(10)
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 10, "Strategy Recommendations with ROI Rationale", ln=True)
+    pdf.ln(4)
+
+    pdf.set_font("Helvetica", "", 12)
+    for idx, strat in enumerate(strategies, 1):
         pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 10, f"{idx}. {strat['title']}", ln=True)
-        pdf.add_paragraph(strat["description"])
+        pdf.cell(0, 8, f"{idx}. {safe_text(strat['title'])}", ln=True)
+        pdf.set_font("Helvetica", "", 11)
+        pdf.multi_cell(0, 7, safe_text(strat['description']))
+        pdf.ln(3)
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-    pdf.output(tmp.name)
-    return FileResponse(tmp.name, media_type='application/pdf', filename="strategy_roi_report.pdf")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        pdf.output(tmp.name)
+        return FileResponse(tmp.name, media_type='application/pdf', filename="roi_tax_strategy.pdf")
