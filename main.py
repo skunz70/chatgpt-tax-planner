@@ -1260,12 +1260,12 @@ class StrategyROIInput(BaseModel):
     ]
 
 from fastapi.responses import FileResponse
-import tempfile
 from fpdf import FPDF
+import tempfile
 
 def safe_text(value):
     try:
-        return str(value).encode('latin-1', errors='replace').decode('latin-1')
+        return str(value).encode("latin-1", errors="replace").decode("latin-1")
     except Exception:
         return str(value)
 
@@ -1291,7 +1291,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "name": "Roth Conversion",
             "tax_cost": round(roth_tax_cost, 2),
             "roi": round(roth_future_savings - roth_tax_cost, 2),
-            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, save approximately ${roth_future_savings:.2f} over time."
+            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, save ~${roth_future_savings:.2f} over time."
         })
 
     if "s_corp_election" in data.strategy_flags and data.business_income > 30000:
@@ -1320,28 +1320,29 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "strategies": strategies
         }
 
-    # Generate the PDF
-    pdf = FPDF(orientation='L', unit='mm', format='A4')
+    # PDF Section
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
     pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.set_font("Helvetica", size=12)
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, safe_text("Tax Strategy Report"), ln=True)
 
-    pdf.cell(0, 10, safe_text("ROI-Based Tax Strategy Report"), ln=True)
-    pdf.ln(5)
+    pdf.set_font("Helvetica", "", 12)
+    pdf.ln(4)
     pdf.cell(0, 10, safe_text(f"Filing Status: {data.filing_status.replace('_', ' ').title()}"), ln=True)
     pdf.cell(0, 10, safe_text(f"Adjusted Gross Income (AGI): ${agi:,.2f}"), ln=True)
     pdf.cell(0, 10, safe_text(f"Taxable Income: ${taxable_income:,.2f}"), ln=True)
-    pdf.ln(10)
+    pdf.ln(6)
 
     for strategy in strategies:
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 10, safe_text(f"Strategy: {strategy['name']}"), ln=True)
-        pdf.set_font("Helvetica", size=12)
-        pdf.cell(0, 10, safe_text(f"Tax Cost: ${strategy['tax_cost']:,.2f}"), ln=True)
-        pdf.cell(0, 10, safe_text(f"ROI: ${strategy['roi']:,.2f}"), ln=True)
-        pdf.multi_cell(0, 10, safe_text(f"Summary: {strategy['summary']}"))
-        pdf.ln(5)
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 8, safe_text(f"Strategy: {strategy['name']}"), ln=True)
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-        pdf.output(tmp_file.name)
-        return FileResponse(tmp_file.name, media_type='application/pdf', filename="roi_tax_strategy.pdf")
+        pdf.set_font("Helvetica", "", 12)
+        pdf.cell(0, 8, safe_text(f"Tax Cost: ${strategy['tax_cost']:,.2f}"), ln=True)
+        pdf.cell(0, 8, safe_text(f"ROI: ${strategy['roi']:,.2f}"), ln=True)
+        pdf.multi_cell(0, 8, safe_text(f"Details: {strategy['summary']}"))
+        pdf.ln(4)
+
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    pdf.output(tmp_file.name)
+    return FileResponse(tmp_file.name, media_type="application/pdf", filename="strategy_report.pdf")
