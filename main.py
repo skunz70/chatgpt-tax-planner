@@ -1260,17 +1260,12 @@ class StrategyROIInput(BaseModel):
     ]
 
 from fastapi.responses import FileResponse
-import tempfile
 from fpdf import FPDF
-
-class PDF(FPDF):
-    def header(self):
-        self.set_font("Helvetica", "B", 14)
-        self.cell(0, 10, "ROI-Based Tax Strategy Report", ln=True, align="C")
-        self.ln(10)
+import tempfile
 
 def safe_text(value):
     try:
+        # Ensure value is string and filter out unsupported characters
         return str(value).encode('latin-1', errors='replace').decode('latin-1')
     except Exception:
         return str(value)
@@ -1287,7 +1282,6 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     standard_deduction = 15000 if data.filing_status == "single" else 30000
     deduction = max(standard_deduction, data.itemized_deductions)
     taxable_income = max(0, agi - deduction)
-    est_tax = round(taxable_income * 0.22, 2)
 
     strategies = []
 
@@ -1324,46 +1318,33 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         return {
             "agi": round(agi, 2),
             "taxable_income": round(taxable_income, 2),
-            "estimated_tax": est_tax,
             "strategies": strategies
         }
 
-    # Generate PDF
-    pdf = PDF(orientation='L', unit='mm', format='A4')
+    # Start PDF generation
+    pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
-    pdf.set_font("Helvetica", "", 12)
+    pdf.set_font("Helvetica", size=12)
 
-    fields = [
-        ("Filing Status", data.filing_status),
-        ("W-2 Income", f"${data.w2_income:,.0f}"),
-        ("Business Income", f"${data.business_income:,.0f}"),
-        ("Capital Gains", f"${data.capital_gains:,.0f}"),
-        ("Dividend Income", f"${data.dividend_income:,.0f}"),
-        ("Retirement Contributions", f"${data.retirement_contributions:,.0f}"),
-        ("Itemized Deductions", f"${data.itemized_deductions:,.0f}"),
-        ("Adjusted Gross Income (AGI)", f"${agi:,.0f}"),
-        ("Taxable Income", f"${taxable_income:,.0f}"),
-        ("Estimated Federal Tax", f"${est_tax:,.0f}")
-    ]
+    pdf.cell(0, 10, txt=safe_text("ROI-Based Tax Strategy Report"), ln=True, align='C')
+    pdf.ln(5)
+    pdf.set_font("Helvetica", size=10)
 
-    for label, value in fields:
-        pdf.cell(90, 10, txt=safe_text(f"{label}:"), ln=0)
-        pdf.cell(0, 10, txt=safe_text(f"{value}"), ln=1)
-
+    pdf.cell(0, 8, txt=safe_text(f"Filing Status: {data.filing_status.replace('_', ' ').title()}"), ln=True)
+    pdf.cell(0, 8, txt=safe_text(f"AGI: ${agi:,.2f}"), ln=True)
+    pdf.cell(0, 8, txt=safe_text(f"Taxable Income: ${taxable_income:,.2f}"), ln=True)
     pdf.ln(8)
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 10, txt="Strategy Recommendations with ROI Rationale", ln=True)
-    pdf.ln(2)
 
     for idx, strategy in enumerate(strategies, start=1):
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 10, txt=safe_text(f"{idx}. {strategy['name']}"), ln=True)
-        pdf.set_font("Helvetica", "", 11)
-        pdf.cell(0, 10, txt=safe_text(f"Tax Cost: ${strategy['tax_cost']:.2f}"), ln=True)
-        pdf.cell(0, 10, txt=safe_text(f"ROI: ${strategy['roi']:.2f}"), ln=True)
-        pdf.multi_cell(0, 8, txt=safe_text(strategy['summary']))
-        pdf.ln(4)
+        pdf.set_font("Helvetica", style="B", size=11)
+        pdf.cell(0, 8, txt=safe_text(f"{idx}. {strategy['name']}"), ln=True)
+        pdf.set_font("Helvetica", size=10)
+        pdf.cell(0, 8, txt=safe_text(f"   Tax Cost: ${strategy['tax_cost']:,.2f}"), ln=True)
+        pdf.cell(0, 8, txt=safe_text(f"   ROI: ${strategy['roi']:,.2f}"), ln=True)
+        pdf.multi_cell(0, 8, txt=safe_text(f"   {strategy['summary']}"))
+        pdf.ln(3)
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-        pdf.output(tmp_file.name)
-        return FileResponse(tmp_file.name, media_type="application/pdf", filename="tax_strategy_report.pdf")
+    # Save to temp file and return
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        pdf.output(tmp.name)
+        return FileResponse(tmp.name, media_type="application/pdf", filename="tax_strategy_report.pdf")
