@@ -1231,5 +1231,77 @@ async def smart_strategy_report(data):
     # 📄 Step 4 – Generate PDF file
     pdf_bytes = generate_smart_strategy_pdf(pdf_payload)
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
+from fastapi import APIRouter
+from pydantic import BaseModel
+from typing import Optional, List
+
+class StrategyROIInput(BaseModel):
+    filing_status: str
+    w2_income: float
+    business_income: float
+    capital_gains: float
+    dividend_income: float
+    retirement_contributions: float
+    itemized_deductions: float
+    estimated_payments: float
+    state: Optional[str] = "AZ"
+    show_pdf: Optional[bool] = False
+    strategy_flags: Optional[List[str]] = [
+        "roth_conversion", "s_corp_election", "aca_optimization"
+    ]
+
+@app.post("/generate_strategy_with_roi")
+def generate_strategy_with_roi(data: StrategyROIInput):
+    # Step 1: Calculate AGI and Taxable Income
+    agi = (
+        data.w2_income +
+        data.business_income +
+        data.capital_gains +
+        data.dividend_income -
+        data.retirement_contributions
+    )
+    standard_deduction = 15000 if data.filing_status == "single" else 30000
+    deduction = max(standard_deduction, data.itemized_deductions)
+    taxable_income = max(0, agi - deduction)
+
+    # Step 2: Mock ROI Calculations
+    strategies = []
+
+    if "roth_conversion" in data.strategy_flags and data.business_income > 0:
+        roth_tax_cost = 0.22 * data.business_income
+        roth_future_savings = roth_tax_cost * 2.5  # Assume 250% lifetime tax savings
+        strategies.append({
+            "name": "Roth Conversion",
+            "tax_cost": round(roth_tax_cost, 2),
+            "roi": round(roth_future_savings - roth_tax_cost, 2),
+            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, save ~${roth_future_savings:.2f} over time."
+        })
+
+    if "s_corp_election" in data.strategy_flags and data.business_income > 30000:
+        payroll = 0.6 * data.business_income
+        se_tax_savings = 0.153 * (data.business_income - payroll)
+        strategies.append({
+            "name": "S-Corp Election",
+            "tax_cost": 0,
+            "roi": round(se_tax_savings, 2),
+            "summary": f"Elect S-Corp. Reasonable salary: ${payroll:.0f}. Estimated SE tax savings: ${se_tax_savings:.2f}."
+        })
+
+    if "aca_optimization" in data.strategy_flags and taxable_income < 75000:
+        subsidy_value = 3200
+        strategies.append({
+            "name": "ACA Subsidy Preservation",
+            "tax_cost": 0,
+            "roi": subsidy_value,
+            "summary": f"Estimated ACA subsidy retained: ${subsidy_value:.2f} by keeping income under $75,000."
+        })
+
+    response = {
+        "agi": round(agi, 2),
+        "taxable_income": round(taxable_income, 2),
+        "strategies": strategies
+    }
+
+    return response
 
 
