@@ -10,6 +10,14 @@ from PyPDF2 import PdfReader
 import io
 from matplotlib import pyplot as plt
 from fpdf import FPDF
+def safe_text(text: str) -> str:
+    """
+    Ensures the text is safe for FPDF by encoding to Latin-1 and replacing unsupported characters.
+    """
+    if not text:
+        return ""
+    return text.encode("latin-1", "replace").decode("latin-1")
+
 from typing import Optional
 
 from schemas import UserOut, UserAuth, TokenSchema, SystemUser
