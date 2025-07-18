@@ -1260,31 +1260,37 @@ class StrategyROIInput(BaseModel):
     ]
 
 from fastapi.responses import FileResponse
-import tempfile
 from fpdf import FPDF
+import tempfile
+
+def safe_text(value):
+    try:
+        return str(value).encode('latin-1', errors='ignore').decode('latin-1')
+    except Exception:
+        return str(value)
 
 class StyledStrategyPDF(FPDF):
     def header(self):
         self.set_font("Helvetica", 'B', 16)
-        self.cell(0, 10, "Tax Strategy ROI Report", ln=True, align="C")
+        self.cell(0, 10, safe_text("Tax Strategy ROI Report"), ln=True, align="C")
         self.ln(5)
 
     def add_summary(self, agi, taxable_income, est_tax, total_roi):
         self.set_font("Helvetica", '', 12)
-        self.cell(0, 10, f"Adjusted Gross Income (AGI): ${agi:,.2f}", ln=True)
-        self.cell(0, 10, f"Taxable Income: ${taxable_income:,.2f}", ln=True)
-        self.cell(0, 10, f"Estimated Tax Liability: ${est_tax:,.2f}", ln=True)
-        self.cell(0, 10, f"Total Projected ROI from Strategies: ${total_roi:,.2f}", ln=True)
+        self.cell(0, 10, safe_text(f"Adjusted Gross Income (AGI): ${agi:,.2f}"), ln=True)
+        self.cell(0, 10, safe_text(f"Taxable Income: ${taxable_income:,.2f}"), ln=True)
+        self.cell(0, 10, safe_text(f"Estimated Tax Liability: ${est_tax:,.2f}"), ln=True)
+        self.cell(0, 10, safe_text(f"Total ROI from Strategies: ${total_roi:,.2f}"), ln=True)
         self.ln(5)
 
     def add_strategy_section(self, strategies):
         for strategy in strategies:
             self.set_font("Helvetica", 'B', 13)
-            self.cell(0, 10, f"Strategy: {strategy['name']}", ln=True)
+            self.cell(0, 10, safe_text(f"Strategy: {strategy['name']}"), ln=True)
             self.set_font("Helvetica", '', 12)
-            self.cell(0, 10, f"Tax Cost: ${strategy['tax_cost']:,.2f}", ln=True)
-            self.cell(0, 10, f"ROI: ${strategy['roi']:,.2f}", ln=True)
-            self.multi_cell(0, 10, f"Summary: {strategy['summary']}")
+            self.cell(0, 10, safe_text(f"Tax Cost: ${strategy['tax_cost']:,.2f}"), ln=True)
+            self.cell(0, 10, safe_text(f"ROI: ${strategy['roi']:,.2f}"), ln=True)
+            self.multi_cell(0, 10, safe_text(f"Summary: {strategy['summary']}"))
             self.ln(3)
             self.line(self.l_margin, self.get_y(), self.w - self.r_margin, self.get_y())
             self.ln(5)
@@ -1298,40 +1304,37 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         data.dividend_income -
         data.retirement_contributions
     )
-    standard_deduction = 15000 if data.filing_status == "single" else 30000
-    deduction = max(standard_deduction, data.itemized_deductions)
+    std_deduction = 15000 if data.filing_status == "single" else 30000
+    deduction = max(std_deduction, data.itemized_deductions)
     taxable_income = max(0, agi - deduction)
     est_tax = round(taxable_income * 0.22, 2)
 
     strategies = []
-
     if "roth_conversion" in data.strategy_flags and data.business_income > 0:
-        roth_tax_cost = 0.22 * data.business_income
-        roth_future_savings = roth_tax_cost * 2.5
+        tax_cost = 0.22 * data.business_income
+        savings = tax_cost * 2.5
         strategies.append({
             "name": "Roth Conversion",
-            "tax_cost": round(roth_tax_cost, 2),
-            "roi": round(roth_future_savings - roth_tax_cost, 2),
-            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, save ~${roth_future_savings:.2f} over time."
+            "tax_cost": round(tax_cost, 2),
+            "roi": round(savings - tax_cost, 2),
+            "summary": f"Convert ${data.business_income} to Roth. Pay ${tax_cost:.2f} now, save ~${savings:.2f} over time."
         })
-
     if "s_corp_election" in data.strategy_flags and data.business_income > 30000:
         payroll = 0.6 * data.business_income
-        se_tax_savings = 0.153 * (data.business_income - payroll)
+        savings = 0.153 * (data.business_income - payroll)
         strategies.append({
             "name": "S-Corp Election",
             "tax_cost": 0,
-            "roi": round(se_tax_savings, 2),
-            "summary": f"Elect S-Corp. Reasonable salary: ${payroll:.0f}. Estimated SE tax savings: ${se_tax_savings:.2f}."
+            "roi": round(savings, 2),
+            "summary": f"Elect S-Corp. Salary: ${payroll:.0f}. SE tax savings: ${savings:.2f}."
         })
-
     if "aca_optimization" in data.strategy_flags and taxable_income < 75000:
-        subsidy_value = 3200
+        subsidy = 3200
         strategies.append({
-            "name": "ACA Subsidy Preservation",
+            "name": "ACA Subsidy Optimization",
             "tax_cost": 0,
-            "roi": subsidy_value,
-            "summary": f"Estimated ACA subsidy retained: ${subsidy_value:.2f} by keeping income under $75,000."
+            "roi": subsidy,
+            "summary": f"Preserve ACA subsidy worth ${subsidy:.2f} by keeping taxable income below $75,000."
         })
 
     if not data.show_pdf:
@@ -1342,9 +1345,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "strategies": strategies
         }
 
-    # PDF generation
-    total_roi = sum(s["roi"] for s in strategies)
-
+    total_roi = sum(s['roi'] for s in strategies)
     pdf = StyledStrategyPDF(orientation="L")
     pdf.add_page()
     pdf.add_summary(agi, taxable_income, est_tax, total_roi)
@@ -1352,4 +1353,4 @@ def generate_strategy_with_roi(data: StrategyROIInput):
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         pdf.output(tmp.name)
-        return FileResponse(path=tmp.name, media_type="application/pdf", filename="strategy_roi_report.pdf")
+        return FileResponse(tmp.name, media_type="application/pdf", filename="roi_tax_strategy.pdf")
