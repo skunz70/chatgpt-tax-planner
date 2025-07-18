@@ -1263,10 +1263,11 @@ from fastapi.responses import FileResponse
 import tempfile
 from fpdf import FPDF
 
-def safe_text(text: str) -> str:
-    if not text:
-        return ""
-    return str(text).encode('latin-1', 'replace').decode('latin-1')
+def safe_text(value):
+    try:
+        return str(value).encode('latin-1', errors='replace').decode('latin-1')
+    except Exception:
+        return str(value)
 
 @app.post("/generate_strategy_with_roi")
 def generate_strategy_with_roi(data: StrategyROIInput):
@@ -1290,7 +1291,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "name": "Roth Conversion",
             "tax_cost": round(roth_tax_cost, 2),
             "roi": round(roth_future_savings - roth_tax_cost, 2),
-            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, save ~${roth_future_savings:.2f} over time."
+            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, save approximately ${roth_future_savings:.2f} over time."
         })
 
     if "s_corp_election" in data.strategy_flags and data.business_income > 30000:
@@ -1319,15 +1320,14 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "strategies": strategies
         }
 
-    # ✅ Begin bulletproof PDF generation
-    pdf = FPDF(orientation="L", unit="mm", format="A4")
-    pdf.set_auto_page_break(auto=True, margin=15)
+    # Generate the PDF
+    pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
-    pdf.set_font("Helvetica", size=14)
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_font("Helvetica", size=12)
 
     pdf.cell(0, 10, safe_text("ROI-Based Tax Strategy Report"), ln=True)
-    pdf.ln(4)
-    pdf.set_font("Helvetica", size=12)
+    pdf.ln(5)
     pdf.cell(0, 10, safe_text(f"Filing Status: {data.filing_status.replace('_', ' ').title()}"), ln=True)
     pdf.cell(0, 10, safe_text(f"Adjusted Gross Income (AGI): ${agi:,.2f}"), ln=True)
     pdf.cell(0, 10, safe_text(f"Taxable Income: ${taxable_income:,.2f}"), ln=True)
@@ -1336,12 +1336,12 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     for strategy in strategies:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 10, safe_text(f"Strategy: {strategy['name']}"), ln=True)
-        pdf.set_font("Helvetica", size=11)
-        pdf.cell(0, 8, safe_text(f"Tax Cost: ${strategy['tax_cost']:.2f}"), ln=True)
-        pdf.cell(0, 8, safe_text(f"ROI: ${strategy['roi']:.2f}"), ln=True)
-        pdf.multi_cell(0, 8, safe_text(strategy["summary"]))
+        pdf.set_font("Helvetica", size=12)
+        pdf.cell(0, 10, safe_text(f"Tax Cost: ${strategy['tax_cost']:,.2f}"), ln=True)
+        pdf.cell(0, 10, safe_text(f"ROI: ${strategy['roi']:,.2f}"), ln=True)
+        pdf.multi_cell(0, 10, safe_text(f"Summary: {strategy['summary']}"))
         pdf.ln(5)
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        pdf.output(tmp.name)
-        return FileResponse(tmp.name, media_type="application/pdf", filename="tax_strategy_report.pdf")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        pdf.output(tmp_file.name)
+        return FileResponse(tmp_file.name, media_type='application/pdf', filename="roi_tax_strategy.pdf")
