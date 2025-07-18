@@ -1,6 +1,7 @@
 from fastapi import FastAPI, status, HTTPException, Depends, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse
+from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse
+
 from fastapi.middleware.cors import CORSMiddleware
 
 from uuid import uuid4
@@ -1258,9 +1259,18 @@ class StrategyROIInput(BaseModel):
         "roth_conversion", "s_corp_election", "aca_optimization"
     ]
 
+from fastapi.responses import FileResponse
+import tempfile
+from fpdf import FPDF
+
+def safe_text(value):
+    try:
+        return str(value).encode('latin-1', errors='ignore').decode('latin-1')
+    except Exception:
+        return str(value)
+
 @app.post("/generate_strategy_with_roi")
 def generate_strategy_with_roi(data: StrategyROIInput):
-    # Step 1: Calculate AGI and Taxable Income
     agi = (
         data.w2_income +
         data.business_income +
@@ -1272,12 +1282,11 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     deduction = max(standard_deduction, data.itemized_deductions)
     taxable_income = max(0, agi - deduction)
 
-    # Step 2: Mock ROI Calculations
     strategies = []
 
     if "roth_conversion" in data.strategy_flags and data.business_income > 0:
         roth_tax_cost = 0.22 * data.business_income
-        roth_future_savings = roth_tax_cost * 2.5  # Assume 250% lifetime tax savings
+        roth_future_savings = roth_tax_cost * 2.5
         strategies.append({
             "name": "Roth Conversion",
             "tax_cost": round(roth_tax_cost, 2),
@@ -1304,12 +1313,32 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "summary": f"Estimated ACA subsidy retained: ${subsidy_value:.2f} by keeping income under $75,000."
         })
 
-    response = {
-        "agi": round(agi, 2),
-        "taxable_income": round(taxable_income, 2),
-        "strategies": strategies
-    }
+    if not data.show_pdf:
+        return {
+            "agi": round(agi, 2),
+            "taxable_income": round(taxable_income, 2),
+            "strategies": strategies
+        }
 
-    return response
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
 
+    pdf.cell(0, 10, txt=safe_text("Tax Strategy Report"), ln=True)
+    pdf.cell(0, 10, txt=safe_text(f"Filing Status: {data.filing_status}"), ln=True)
+    pdf.cell(0, 10, txt=safe_text(f"AGI: ${agi:.2f}"), ln=True)
+    pdf.cell(0, 10, txt=safe_text(f"Taxable Income: ${taxable_income:.2f}"), ln=True)
+    pdf.ln(10)
 
+    for strategy in strategies:
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(0, 10, txt=safe_text(f"Strategy: {strategy['name']}"), ln=True)
+        pdf.set_font("Arial", size=12)
+        pdf.cell(0, 10, txt=safe_text(f"Tax Cost: ${strategy['tax_cost']:.2f}"), ln=True)
+        pdf.cell(0, 10, txt=safe_text(f"ROI: ${strategy['roi']:.2f}"), ln=True)
+        pdf.multi_cell(0, 10, txt=safe_text(strategy['summary']))
+        pdf.ln(5)
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        pdf.output(tmp.name)
+        return FileResponse(path=tmp.name, filename="strategy_report.pdf", media_type="application/pdf")
