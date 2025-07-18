@@ -1260,15 +1260,13 @@ class StrategyROIInput(BaseModel):
     ]
 
 from fastapi.responses import FileResponse
-from fpdf import FPDF
 import tempfile
+from fpdf import FPDF
 
-def safe_text(value):
-    try:
-        # Ensure value is string and filter out unsupported characters
-        return str(value).encode('latin-1', errors='replace').decode('latin-1')
-    except Exception:
-        return str(value)
+def safe_text(text: str) -> str:
+    if not text:
+        return ""
+    return str(text).encode('latin-1', 'replace').decode('latin-1')
 
 @app.post("/generate_strategy_with_roi")
 def generate_strategy_with_roi(data: StrategyROIInput):
@@ -1321,30 +1319,29 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "strategies": strategies
         }
 
-    # Start PDF generation
-    pdf = FPDF(orientation='L', unit='mm', format='A4')
+    # ✅ Begin bulletproof PDF generation
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
+    pdf.set_font("Helvetica", size=14)
+
+    pdf.cell(0, 10, safe_text("ROI-Based Tax Strategy Report"), ln=True)
+    pdf.ln(4)
     pdf.set_font("Helvetica", size=12)
+    pdf.cell(0, 10, safe_text(f"Filing Status: {data.filing_status.replace('_', ' ').title()}"), ln=True)
+    pdf.cell(0, 10, safe_text(f"Adjusted Gross Income (AGI): ${agi:,.2f}"), ln=True)
+    pdf.cell(0, 10, safe_text(f"Taxable Income: ${taxable_income:,.2f}"), ln=True)
+    pdf.ln(10)
 
-    pdf.cell(0, 10, txt=safe_text("ROI-Based Tax Strategy Report"), ln=True, align='C')
-    pdf.ln(5)
-    pdf.set_font("Helvetica", size=10)
+    for strategy in strategies:
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 10, safe_text(f"Strategy: {strategy['name']}"), ln=True)
+        pdf.set_font("Helvetica", size=11)
+        pdf.cell(0, 8, safe_text(f"Tax Cost: ${strategy['tax_cost']:.2f}"), ln=True)
+        pdf.cell(0, 8, safe_text(f"ROI: ${strategy['roi']:.2f}"), ln=True)
+        pdf.multi_cell(0, 8, safe_text(strategy["summary"]))
+        pdf.ln(5)
 
-    pdf.cell(0, 8, txt=safe_text(f"Filing Status: {data.filing_status.replace('_', ' ').title()}"), ln=True)
-    pdf.cell(0, 8, txt=safe_text(f"AGI: ${agi:,.2f}"), ln=True)
-    pdf.cell(0, 8, txt=safe_text(f"Taxable Income: ${taxable_income:,.2f}"), ln=True)
-    pdf.ln(8)
-
-    for idx, strategy in enumerate(strategies, start=1):
-        pdf.set_font("Helvetica", style="B", size=11)
-        pdf.cell(0, 8, txt=safe_text(f"{idx}. {strategy['name']}"), ln=True)
-        pdf.set_font("Helvetica", size=10)
-        pdf.cell(0, 8, txt=safe_text(f"   Tax Cost: ${strategy['tax_cost']:,.2f}"), ln=True)
-        pdf.cell(0, 8, txt=safe_text(f"   ROI: ${strategy['roi']:,.2f}"), ln=True)
-        pdf.multi_cell(0, 8, txt=safe_text(f"   {strategy['summary']}"))
-        pdf.ln(3)
-
-    # Save to temp file and return
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         pdf.output(tmp.name)
         return FileResponse(tmp.name, media_type="application/pdf", filename="tax_strategy_report.pdf")
