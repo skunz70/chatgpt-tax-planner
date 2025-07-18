@@ -1262,12 +1262,18 @@ class StrategyROIInput(BaseModel):
 from fastapi.responses import FileResponse
 from fpdf import FPDF
 import tempfile
+import re
 
-def safe_text(value):
-    try:
-        return str(value).encode("latin-1", errors="replace").decode("latin-1")
-    except Exception:
-        return str(value)
+def clean_text(text):
+    """
+    Replaces bullet points, smart punctuation, and non-ASCII characters.
+    Ensures compatibility with FPDF (Latin-1).
+    """
+    if not text:
+        return ""
+    # Remove bullet points, smart quotes, em dashes, etc.
+    text = re.sub(r"[•●▪️–—“”‘’]", "-", str(text))
+    return text.encode("latin-1", errors="replace").decode("latin-1")
 
 @app.post("/generate_strategy_with_roi")
 def generate_strategy_with_roi(data: StrategyROIInput):
@@ -1287,30 +1293,33 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     if "roth_conversion" in data.strategy_flags and data.business_income > 0:
         roth_tax_cost = 0.22 * data.business_income
         roth_future_savings = roth_tax_cost * 2.5
+        summary = f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, save ~${roth_future_savings:.2f} over time."
         strategies.append({
             "name": "Roth Conversion",
             "tax_cost": round(roth_tax_cost, 2),
             "roi": round(roth_future_savings - roth_tax_cost, 2),
-            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, save ~${roth_future_savings:.2f} over time."
+            "summary": clean_text(summary)
         })
 
     if "s_corp_election" in data.strategy_flags and data.business_income > 30000:
         payroll = 0.6 * data.business_income
         se_tax_savings = 0.153 * (data.business_income - payroll)
+        summary = f"Elect S-Corp. Reasonable salary: ${payroll:.0f}. Estimated SE tax savings: ${se_tax_savings:.2f}."
         strategies.append({
             "name": "S-Corp Election",
             "tax_cost": 0,
             "roi": round(se_tax_savings, 2),
-            "summary": f"Elect S-Corp. Reasonable salary: ${payroll:.0f}. Estimated SE tax savings: ${se_tax_savings:.2f}."
+            "summary": clean_text(summary)
         })
 
     if "aca_optimization" in data.strategy_flags and taxable_income < 75000:
         subsidy_value = 3200
+        summary = f"Estimated ACA subsidy retained: ${subsidy_value:.2f} by keeping income under $75,000."
         strategies.append({
             "name": "ACA Subsidy Preservation",
             "tax_cost": 0,
             "roi": subsidy_value,
-            "summary": f"Estimated ACA subsidy retained: ${subsidy_value:.2f} by keeping income under $75,000."
+            "summary": clean_text(summary)
         })
 
     if not data.show_pdf:
@@ -1320,27 +1329,27 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "strategies": strategies
         }
 
-    # PDF Section
+    # PDF generation
     pdf = FPDF(orientation="L", unit="mm", format="A4")
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, safe_text("Tax Strategy Report"), ln=True)
+    pdf.cell(0, 10, clean_text("Tax Strategy Report"), ln=True)
 
     pdf.set_font("Helvetica", "", 12)
     pdf.ln(4)
-    pdf.cell(0, 10, safe_text(f"Filing Status: {data.filing_status.replace('_', ' ').title()}"), ln=True)
-    pdf.cell(0, 10, safe_text(f"Adjusted Gross Income (AGI): ${agi:,.2f}"), ln=True)
-    pdf.cell(0, 10, safe_text(f"Taxable Income: ${taxable_income:,.2f}"), ln=True)
+    pdf.cell(0, 10, clean_text(f"Filing Status: {data.filing_status.replace('_', ' ').title()}"), ln=True)
+    pdf.cell(0, 10, clean_text(f"Adjusted Gross Income (AGI): ${agi:,.2f}"), ln=True)
+    pdf.cell(0, 10, clean_text(f"Taxable Income: ${taxable_income:,.2f}"), ln=True)
     pdf.ln(6)
 
     for strategy in strategies:
         pdf.set_font("Helvetica", "B", 13)
-        pdf.cell(0, 8, safe_text(f"Strategy: {strategy['name']}"), ln=True)
+        pdf.cell(0, 8, clean_text(f"Strategy: {strategy['name']}"), ln=True)
 
         pdf.set_font("Helvetica", "", 12)
-        pdf.cell(0, 8, safe_text(f"Tax Cost: ${strategy['tax_cost']:,.2f}"), ln=True)
-        pdf.cell(0, 8, safe_text(f"ROI: ${strategy['roi']:,.2f}"), ln=True)
-        pdf.multi_cell(0, 8, safe_text(f"Details: {strategy['summary']}"))
+        pdf.cell(0, 8, clean_text(f"Tax Cost: ${strategy['tax_cost']:,.2f}"), ln=True)
+        pdf.cell(0, 8, clean_text(f"ROI: ${strategy['roi']:,.2f}"), ln=True)
+        pdf.multi_cell(0, 8, clean_text(f"Details: {strategy['summary']}"))
         pdf.ln(4)
 
     tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
