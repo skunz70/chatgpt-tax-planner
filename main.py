@@ -1260,8 +1260,14 @@ class StrategyROIInput(BaseModel):
     ]
 
 from fastapi.responses import FileResponse
-from fpdf import FPDF
 import tempfile
+from fpdf import FPDF
+
+class PDF(FPDF):
+    def header(self):
+        self.set_font("Helvetica", "B", 14)
+        self.cell(0, 10, "ROI-Based Tax Strategy Report", ln=True, align="C")
+        self.ln(10)
 
 def safe_text(value):
     try:
@@ -1281,77 +1287,83 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     standard_deduction = 15000 if data.filing_status == "single" else 30000
     deduction = max(standard_deduction, data.itemized_deductions)
     taxable_income = max(0, agi - deduction)
-    estimated_tax = round(taxable_income * 0.22, 2)
+    est_tax = round(taxable_income * 0.22, 2)
 
-    strategies = [
-        {
-            "title": "Max out 401(k) or Traditional IRA",
-            "description": "Maxing out a 401(k) or IRA reduces your taxable income. This strategy can lower your AGI, helping you qualify for other tax breaks and reduce your federal and state tax bill."
-        },
-        {
-            "title": "Maximize Traditional IRA Contributions",
-            "description": "This reduces taxable income by up to $7,000 per spouse (or $8,000 if age 50+). Effective for married filers with AGI under deductibility thresholds."
-        },
-        {
-            "title": "Max out HSA if eligible",
-            "description": "If enrolled in a high-deductible health plan, you can contribute up to $8,300 (family) pre-tax. HSAs are triple-tax advantaged."
-        },
-        {
-            "title": "S Corporation Election",
-            "description": "Switching to an S Corp can save self-employment tax on profits above a reasonable salary. Typical savings for $40,000 profit: ~$4,000+."
-        },
-        {
-            "title": "Roth Conversion",
-            "description": "Consider converting part of pre-tax funds to Roth while in a lower tax bracket. Pay tax now, enjoy tax-free growth later."
-        }
-    ]
+    strategies = []
+
+    if "roth_conversion" in data.strategy_flags and data.business_income > 0:
+        roth_tax_cost = 0.22 * data.business_income
+        roth_future_savings = roth_tax_cost * 2.5
+        strategies.append({
+            "name": "Roth Conversion",
+            "tax_cost": round(roth_tax_cost, 2),
+            "roi": round(roth_future_savings - roth_tax_cost, 2),
+            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, save ~${roth_future_savings:.2f} over time."
+        })
+
+    if "s_corp_election" in data.strategy_flags and data.business_income > 30000:
+        payroll = 0.6 * data.business_income
+        se_tax_savings = 0.153 * (data.business_income - payroll)
+        strategies.append({
+            "name": "S-Corp Election",
+            "tax_cost": 0,
+            "roi": round(se_tax_savings, 2),
+            "summary": f"Elect S-Corp. Reasonable salary: ${payroll:.0f}. Estimated SE tax savings: ${se_tax_savings:.2f}."
+        })
+
+    if "aca_optimization" in data.strategy_flags and taxable_income < 75000:
+        subsidy_value = 3200
+        strategies.append({
+            "name": "ACA Subsidy Preservation",
+            "tax_cost": 0,
+            "roi": subsidy_value,
+            "summary": f"Estimated ACA subsidy retained: ${subsidy_value:.2f} by keeping income under $75,000."
+        })
 
     if not data.show_pdf:
         return {
             "agi": round(agi, 2),
             "taxable_income": round(taxable_income, 2),
-            "estimated_federal_tax": estimated_tax,
+            "estimated_tax": est_tax,
             "strategies": strategies
         }
 
-    # ✅ Begin styled PDF generation
-    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    # Generate PDF
+    pdf = PDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, safe_text("ROI-Based Tax Strategy Report"), ln=True, align="C")
-
     pdf.set_font("Helvetica", "", 12)
-    pdf.ln(8)
 
-    summary_lines = [
-        f"Filing Status: {data.filing_status}",
-        f"W-2 Income: ${data.w2_income:,.0f}",
-        f"Business Income: ${data.business_income:,.0f}",
-        f"Capital Gains: ${data.capital_gains:,.0f}",
-        f"Dividend Income: ${data.dividend_income:,.0f}",
-        f"Retirement Contributions: ${data.retirement_contributions:,.0f}",
-        f"Itemized Deductions: ${data.itemized_deductions:,.0f}",
-        f"Adjusted Gross Income (AGI): ${agi:,.0f}",
-        f"Taxable Income: ${taxable_income:,.0f}",
-        f"Estimated Federal Tax: ${estimated_tax:,.0f}"
+    fields = [
+        ("Filing Status", data.filing_status),
+        ("W-2 Income", f"${data.w2_income:,.0f}"),
+        ("Business Income", f"${data.business_income:,.0f}"),
+        ("Capital Gains", f"${data.capital_gains:,.0f}"),
+        ("Dividend Income", f"${data.dividend_income:,.0f}"),
+        ("Retirement Contributions", f"${data.retirement_contributions:,.0f}"),
+        ("Itemized Deductions", f"${data.itemized_deductions:,.0f}"),
+        ("Adjusted Gross Income (AGI)", f"${agi:,.0f}"),
+        ("Taxable Income", f"${taxable_income:,.0f}"),
+        ("Estimated Federal Tax", f"${est_tax:,.0f}")
     ]
 
-    for line in summary_lines:
-        pdf.cell(0, 8, safe_text(line), ln=True)
+    for label, value in fields:
+        pdf.cell(90, 10, txt=safe_text(f"{label}:"), ln=0)
+        pdf.cell(0, 10, txt=safe_text(f"{value}"), ln=1)
 
-    pdf.ln(10)
+    pdf.ln(8)
     pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 10, "Strategy Recommendations with ROI Rationale", ln=True)
-    pdf.ln(4)
+    pdf.cell(0, 10, txt="Strategy Recommendations with ROI Rationale", ln=True)
+    pdf.ln(2)
 
-    pdf.set_font("Helvetica", "", 12)
-    for idx, strat in enumerate(strategies, 1):
+    for idx, strategy in enumerate(strategies, start=1):
         pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 8, f"{idx}. {safe_text(strat['title'])}", ln=True)
+        pdf.cell(0, 10, txt=safe_text(f"{idx}. {strategy['name']}"), ln=True)
         pdf.set_font("Helvetica", "", 11)
-        pdf.multi_cell(0, 7, safe_text(strat['description']))
-        pdf.ln(3)
+        pdf.cell(0, 10, txt=safe_text(f"Tax Cost: ${strategy['tax_cost']:.2f}"), ln=True)
+        pdf.cell(0, 10, txt=safe_text(f"ROI: ${strategy['roi']:.2f}"), ln=True)
+        pdf.multi_cell(0, 8, txt=safe_text(strategy['summary']))
+        pdf.ln(4)
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        pdf.output(tmp.name)
-        return FileResponse(tmp.name, media_type='application/pdf', filename="roi_tax_strategy.pdf")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        pdf.output(tmp_file.name)
+        return FileResponse(tmp_file.name, media_type="application/pdf", filename="tax_strategy_report.pdf")
