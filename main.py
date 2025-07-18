@@ -1313,30 +1313,34 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "summary": f"Estimated ACA subsidy retained: ${subsidy_value:.2f} by keeping income under $75,000."
         })
 
-    if not data.show_pdf:
+        if not data.show_pdf:
         return {
             "agi": round(agi, 2),
             "taxable_income": round(taxable_income, 2),
             "strategies": strategies
         }
 
-    # Begin PDF generation
+    # ✅ Begin PDF generation (properly indented now)
     pdf = FPDF()
-pdf.add_page()
-pdf.set_font("Arial", size=12)
-
-pdf.cell(0, 10, txt=safe_text("Tax Strategy Report"), ln=True)
-pdf.cell(0, 10, txt=safe_text(f"Filing Status: {data.filing_status}"), ln=True)
-pdf.cell(0, 10, txt=safe_text(f"AGI: ${agi:.2f}"), ln=True)
-pdf.cell(0, 10, txt=safe_text(f"Taxable Income: ${taxable_income:.2f}"), ln=True)
-pdf.ln(10)
-
-for strategy in strategies:
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, txt=safe_text(f"Strategy: {strategy['name']}"), ln=True)
+    pdf.add_page()
     pdf.set_font("Arial", size=12)
-    pdf.cell(0, 10, txt=safe_text(f"Tax Cost: ${strategy['tax_cost']:.2f}"), ln=True)
-    pdf.cell(0, 10, txt=safe_text(f"ROI: ${strategy['roi']:.2f}"), ln=True)
-    pdf.multi_cell(0, 10, txt=safe_text(strategy['summary']))
-    pdf.ln(5)
+
+    pdf.cell(0, 10, txt=safe_text("Tax Strategy Report"), ln=True)
+    pdf.cell(0, 10, txt=safe_text(f"Filing Status: {data.filing_status}"), ln=True)
+    pdf.cell(0, 10, txt=safe_text(f"AGI: ${agi:.2f}"), ln=True)
+    pdf.cell(0, 10, txt=safe_text(f"Taxable Income: ${taxable_income:.2f}"), ln=True)
+    pdf.ln(10)
+
+    for strategy in strategies:
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(0, 10, txt=safe_text(f"Strategy: {strategy['name']}"), ln=True)
+        pdf.set_font("Arial", size=12)
+        pdf.cell(0, 10, txt=safe_text(f"Tax Cost: ${strategy['tax_cost']:.2f}"), ln=True)
+        pdf.cell(0, 10, txt=safe_text(f"ROI: ${strategy['roi']:.2f}"), ln=True)
+        pdf.multi_cell(0, 10, txt=safe_text(strategy['summary']))
+        pdf.ln(5)
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        pdf.output(tmp.name)
+        return FileResponse(path=tmp.name, filename="strategy_report.pdf", media_type="application/pdf")
 
