@@ -1263,11 +1263,31 @@ from fastapi.responses import FileResponse
 import tempfile
 from fpdf import FPDF
 
-def safe_text(value):
-    try:
-        return str(value).encode('latin-1', errors='ignore').decode('latin-1')
-    except Exception:
-        return str(value)
+class StyledStrategyPDF(FPDF):
+    def header(self):
+        self.set_font("Helvetica", 'B', 16)
+        self.cell(0, 10, "Tax Strategy ROI Report", ln=True, align="C")
+        self.ln(5)
+
+    def add_summary(self, agi, taxable_income, est_tax, total_roi):
+        self.set_font("Helvetica", '', 12)
+        self.cell(0, 10, f"Adjusted Gross Income (AGI): ${agi:,.2f}", ln=True)
+        self.cell(0, 10, f"Taxable Income: ${taxable_income:,.2f}", ln=True)
+        self.cell(0, 10, f"Estimated Tax Liability: ${est_tax:,.2f}", ln=True)
+        self.cell(0, 10, f"Total Projected ROI from Strategies: ${total_roi:,.2f}", ln=True)
+        self.ln(5)
+
+    def add_strategy_section(self, strategies):
+        for strategy in strategies:
+            self.set_font("Helvetica", 'B', 13)
+            self.cell(0, 10, f"Strategy: {strategy['name']}", ln=True)
+            self.set_font("Helvetica", '', 12)
+            self.cell(0, 10, f"Tax Cost: ${strategy['tax_cost']:,.2f}", ln=True)
+            self.cell(0, 10, f"ROI: ${strategy['roi']:,.2f}", ln=True)
+            self.multi_cell(0, 10, f"Summary: {strategy['summary']}")
+            self.ln(3)
+            self.line(self.l_margin, self.get_y(), self.w - self.r_margin, self.get_y())
+            self.ln(5)
 
 @app.post("/generate_strategy_with_roi")
 def generate_strategy_with_roi(data: StrategyROIInput):
@@ -1281,6 +1301,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     standard_deduction = 15000 if data.filing_status == "single" else 30000
     deduction = max(standard_deduction, data.itemized_deductions)
     taxable_income = max(0, agi - deduction)
+    est_tax = round(taxable_income * 0.22, 2)
 
     strategies = []
 
@@ -1317,29 +1338,18 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         return {
             "agi": round(agi, 2),
             "taxable_income": round(taxable_income, 2),
+            "estimated_tax": est_tax,
             "strategies": strategies
         }
 
-    # --- PDF Generation ---
-    pdf = FPDF()
+    # PDF generation
+    total_roi = sum(s["roi"] for s in strategies)
+
+    pdf = StyledStrategyPDF(orientation="L")
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
-
-    pdf.cell(0, 10, txt=safe_text("Tax Strategy Report"), ln=True)
-    pdf.cell(0, 10, txt=safe_text(f"Filing Status: {data.filing_status}"), ln=True)
-    pdf.cell(0, 10, txt=safe_text(f"AGI: ${agi:.2f}"), ln=True)
-    pdf.cell(0, 10, txt=safe_text(f"Taxable Income: ${taxable_income:.2f}"), ln=True)
-    pdf.ln(10)
-
-    for strategy in strategies:
-        pdf.set_font("Arial", 'B', 12)
-        pdf.cell(0, 10, txt=safe_text(f"Strategy: {strategy['name']}"), ln=True)
-        pdf.set_font("Arial", size=12)
-        pdf.cell(0, 10, txt=safe_text(f"Tax Cost: ${strategy['tax_cost']:.2f}"), ln=True)
-        pdf.cell(0, 10, txt=safe_text(f"ROI: ${strategy['roi']:.2f}"), ln=True)
-        pdf.multi_cell(0, 10, txt=safe_text(strategy['summary']))
-        pdf.ln(5)
+    pdf.add_summary(agi, taxable_income, est_tax, total_roi)
+    pdf.add_strategy_section(strategies)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         pdf.output(tmp.name)
-        return FileResponse(path=tmp.name, filename="strategy_report.pdf", media_type="application/pdf")
+        return FileResponse(path=tmp.name, media_type="application/pdf", filename="strategy_roi_report.pdf")
