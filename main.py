@@ -1320,6 +1320,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "strategies": strategies
         }
 
+    # Begin PDF generation
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
