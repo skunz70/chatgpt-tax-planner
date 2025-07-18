@@ -1314,11 +1314,12 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         })
 
         if not data.show_pdf:
-        return {
-            "agi": round(agi, 2),
-            "taxable_income": round(taxable_income, 2),
-            "strategies": strategies
-        }
+    return {
+        "agi": round(agi, 2),
+        "taxable_income": round(taxable_income, 2),
+        "strategies": strategies
+    }
+
 
     # ✅ Begin PDF generation (properly indented now)
     pdf = FPDF()
