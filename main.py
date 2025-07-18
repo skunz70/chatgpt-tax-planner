@@ -1313,15 +1313,14 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "summary": f"Estimated ACA subsidy retained: ${subsidy_value:.2f} by keeping income under $75,000."
         })
 
-        if not data.show_pdf:
-    return {
-        "agi": round(agi, 2),
-        "taxable_income": round(taxable_income, 2),
-        "strategies": strategies
-    }
+    if not data.show_pdf:
+        return {
+            "agi": round(agi, 2),
+            "taxable_income": round(taxable_income, 2),
+            "strategies": strategies
+        }
 
-
-    # ✅ Begin PDF generation (properly indented now)
+    # --- PDF Generation ---
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
@@ -1344,4 +1343,3 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         pdf.output(tmp.name)
         return FileResponse(path=tmp.name, filename="strategy_report.pdf", media_type="application/pdf")
-
