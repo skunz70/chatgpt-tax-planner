@@ -1270,7 +1270,7 @@ from fpdf import FPDF
 
 def safe_text(value):
     try:
-        return str(value).encode('latin-1', errors='ignore').decode('latin-1')
+        return str(value).encode("latin-1", errors="ignore").decode("latin-1")
     except Exception:
         return str(value)
 
@@ -1325,28 +1325,26 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "strategies": strategies
         }
 
-    # Begin PDF generation
-    pdf = FPDF(orientation='P', unit='mm', format='A4')
+    # PDF Generation
+    pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 10, safe_text("Tax Strategy Summary"), ln=True)
-
     pdf.set_font("Arial", size=12)
-    pdf.cell(0, 10, safe_text(f"Filing Status: {data.filing_status.replace('_', ' ').title()}"), ln=True)
-    pdf.cell(0, 10, safe_text(f"AGI: ${agi:,.2f}"), ln=True)
-    pdf.cell(0, 10, safe_text(f"Taxable Income: ${taxable_income:,.2f}"), ln=True)
+
+    pdf.cell(0, 10, txt=safe_text("Tax Strategy Report"), ln=True)
+    pdf.cell(0, 10, txt=safe_text(f"Filing Status: {data.filing_status}"), ln=True)
+    pdf.cell(0, 10, txt=safe_text(f"AGI: ${agi:.2f}"), ln=True)
+    pdf.cell(0, 10, txt=safe_text(f"Taxable Income: ${taxable_income:.2f}"), ln=True)
     pdf.ln(5)
 
-    for strat in strategies:
-        pdf.set_font("Arial", 'B', 12)
-        pdf.cell(0, 10, safe_text(strat["name"]), ln=True)
-        pdf.set_font("Arial", size=11)
-        pdf.cell(0, 8, safe_text(f"Tax Cost: ${strat['tax_cost']:.2f}"), ln=True)
-        pdf.cell(0, 8, safe_text(f"ROI: ${strat['roi']:.2f}"), ln=True)
-        pdf.multi_cell(0, 8, safe_text(strat["summary"]))
-        pdf.ln(4)
+    for strategy in strategies:
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 10, txt=safe_text(f"Strategy: {strategy['name']}"), ln=True)
+        pdf.set_font("Arial", size=12)
+        pdf.cell(0, 10, txt=safe_text(f"Tax Cost: ${strategy['tax_cost']:.2f}"), ln=True)
+        pdf.cell(0, 10, txt=safe_text(f"ROI: ${strategy['roi']:.2f}"), ln=True)
+        pdf.multi_cell(0, 10, txt=safe_text(strategy["summary"]))
+        pdf.ln(5)
 
-    # Save to temp file
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-        pdf.output(tmp_file.name)
-        return FileResponse(tmp_file.name, media_type='application/pdf', filename="tax_strategy_report.pdf")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
+        pdf.output(tmpfile.name)
+        return FileResponse(tmpfile.name, media_type="application/pdf", filename="tax_strategy_report.pdf")
