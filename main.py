@@ -1296,7 +1296,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "name": "Roth Conversion",
             "tax_cost": round(roth_tax_cost, 2),
             "roi": round(roth_future_savings - roth_tax_cost, 2),
-            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, save ~${roth_future_savings:.2f} over time."
+            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, potentially save ${roth_future_savings:.2f} long-term."
         })
 
     if "s_corp_election" in data.strategy_flags and data.business_income > 30000:
@@ -1306,7 +1306,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "name": "S-Corp Election",
             "tax_cost": 0,
             "roi": round(se_tax_savings, 2),
-            "summary": f"Elect S-Corp. Reasonable salary: ${payroll:.0f}. Estimated SE tax savings: ${se_tax_savings:.2f}."
+            "summary": f"Elect S-Corp. Reasonable salary: ${payroll:.0f}. Estimated self-employment tax savings: ${se_tax_savings:.2f}."
         })
 
     if "aca_optimization" in data.strategy_flags and taxable_income < 75000:
@@ -1315,7 +1315,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "name": "ACA Subsidy Preservation",
             "tax_cost": 0,
             "roi": subsidy_value,
-            "summary": f"Estimated ACA subsidy retained: ${subsidy_value:.2f} by keeping income under $75,000."
+            "summary": f"Retain estimated ACA subsidy of ${subsidy_value:.2f} by keeping income under threshold."
         })
 
     if not data.show_pdf:
@@ -1330,21 +1330,30 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     pdf.add_page()
     pdf.set_font("Arial", size=12)
 
-    pdf.cell(0, 10, txt=safe_text("Tax Strategy Report"), ln=True)
-    pdf.cell(0, 10, txt=safe_text(f"Filing Status: {data.filing_status}"), ln=True)
-    pdf.cell(0, 10, txt=safe_text(f"AGI: ${agi:.2f}"), ln=True)
-    pdf.cell(0, 10, txt=safe_text(f"Taxable Income: ${taxable_income:.2f}"), ln=True)
+    pdf.cell(0, 10, txt=safe_text("TAX STRATEGY REPORT"), ln=True)
     pdf.ln(5)
+    pdf.cell(0, 10, txt=safe_text(f"Filing Status: {data.filing_status}"), ln=True)
+    pdf.cell(0, 10, txt=safe_text(f"Adjusted Gross Income (AGI): ${agi:.2f}"), ln=True)
+    pdf.cell(0, 10, txt=safe_text(f"Taxable Income: ${taxable_income:.2f}"), ln=True)
+    pdf.ln(10)
 
-    for strategy in strategies:
+    if strategies:
         pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 10, txt=safe_text(f"Strategy: {strategy['name']}"), ln=True)
+        pdf.cell(0, 10, txt="Strategy Recommendations", ln=True)
         pdf.set_font("Arial", size=12)
-        pdf.cell(0, 10, txt=safe_text(f"Tax Cost: ${strategy['tax_cost']:.2f}"), ln=True)
-        pdf.cell(0, 10, txt=safe_text(f"ROI: ${strategy['roi']:.2f}"), ln=True)
-        pdf.multi_cell(0, 10, txt=safe_text(strategy["summary"]))
-        pdf.ln(5)
+        pdf.ln(2)
+
+        for s in strategies:
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(0, 10, txt=safe_text(s["name"]), ln=True)
+            pdf.set_font("Arial", size=12)
+            pdf.cell(0, 10, txt=safe_text(f"Tax Cost: ${s['tax_cost']:.2f}"), ln=True)
+            pdf.cell(0, 10, txt=safe_text(f"ROI: ${s['roi']:.2f}"), ln=True)
+            pdf.multi_cell(0, 10, txt=safe_text(s["summary"]))
+            pdf.ln(4)
+    else:
+        pdf.cell(0, 10, txt="No strategy recommendations available for this profile.", ln=True)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
         pdf.output(tmpfile.name)
-        return FileResponse(tmpfile.name, media_type="application/pdf", filename="tax_strategy_report.pdf")
+        return FileResponse(tmpfile.name, media_type="application/pdf", filename="strategy_report.pdf")
