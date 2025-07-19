@@ -1276,12 +1276,6 @@ from fastapi.responses import FileResponse
 import tempfile
 from fpdf import FPDF
 
-def safe_text(value):
-    try:
-        return str(value).encode("latin-1", errors="ignore").decode("latin-1")
-    except Exception:
-        return str(value)
-
 @app.post("/generate_strategy_with_roi")
 def generate_strategy_with_roi(data: StrategyROIInput):
     agi = (
@@ -1338,29 +1332,29 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     pdf.add_page()
     pdf.set_font("Arial", size=12)
 
-    pdf.cell(0, 10, txt=safe_text("TAX STRATEGY REPORT"), ln=True)
+    pdf.cell(0, 10, txt=clean_text("TAX STRATEGY REPORT"), ln=True)
     pdf.ln(5)
-    pdf.cell(0, 10, txt=safe_text(f"Filing Status: {data.filing_status}"), ln=True)
-    pdf.cell(0, 10, txt=safe_text(f"Adjusted Gross Income (AGI): ${agi:.2f}"), ln=True)
-    pdf.cell(0, 10, txt=safe_text(f"Taxable Income: ${taxable_income:.2f}"), ln=True)
+    pdf.cell(0, 10, txt=clean_text(f"Filing Status: {data.filing_status}"), ln=True)
+    pdf.cell(0, 10, txt=clean_text(f"Adjusted Gross Income (AGI): ${agi:.2f}"), ln=True)
+    pdf.cell(0, 10, txt=clean_text(f"Taxable Income: ${taxable_income:.2f}"), ln=True)
     pdf.ln(10)
 
     if strategies:
         pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 10, txt="Strategy Recommendations", ln=True)
+        pdf.cell(0, 10, txt=clean_text("Strategy Recommendations"), ln=True)
         pdf.set_font("Arial", size=12)
         pdf.ln(2)
 
         for s in strategies:
             pdf.set_font("Arial", "B", 12)
-            pdf.cell(0, 10, txt=safe_text(s["name"]), ln=True)
+            pdf.cell(0, 10, txt=clean_text(s["name"]), ln=True)
             pdf.set_font("Arial", size=12)
-            pdf.cell(0, 10, txt=safe_text(f"Tax Cost: ${s['tax_cost']:.2f}"), ln=True)
-            pdf.cell(0, 10, txt=safe_text(f"ROI: ${s['roi']:.2f}"), ln=True)
-            pdf.multi_cell(0, 10, txt=safe_text(s["summary"]))
+            pdf.cell(0, 10, txt=clean_text(f"Tax Cost: ${s['tax_cost']:.2f}"), ln=True)
+            pdf.cell(0, 10, txt=clean_text(f"ROI: ${s['roi']:.2f}"), ln=True)
+            pdf.multi_cell(0, 10, txt=clean_text(s["summary"]))
             pdf.ln(4)
     else:
-        pdf.cell(0, 10, txt="No strategy recommendations available for this profile.", ln=True)
+        pdf.cell(0, 10, txt=clean_text("No strategy recommendations available for this profile."), ln=True)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
         pdf.output(tmpfile.name)
