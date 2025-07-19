@@ -13,14 +13,22 @@ from matplotlib import pyplot as plt
 from fpdf import FPDF
 import re
 
-def safe_text(value):
-    if not value:
+import re
+
+def clean_text(text: str) -> str:
+    """
+    Strips emojis, bullets, smart quotes, and ensures the text is Latin-1 encodable.
+    """
+    if not text:
         return ""
-    text = str(value)
-    # Replace common non-latin characters and emojis
-    text = text.replace("–", "-").replace("—", "-")
-    text = text.replace("“", '"').replace("”", '"').replace("’", "'")
-    text = re.sub(r'[^\x00-\xFF]', '', text)  # Remove non-latin-1 chars
+    text = re.sub(r'[^\x00-\x7F]+', ' ', text)  # Remove emojis and non-ASCII
+    replacements = {
+        "“": '"', "”": '"',
+        "‘": "'", "’": "'",
+        "•": "-", "–": "-", "—": "-"
+    }
+    for k, v in replacements.items():
+        text = text.replace(k, v)
     return text.encode("latin-1", "replace").decode("latin-1")
 
 
