@@ -1272,54 +1272,13 @@ class StrategyROIInput(BaseModel):
         "roth_conversion", "s_corp_election", "aca_optimization"
     ]
 
-from fastapi.responses import FileResponse
-import tempfile
-from fpdf import FPDF
+from reportlab.lib.pagesizes import landscape, letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import inch
 
 @app.post("/generate_strategy_with_roi")
 def generate_strategy_with_roi(data: StrategyROIInput):
-    agi = (
-        data.w2_income +
-        data.business_income +
-        data.capital_gains +
-        data.dividend_income -
-        data.retirement_contributions
-    )
-    standard_deduction = 15000 if data.filing_status == "single" else 30000
-    deduction = max(standard_deduction, data.itemized_deductions)
-    taxable_income = max(0, agi - deduction)
-
-    strategies = []
-
-    if "roth_conversion" in data.strategy_flags and data.business_income > 0:
-        roth_tax_cost = 0.22 * data.business_income
-        roth_future_savings = roth_tax_cost * 2.5
-        strategies.append({
-            "name": "Roth Conversion",
-            "tax_cost": round(roth_tax_cost, 2),
-            "roi": round(roth_future_savings - roth_tax_cost, 2),
-            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, potentially save ${roth_future_savings:.2f} long-term."
-        })
-
-    if "s_corp_election" in data.strategy_flags and data.business_income > 30000:
-        payroll = 0.6 * data.business_income
-        se_tax_savings = 0.153 * (data.business_income - payroll)
-        strategies.append({
-            "name": "S-Corp Election",
-            "tax_cost": 0,
-            "roi": round(se_tax_savings, 2),
-            "summary": f"Elect S-Corp. Reasonable salary: ${payroll:.0f}. Estimated self-employment tax savings: ${se_tax_savings:.2f}."
-        })
-
-    if "aca_optimization" in data.strategy_flags and taxable_income < 75000:
-        subsidy_value = 3200
-        strategies.append({
-            "name": "ACA Subsidy Preservation",
-            "tax_cost": 0,
-            "roi": subsidy_value,
-            "summary": f"Retain estimated ACA subsidy of ${subsidy_value:.2f} by keeping income under threshold."
-        })
-
+    ...
     if not data.show_pdf:
         return {
             "agi": round(agi, 2),
@@ -1327,35 +1286,45 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "strategies": strategies
         }
 
-    # PDF Generation
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-
-    pdf.cell(0, 10, txt=clean_text("TAX STRATEGY REPORT"), ln=True)
-    pdf.ln(5)
-    pdf.cell(0, 10, txt=clean_text(f"Filing Status: {data.filing_status}"), ln=True)
-    pdf.cell(0, 10, txt=clean_text(f"Adjusted Gross Income (AGI): ${agi:.2f}"), ln=True)
-    pdf.cell(0, 10, txt=clean_text(f"Taxable Income: ${taxable_income:.2f}"), ln=True)
-    pdf.ln(10)
-
-    if strategies:
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 10, txt=clean_text("Strategy Recommendations"), ln=True)
-        pdf.set_font("Arial", size=12)
-        pdf.ln(2)
-
-        for s in strategies:
-            pdf.set_font("Arial", "B", 12)
-            pdf.cell(0, 10, txt=clean_text(s["name"]), ln=True)
-            pdf.set_font("Arial", size=12)
-            pdf.cell(0, 10, txt=clean_text(f"Tax Cost: ${s['tax_cost']:.2f}"), ln=True)
-            pdf.cell(0, 10, txt=clean_text(f"ROI: ${s['roi']:.2f}"), ln=True)
-            pdf.multi_cell(0, 10, txt=clean_text(s["summary"]))
-            pdf.ln(4)
-    else:
-        pdf.cell(0, 10, txt=clean_text("No strategy recommendations available for this profile."), ln=True)
-
+    # Generate PDF using ReportLab
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
-        pdf.output(tmpfile.name)
+        c = canvas.Canvas(tmpfile.name, pagesize=landscape(letter))
+        width, height = landscape(letter)
+
+        x_margin = 1 * inch
+        y = height - 1 * inch
+        line_height = 14
+
+        def draw_line(text, bold=False):
+            nonlocal y
+            if y < 1 * inch:
+                c.showPage()
+                y = height - 1 * inch
+            if bold:
+                c.setFont("Helvetica-Bold", 12)
+            else:
+                c.setFont("Helvetica", 11)
+            c.drawString(x_margin, y, str(text))
+            y -= line_height
+
+        draw_line("TAX STRATEGY REPORT", bold=True)
+        draw_line(f"Filing Status: {data.filing_status}")
+        draw_line(f"Adjusted Gross Income (AGI): ${agi:.2f}")
+        draw_line(f"Taxable Income: ${taxable_income:.2f}")
+        draw_line("")
+
+        if strategies:
+            draw_line("Strategy Recommendations", bold=True)
+            for s in strategies:
+                draw_line(f"- {s['name']}", bold=True)
+                draw_line(f"  Tax Cost: ${s['tax_cost']:.2f}")
+                draw_line(f"  ROI: ${s['roi']:.2f}")
+                for line in str(s['summary']).splitlines():
+                    draw_line(f"  {line}")
+                draw_line("")
+        else:
+            draw_line("No strategy recommendations available.")
+
+        c.save()
+
         return FileResponse(tmpfile.name, media_type="application/pdf", filename="strategy_report.pdf")
