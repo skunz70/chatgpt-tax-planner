@@ -1328,3 +1328,71 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         c.save()
 
         return FileResponse(tmpfile.name, media_type="application/pdf", filename="strategy_report.pdf")
+from fastapi.responses import FileResponse
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.pdfgen import canvas
+import tempfile
+
+@app.post("/generate_ascii_strategy_pdf")
+def generate_ascii_strategy_pdf(data: StrategyROIInput):
+    agi = (
+        data.w2_income +
+        data.business_income +
+        data.capital_gains +
+        data.dividend_income -
+        data.retirement_contributions
+    )
+    standard_deduction = 15000 if data.filing_status == "single" else 30000
+    deduction = max(standard_deduction, data.itemized_deductions)
+    taxable_income = max(0, agi - deduction)
+
+    strategies = []
+
+    if "roth_conversion" in data.strategy_flags and data.business_income > 0:
+        roth_tax_cost = 0.22 * data.business_income
+        roth_future_savings = roth_tax_cost * 2.5
+        strategies.append(f"Roth Conversion:\n  - Convert ${data.business_income} to Roth.\n  - Pay ${roth_tax_cost:.2f} now.\n  - Potential long-term savings: ${roth_future_savings:.2f}")
+
+    if "s_corp_election" in data.strategy_flags and data.business_income > 30000:
+        payroll = 0.6 * data.business_income
+        se_tax_savings = 0.153 * (data.business_income - payroll)
+        strategies.append(f"S-Corp Election:\n  - Reasonable salary: ${payroll:.0f}\n  - Estimated SE tax savings: ${se_tax_savings:.2f}")
+
+    if "aca_optimization" in data.strategy_flags and taxable_income < 75000:
+        subsidy_value = 3200
+        strategies.append(f"ACA Subsidy Optimization:\n  - AGI below threshold preserves ~$3,200 in health subsidies.")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        c = canvas.Canvas(tmp.name, pagesize=landscape(letter))
+        width, height = landscape(letter)
+
+        c.setFont("Courier", 11)
+        y = height - 50
+
+        def draw_line(text):
+            nonlocal y
+            if y < 50:
+                c.showPage()
+                y = height - 50
+                c.setFont("Courier", 11)
+            c.drawString(40, y, text)
+            y -= 20
+
+        draw_line("TAX STRATEGY REPORT")
+        draw_line("-" * 60)
+        draw_line(f"Filing Status: {data.filing_status}")
+        draw_line(f"Adjusted Gross Income (AGI): ${agi:,.2f}")
+        draw_line(f"Taxable Income: ${taxable_income:,.2f}")
+        draw_line("")
+
+        draw_line("RECOMMENDED STRATEGIES:")
+        if not strategies:
+            draw_line("No applicable strategies found.")
+        else:
+            for strategy in strategies:
+                for line in strategy.split("\n"):
+                    draw_line(line)
+                draw_line("")
+
+        c.save()
+        return FileResponse(tmp.name, media_type="application/pdf", filename="ascii_strategy_report.pdf")
