@@ -1290,16 +1290,10 @@ from reportlab.lib.pagesizes import landscape, letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 import tempfile
-import re
-
-def safe_ascii(text):
-    try:
-        return re.sub(r"[^\x00-\x7F]+", "", str(text))
-    except Exception:
-        return str(text)
 
 @app.post("/generate_strategy_with_roi")
 def generate_strategy_with_roi(data: StrategyROIInput):
+    # Calculations
     agi = (
         data.w2_income +
         data.business_income +
@@ -1311,6 +1305,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     deduction = max(standard_deduction, data.itemized_deductions)
     taxable_income = max(0, agi - deduction)
 
+    # Build strategy list
     strategies = []
 
     if "roth_conversion" in data.strategy_flags and data.business_income > 0:
@@ -1320,7 +1315,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "name": "Roth Conversion",
             "tax_cost": round(roth_tax_cost, 2),
             "roi": round(roth_future_savings - roth_tax_cost, 2),
-            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now. Potential long-term savings: ${roth_future_savings:.2f}"
+            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, potentially save ${roth_future_savings:.2f} long-term."
         })
 
     if "s_corp_election" in data.strategy_flags and data.business_income > 30000:
@@ -1339,9 +1334,10 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "name": "ACA Subsidy Optimization",
             "tax_cost": 0,
             "roi": subsidy_value,
-            "summary": f"Keep AGI under threshold to retain ~$3,200 in ACA health insurance subsidies."
+            "summary": f"Retain estimated ACA subsidy of ${subsidy_value:.2f} by keeping income under threshold."
         })
 
+    # Return JSON if PDF not requested
     if not data.show_pdf:
         return {
             "agi": round(agi, 2),
@@ -1349,7 +1345,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "strategies": strategies
         }
 
-    # PDF Generation
+    # Generate PDF
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
         c = canvas.Canvas(tmpfile.name, pagesize=landscape(letter))
         width, height = landscape(letter)
@@ -1363,27 +1359,25 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             if y < 1 * inch:
                 c.showPage()
                 y = height - 1 * inch
-            clean_text = safe_ascii(text)
-            if bold:
-                c.setFont("Helvetica-Bold", 12)
-            else:
-                c.setFont("Helvetica", 11)
-            c.drawString(x_margin, y, clean_text)
+            font = "Helvetica-Bold" if bold else "Helvetica"
+            c.setFont(font, 12 if bold else 11)
+            c.drawString(x_margin, y, str(text))
             y -= line_height
 
         draw_line("TAX STRATEGY REPORT", bold=True)
         draw_line(f"Filing Status: {data.filing_status}")
-        draw_line(f"Adjusted Gross Income (AGI): ${agi:.2f}")
-        draw_line(f"Taxable Income: ${taxable_income:.2f}")
+        draw_line(f"Adjusted Gross Income (AGI): ${agi:,.2f}")
+        draw_line(f"Taxable Income: ${taxable_income:,.2f}")
         draw_line("")
 
         if strategies:
             draw_line("Strategy Recommendations", bold=True)
             for s in strategies:
-                draw_line(f"{s['name']}", bold=True)
+                draw_line(f"- {s['name']}", bold=True)
                 draw_line(f"  Tax Cost: ${s['tax_cost']:.2f}")
                 draw_line(f"  ROI: ${s['roi']:.2f}")
-                draw_line(f"  {s['summary']}")
+                for line in str(s["summary"]).splitlines():
+                    draw_line(f"  {line}")
                 draw_line("")
         else:
             draw_line("No strategy recommendations available.")
