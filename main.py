@@ -1308,16 +1308,31 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     if "roth_conversion" in data.strategy_flags and data.business_income > 0:
         roth_tax_cost = 0.22 * data.business_income
         roth_future_savings = roth_tax_cost * 2.5
-        strategies.append(f"Roth Conversion:\n  Convert ${data.business_income} to Roth.\n  Pay ${roth_tax_cost:.2f} now.\n  Long-term savings: ~${roth_future_savings:.2f}")
+        strategies.append({
+            "name": "Roth Conversion",
+            "tax_cost": round(roth_tax_cost, 2),
+            "roi": round(roth_future_savings - roth_tax_cost, 2),
+            "summary": f"Convert ${data.business_income} to Roth. Pay ${roth_tax_cost:.2f} now, potentially save ${roth_future_savings:.2f} long-term."
+        })
 
     if "s_corp_election" in data.strategy_flags and data.business_income > 30000:
         payroll = 0.6 * data.business_income
         se_tax_savings = 0.153 * (data.business_income - payroll)
-        strategies.append(f"S-Corp Election:\n  Salary: ${payroll:.0f}\n  Estimated SE tax savings: ${se_tax_savings:.2f}")
+        strategies.append({
+            "name": "S-Corp Election",
+            "tax_cost": 0,
+            "roi": round(se_tax_savings, 2),
+            "summary": f"Elect S-Corp. Reasonable salary: ${payroll:.0f}. Estimated self-employment tax savings: ${se_tax_savings:.2f}."
+        })
 
     if "aca_optimization" in data.strategy_flags and taxable_income < 75000:
         subsidy_value = 3200
-        strategies.append(f"ACA Optimization:\n  AGI under threshold preserves ~$3,200 in health subsidies.")
+        strategies.append({
+            "name": "ACA Subsidy Preservation",
+            "tax_cost": 0,
+            "roi": subsidy_value,
+            "summary": f"Retain estimated ACA subsidy of ${subsidy_value:.2f} by keeping income under threshold."
+        })
 
     if not data.show_pdf:
         return {
@@ -1326,38 +1341,45 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "strategies": strategies
         }
 
-    # ✅ Generate PDF in plain Courier format
+    # Generate PDF using ReportLab (plain ASCII, landscape, clean formatting)
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import landscape, letter
+    from reportlab.lib.units import inch
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
         c = canvas.Canvas(tmpfile.name, pagesize=landscape(letter))
         width, height = landscape(letter)
 
-        c.setFont("Courier", 11)
-        y = height - 50
+        x_margin = 1 * inch
+        y = height - 1 * inch
+        line_height = 14
 
-        def draw_line(text):
+        def draw_line(text, bold=False):
             nonlocal y
-            if y < 50:
+            if y < 1 * inch:
                 c.showPage()
-                y = height - 50
-                c.setFont("Courier", 11)
-            c.drawString(40, y, text)
-            y -= 20
+                y = height - 1 * inch
+            c.setFont("Helvetica-Bold", 12 if bold else 11)
+            c.drawString(x_margin, y, safe_text(text))
+            y -= line_height
 
-        draw_line("TAX STRATEGY REPORT")
-        draw_line("-" * 60)
+        draw_line("TAX STRATEGY REPORT", bold=True)
         draw_line(f"Filing Status: {data.filing_status}")
-        draw_line(f"Adjusted Gross Income (AGI): ${agi:,.2f}")
-        draw_line(f"Taxable Income: ${taxable_income:,.2f}")
+        draw_line(f"Adjusted Gross Income (AGI): ${agi:.2f}")
+        draw_line(f"Taxable Income: ${taxable_income:.2f}")
         draw_line("")
 
-        draw_line("RECOMMENDED STRATEGIES:")
-        if not strategies:
-            draw_line("  No applicable strategies found.")
-        else:
+        if strategies:
+            draw_line("Strategy Recommendations", bold=True)
             for s in strategies:
-                for line in s.split("\n"):
+                draw_line(f"{s['name']}", bold=True)
+                draw_line(f"  Tax Cost: ${s['tax_cost']:.2f}")
+                draw_line(f"  ROI: ${s['roi']:.2f}")
+                for line in str(s['summary']).splitlines():
                     draw_line(f"  {line}")
                 draw_line("")
+        else:
+            draw_line("No strategy recommendations available.")
 
         c.save()
         return FileResponse(tmpfile.name, media_type="application/pdf", filename="strategy_report.pdf")
