@@ -123,6 +123,19 @@ async def quick_entry_plan(data):
 
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
 
+import re
+from fpdf import FPDF
+import tempfile
+from fastapi.responses import FileResponse
+
+def safe_text(value):
+    try:
+        text = str(value)
+        # Strip emojis, bullets, and non-ASCII
+        clean = re.sub(r"[^\x00-\x7F]+", "", text)
+        return clean.encode("latin-1", errors="ignore").decode("latin-1")
+    except Exception:
+        return str(value)
 
    
        
