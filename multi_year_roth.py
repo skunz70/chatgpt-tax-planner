@@ -17,7 +17,8 @@ class YearlyProjection(BaseModel):
     marginal_rate: str
 
 @router.post("/multi_year_roth_projection", response_model=List[YearlyProjection])
-def multi_year_roth_projection(data: MultiYearRothRequest):
+def compare_scenarios(data: MultiYearRothRequest):
+
     projections = []
     for i in range(data.years):
         year = 2025 + i
