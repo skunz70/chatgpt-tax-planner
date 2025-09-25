@@ -3,6 +3,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse
 
 from fastapi.middleware.cors import CORSMiddleware
+from year_end_planning import generate_strategy_with_roi
+from multi_year_roth import compare_scenarios
 
 from uuid import uuid4
 import pytesseract
@@ -222,6 +224,8 @@ async def tax_router(request: ActionRequest):
         "prompt_helper": prompt_helper,
         "quick_entry_plan": quick_entry_plan,  # ✅ NEW shortcut action
         "smart_strategy_report": smart_strategy_report,
+        "scenario_comparison": compare_scenarios,
+        "generate_strategy_with_roi": generate_strategy_with_roi,
 
     }
 
