@@ -4,6 +4,7 @@ from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse,
 
 from fastapi.middleware.cors import CORSMiddleware
 from year_end_planning import year_end_plan
+from withdrawal_optimizer import router as withdrawal_optimizer_router
 
 from multi_year_roth import compare_scenarios
 
@@ -176,6 +177,7 @@ async def quick_entry_plan(data):
     itemized_deductions = data.get("itemized_deductions", 0)
     estimated_payments = data.get("estimated_payments", 0)
     filing_status = data.get("filing_status", "single")
+    app.include_router(withdrawal_optimizer_router)
 
     agi = w2_income + business_income + capital_gains + dividend_income - retirement_contributions
 
