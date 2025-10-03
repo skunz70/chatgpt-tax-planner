@@ -369,16 +369,18 @@ async def parse_1040(file: UploadFile = File(...)):
     from pdf2image import convert_from_bytes
     import re
 
-    def extract_values(text):
-        agi_match = re.search(r"Adjusted Gross Income\s+\$?([0-9,]+)", text, re.IGNORECASE)
-        taxable_income_match = re.search(r"Taxable Income\s+\$?([0-9,]+)", text, re.IGNORECASE)
-        total_tax_match = re.search(r"Total Tax\s+\$?([0-9,]+)", text, re.IGNORECASE)
-
-        agi = int(agi_match.group(1).replace(',', '')) if agi_match else None
-        taxable_income = int(taxable_income_match.group(1).replace(',', '')) if taxable_income_match else None
-        total_tax = int(total_tax_match.group(1).replace(',', '')) if total_tax_match else None
-
-        return agi, taxable_income, total_tax
+    def extract_1040_lines(text: str) -> dict:
+    lines = {
+        "agi": None,
+        ...
+    }
+    patterns = {
+        "agi": r"11\s+.*?\$?\s*([\d,]+)",
+        ...
+    }
+    for key, pattern in patterns.items():
+        ...
+    return lines
 
     # Step 1: Try standard PDF text extraction
     reader = PdfReader(file.file)
