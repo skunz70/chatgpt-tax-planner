@@ -369,7 +369,7 @@ async def parse_1040(file: UploadFile = File(...)):
     from pdf2image import convert_from_bytes
     import re
 
-   def extract_1040_lines(text: str) -> dict:
+  def extract_1040_lines(text: str) -> dict:
     import re
 
     lines = {
@@ -398,6 +398,7 @@ async def parse_1040(file: UploadFile = File(...)):
             lines[key] = int(match.group(1).replace(",", ""))
 
     return lines
+
 
 
 @app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF with OCR fallback")
