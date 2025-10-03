@@ -372,38 +372,59 @@ async def parse_1040(file: UploadFile = File(...)):
     def extract_1040_lines(text: str) -> dict:
     lines = {
         "agi": None,
-        ...
+        "taxable_income": None,
+        "total_tax": None,
+        "withholding": None,
+        "estimated_payments": None,
+        "total_payments": None,
+        "balance_due": None,
     }
+
     patterns = {
         "agi": r"11\s+.*?\$?\s*([\d,]+)",
-        ...
+        "taxable_income": r"15\s+.*?\$?\s*([\d,]+)",
+        "total_tax": r"24\s+.*?\$?\s*([\d,]+)",
+        "withholding": r"25d\s+.*?\$?\s*([\d,]+)",
+        "estimated_payments": r"26\s+.*?\$?\s*([\d,]+)",
+        "total_payments": r"33\s+.*?\$?\s*([\d,]+)",
+        "balance_due": r"37\s+.*?\$?\s*([\d,]+)",
     }
+
     for key, pattern in patterns.items():
-        ...
+        match = re.search(pattern, text)
+        if match:
+            lines[key] = int(match.group(1).replace(",", ""))
+
     return lines
 
-    # Step 1: Try standard PDF text extraction
-    reader = PdfReader(file.file)
-    extracted_text = "".join(page.extract_text() or "" for page in reader.pages)
-    agi, taxable_income, total_tax = extract_values(extracted_text)
+@app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF with OCR fallback")
+async def parse_1040(file: UploadFile = File(...)):
+    pdf_bytes = await file.read()
+    text = ""
 
-    # Step 2: If no values found, use OCR
-    if not all([agi, taxable_income, total_tax]):
-        file.file.seek(0)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
-            temp_pdf.write(file.file.read())
-            temp_pdf_path = temp_pdf.name
+    try:
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        text = "".join(page.extract_text() or "" for page in reader.pages)
+    except:
+        text = ""
 
-        images = convert_from_bytes(open(temp_pdf_path, 'rb').read())
-        ocr_text = "\n".join(pytesseract.image_to_string(img) for img in images)
-        agi, taxable_income, total_tax = extract_values(ocr_text)
+    if not text.strip():
+        text = extract_text_with_ocr(pdf_bytes)
+
+    lines = extract_1040_lines(text)
 
     return {
-        "filing_status": "married_filing_jointly" if "joint" in extracted_text.lower() else "single",
-        "agi": agi or 0,
-        "taxable_income": taxable_income or 0,
-        "total_tax": total_tax or 0
+        "filing_status": "married_filing_jointly" if "joint" in text.lower() else "single",
+        "agi": lines["agi"],
+        "taxable_income": lines["taxable_income"],
+        "total_tax": lines["total_tax"],
+        "withholding": lines["withholding"],
+        "estimated_payments": lines["estimated_payments"],
+        "total_payments": lines["total_payments"],
+        "balance_due": lines["balance_due"]
     }
+
+   
 
 
    
