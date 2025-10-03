@@ -362,16 +362,16 @@ from pdf2image import convert_from_bytes
 import pytesseract
 import io
 
-@app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF with OCR fallback")
-async def parse_1040(file: UploadFile = File(...)):
-    import tempfile
-    import pytesseract
-    from pdf2image import convert_from_bytes
-    import re
+from fastapi import FastAPI, UploadFile, File
+from PyPDF2 import PdfReader
+import io
+import re
+from pdf2image import convert_from_bytes
+import pytesseract
 
-def extract_1040_lines(text: str) -> dict:
-    import re
+app = FastAPI()
 
+def extract_1040_lines_from_text(text: str) -> dict:
     lines = {
         "agi": None,
         "taxable_income": None,
@@ -381,44 +381,51 @@ def extract_1040_lines(text: str) -> dict:
         "total_payments": None,
         "balance_due": None,
     }
-
     patterns = {
         "agi": r"11\s+.*?\$?\s*([\d,]+)",
         "taxable_income": r"15\s+.*?\$?\s*([\d,]+)",
         "total_tax": r"24\s+.*?\$?\s*([\d,]+)",
         "withholding": r"25d\s+.*?\$?\s*([\d,]+)",
-        "estimated_payments": r"26\s+.*?\$?\s*([\d,]+)",
-        "total_payments": r"33\s+.*?\$?\s*([\d,]+)",
+        "estimated_payments": r"33\s+.*?\$?\s*([\d,]+)",  # sometimes 33 is “total payments”
         "balance_due": r"37\s+.*?\$?\s*([\d,]+)",
     }
-
-    for key, pattern in patterns.items():
-        match = re.search(pattern, text)
-        if match:
-            lines[key] = int(match.group(1).replace(",", ""))
-
+    for key, pat in patterns.items():
+        m = re.search(pat, text)
+        if m:
+            try:
+                lines[key] = int(m.group(1).replace(",", ""))
+            except:
+                pass
     return lines
 
-
+def ocr_extract_text(pdf_bytes: bytes) -> str:
+    text = ""
+    images = convert_from_bytes(pdf_bytes)
+    for img in images:
+        text += pytesseract.image_to_string(img) + "\n"
+    return text
 
 @app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF with OCR fallback")
 async def parse_1040(file: UploadFile = File(...)):
     pdf_bytes = await file.read()
-    text = ""
 
-    try:
-        reader = PdfReader(io.BytesIO(pdf_bytes))
-        text = "".join(page.extract_text() or "" for page in reader.pages)
-    except:
-        text = ""
+    # Try OCR first (since your forms are scanned)
+    text = ocr_extract_text(pdf_bytes)
 
+    # Then fallback: try reading embedded text
     if not text.strip():
-        text = extract_text_with_ocr(pdf_bytes)
+        try:
+            reader = PdfReader(io.BytesIO(pdf_bytes))
+            pages_text = [page.extract_text() or "" for page in reader.pages]
+            text = "\n".join(pages_text)
+        except:
+            pass
 
-    lines = extract_1040_lines(text)
-
+    # Now parse the key 1040 values
+    lines = extract_1040_lines_from_text(text)
+    # Return what we can
     return {
-        "filing_status": "married_filing_jointly" if "joint" in text.lower() else "single",
+        "filing_status": "unknown",  # you can improve this logic if “Married,” etc. appears in text
         "agi": lines["agi"],
         "taxable_income": lines["taxable_income"],
         "total_tax": lines["total_tax"],
