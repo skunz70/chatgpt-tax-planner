@@ -2,6 +2,7 @@ from fastapi import FastAPI, status, HTTPException, Depends, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse
 from fastapi.responses import HTMLResponse
+app = FastAPI()
 
 @app.get("/upload", response_class=HTMLResponse)
 def upload_form():
