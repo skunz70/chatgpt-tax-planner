@@ -8,6 +8,8 @@ router = APIRouter()
 
 @router.post("/auto_tax_plan")
 async def auto_tax_plan(file: UploadFile = File(...)):
+    print(f"📥 Received file: {file.filename}")  # <--- LOGGING LINE HERE
+
     # Save uploaded temporary PDF
     temp_name = f"/tmp/{file.filename}"
     with open(temp_name, "wb") as f:
@@ -25,3 +27,4 @@ async def auto_tax_plan(file: UploadFile = File(...)):
     strat = generateStrategyWithROI(parsed)
 
     return JSONResponse(content=strat)
+
