@@ -12,6 +12,8 @@ def upload_form():
 from fastapi.middleware.cors import CORSMiddleware
 from year_end_planning import year_end_plan
 from withdrawal_optimizer import router as withdrawal_optimizer_router
+from auto_tax_plan import router as auto_tax_plan_router
+app.include_router(auto_tax_plan_router)
 
 from multi_year_roth import compare_scenarios
 
