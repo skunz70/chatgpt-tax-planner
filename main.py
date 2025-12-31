@@ -1,19 +1,31 @@
 from fastapi import FastAPI, status, HTTPException, Depends, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse
-from fastapi.responses import HTMLResponse
+from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+
+from year_end_planning import year_end_plan
+from withdrawal_optimizer import router as withdrawal_optimizer_router
+from auto_tax_plan import router as auto_tax_plan_router
+
 app = FastAPI()
 
+# Your new parse_1040 route
+@app.post("/parse_1040")
+async def parse_1040(file: UploadFile = File(...)):
+    contents = await file.read()
+    # TODO: add your 1040 parsing logic here
+    return {"status": "received", "filename": file.filename}
+
+# Your upload form route
 @app.get("/upload", response_class=HTMLResponse)
 def upload_form():
     with open("Frontend/upload.html", "r") as f:
         return f.read()
 
-from fastapi.middleware.cors import CORSMiddleware
-from year_end_planning import year_end_plan
-from withdrawal_optimizer import router as withdrawal_optimizer_router
-from auto_tax_plan import router as auto_tax_plan_router
+# Include routers (order matters)
 app.include_router(auto_tax_plan_router)
+app.include_router(withdrawal_optimizer_router)
+
 
 from multi_year_roth import compare_scenarios
 
