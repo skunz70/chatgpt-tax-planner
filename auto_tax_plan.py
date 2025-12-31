@@ -1,35 +1,27 @@
-from fastapi import APIRouter, UploadFile, File
-from fastapi.responses import FileResponse
-import os
-from uuid import uuid4
+from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi.responses import JSONResponse
+from parse_1040 import parse1040
+from parse_1120s import parse1120s
+from generate_strategy_with_roi import generateStrategyWithROI
 
 router = APIRouter()
 
 @router.post("/auto_tax_plan")
 async def auto_tax_plan(file: UploadFile = File(...)):
-    # Save uploaded file
-    temp_filename = f"/tmp/{uuid4()}_{file.filename}"
-    with open(temp_filename, "wb") as f:
+    # Save uploaded temporary PDF
+    temp_name = f"/tmp/{file.filename}"
+    with open(temp_name, "wb") as f:
         f.write(await file.read())
 
-    # Simulate OCR & tax analysis
-    # TODO: Replace this with actual parsing logic for 1040, 1120-S, etc.
-    tax_summary_text = f"""
-    Tax Plan Summary (Auto Generated):
+    # Guess form type by filename or first page text
+    if "1040" in file.filename:
+        parsed = parse1040(temp_name)
+    elif "1120" in file.filename:
+        parsed = parse1120s(temp_name)
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported tax form")
 
-    - Detected Form: {file.filename}
-    - AGI: $152,000
-    - Taxable Income: $122,000
-    - Suggested Strategies:
-      * Roth Conversion: Convert $40,000 → Save $22,000 over time.
-      * S-Corp Election: Save ~$2,448 in SE tax.
+    # Generate strategy
+    strat = generateStrategyWithROI(parsed)
 
-    This is a sample output.
-    """
-
-    # Save the result to a PDF (as plain text for now)
-    result_path = f"/tmp/{uuid4()}_tax_plan.txt"
-    with open(result_path, "w") as f:
-        f.write(tax_summary_text)
-
-    return FileResponse(result_path, filename="automated_tax_plan.txt")
+    return JSONResponse(content=strat)
