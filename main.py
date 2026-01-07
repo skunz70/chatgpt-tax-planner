@@ -14,6 +14,12 @@ from parse_1040 import parse1040
 from report_generator import generate_tax_plan_pdf
 from fastapi.responses import StreamingResponse
 import io
+from fastapi.responses import HTMLResponse
+
+@app.get("/upload", response_class=HTMLResponse)
+def upload_form():
+    with open("Frontend/upload.html", "r") as f:
+        return f.read()
 
 @app.post("/parse_1040")
 async def parse_1040_endpoint(file: UploadFile = File(...)):
