@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Tax Planner Upload",
+  "name_for_model": "tax_planner_upload",
+  "description_for_human": "Upload a tax return (1040, etc.) and generate a tax planning report.",
+  "description_for_model": "Upload a tax return file and return a PDF report with tax planning suggestions.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://chatgpt-tax-planner.onrender.com/openapi.yaml"
+  },
+  "logo_url": "https://chatgpt-tax-planner.onrender.com/Valhalla%20Logo%20Eagle-Tax%20Services.jpg",
+  "contact_email": "skunz@valhallataxservice.com",
+  "legal_info_url": "https://valhallataxservice.com/legal"
+}
