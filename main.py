@@ -9,12 +9,13 @@ from auto_tax_plan import router as auto_tax_plan_router
 
 app = FastAPI()
 
-# Your new parse_1040 route
+from parse_1040 import parse1040
+
 @app.post("/parse_1040")
-async def parse_1040(file: UploadFile = File(...)):
+async def parse_1040_endpoint(file: UploadFile = File(...)):
     contents = await file.read()
-    # TODO: add your 1040 parsing logic here
-    return {"status": "received", "filename": file.filename}
+    data = parse1040(contents)
+    return data
 
 # Your upload form route
 @app.get("/upload", response_class=HTMLResponse)
