@@ -2,12 +2,23 @@ from fastapi import FastAPI, status, HTTPException, Depends, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
+
 
 from year_end_planning import year_end_plan
 from withdrawal_optimizer import router as withdrawal_optimizer_router
 from auto_tax_plan import router as auto_tax_plan_router
 
 app = FastAPI()
+# Serve the openapi.yaml and ai-plugin.json files
+# 1) Expose the root for openapi.yaml
+if os.path.exists("openapi.yaml"):
+    app.mount("/", StaticFiles(directory=".", html=True), name="static-root")
+
+# 2) Expose the .well-known folder
+if os.path.exists(".well-known"):
+    app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
 
 from parse_1040 import parse1040
 
