@@ -15,6 +15,7 @@ from report_generator import generate_tax_plan_pdf
 from fastapi.responses import StreamingResponse
 import io
 from fastapi.responses import HTMLResponse
+print("REGISTERING UPLOAD ROUTE")
 
 @app.get("/upload", response_class=HTMLResponse)
 def upload_form():
