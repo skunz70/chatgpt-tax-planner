@@ -11,11 +11,35 @@ app = FastAPI()
 
 from parse_1040 import parse1040
 
+from report_generator import generate_tax_plan_pdf
+from fastapi.responses import StreamingResponse
+import io
+
 @app.post("/parse_1040")
 async def parse_1040_endpoint(file: UploadFile = File(...)):
     contents = await file.read()
     data = parse1040(contents)
-    return data
+
+    # Compose report data structure
+    report_data = {
+        "filing_status": "Married Filing Jointly",  # Optional: make dynamic later
+        "agi": float(data.get("agi", 0)),
+        "taxable_income": float(data.get("taxable_income", 0)),
+        "total_tax": float(data.get("tax", 0)),  # Placeholder for now
+        "marginal_rate": "22%",  # Placeholder
+        "strategies": [f"{s['name']}: {s['summary']} (ROI: ${s['roi']:,}, Tax Cost: ${s['tax_cost']:,})" for s in data.get("strategies", [])],
+    }
+
+    # Generate PDF bytes
+    pdf_bytes = generate_tax_plan_pdf(report_data)
+
+    # Return as downloadable PDF
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline; filename=tax_plan_report.pdf"}
+    )
+
 
 # Your upload form route
 @app.get("/upload", response_class=HTMLResponse)
