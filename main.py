@@ -1479,3 +1479,6 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         return FileResponse(tmpfile.name, media_type="application/pdf", filename="strategy_report.pdf")
 from auto_tax_plan import router as auto_tax_plan_router
 app.include_router(auto_tax_plan_router)
+@app.get("/")
+def root():
+    return {"message": "Main.py is active"}
