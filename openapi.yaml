@@ -1,0 +1,30 @@
+openapi: 3.0.1
+info:
+  title: Tax Planner Upload API
+  description: Upload a tax return PDF and generate a customized planning report.
+  version: "1.0.0"
+servers:
+  - url: https://chatgpt-tax-planner.onrender.com
+paths:
+  /parse_1040:
+    post:
+      summary: Upload and parse a 1040 tax return
+      operationId: parse1040
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Successfully generated report
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
