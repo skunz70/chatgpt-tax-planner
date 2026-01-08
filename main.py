@@ -4,19 +4,24 @@ from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse,
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+import io
+
+# ✅ Only ONE app instance
 app = FastAPI()
-# Serve static plugin and schema files
+
+# ✅ Serve static plugin and schema files BEFORE other routes
 if os.path.exists("openapi.yaml"):
     app.mount("/openapi.yaml", StaticFiles(directory=".", html=True), name="openapi-file")
 
-# Serve manifest from .well-known folder
 if os.path.exists(".well-known"):
     app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
 
-
+# ✅ Import everything else AFTER static mounts
 from year_end_planning import year_end_plan
 from withdrawal_optimizer import router as withdrawal_optimizer_router
 from auto_tax_plan import router as auto_tax_plan_router
+from parse_1040 import parse1040
+from report_generator import generate_tax_plan_pdf
 
 app = FastAPI()
 # Serve the openapi.yaml and ai-plugin.json files
