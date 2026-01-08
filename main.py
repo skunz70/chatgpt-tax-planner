@@ -4,6 +4,14 @@ from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse,
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+app = FastAPI()
+# Serve static plugin and schema files
+if os.path.exists("openapi.yaml"):
+    app.mount("/openapi.yaml", StaticFiles(directory=".", html=True), name="openapi-file")
+
+# Serve manifest from .well-known folder
+if os.path.exists(".well-known"):
+    app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
 
 
 from year_end_planning import year_end_plan
