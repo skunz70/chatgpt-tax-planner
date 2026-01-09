@@ -15,6 +15,27 @@ if os.path.exists("openapi.yaml"):
 
 if os.path.exists(".well-known"):
     app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
+from fastapi import Response
+
+# Serve plugin manifest directly
+@app.get("/.well-known/ai-plugin.json", response_class=Response)
+def get_plugin_manifest():
+    try:
+        with open("ai-plugin.json", "r") as f:
+            content = f.read()
+        return Response(content=content, media_type="application/json")
+    except FileNotFoundError:
+        return Response(content="Plugin manifest not found", media_type="text/plain")
+
+# Serve OpenAPI spec directly
+@app.get("/openapi.yaml", response_class=Response)
+def get_openapi_yaml():
+    try:
+        with open("openapi.yaml", "r") as f:
+            content = f.read()
+        return Response(content=content, media_type="application/x-yaml")
+    except FileNotFoundError:
+        return Response(content="OpenAPI spec not found", media_type="text/plain")
 
 # ✅ Import everything else AFTER static mounts
 from year_end_planning import year_end_plan
