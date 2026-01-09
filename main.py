@@ -3,6 +3,7 @@ from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse,
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import io
+from fastapi.staticfiles import StaticFiles
 
 # ---- ONE FastAPI app ----
 app = FastAPI()
