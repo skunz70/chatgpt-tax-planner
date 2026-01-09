@@ -50,7 +50,7 @@ from report_generator import generate_tax_plan_pdf
 
 # 2) Expose the .well-known folder
 if os.path.exists(".well-known"):
-    app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
+    
 
 from parse_1040 import parse1040
 
