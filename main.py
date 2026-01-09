@@ -46,11 +46,7 @@ from report_generator import generate_tax_plan_pdf
 
 
 
-app = FastAPI()
-# Serve the openapi.yaml and ai-plugin.json files
-# 1) Expose the root for openapi.yaml
-if os.path.exists("openapi.yaml"):
-    app.mount("/", StaticFiles(directory=".", html=True), name="static-root")
+
 
 # 2) Expose the .well-known folder
 if os.path.exists(".well-known"):
