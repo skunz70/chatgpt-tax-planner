@@ -7,10 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordRequestForm
 
-# ---- ONE FastAPI app ----
+# ---- One FastAPI app instance ----
 app = FastAPI()
 
-# ---- CORS (optional) ----
+# ---- CORS middleware ----
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -39,13 +39,17 @@ def serve_openapi_spec():
     except FileNotFoundError:
         return Response("OpenAPI spec not found", media_type="text/plain")
 
+# ---- Serve static files from .well-known ----
+if os.path.exists(".well-known"):
+    app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
 
-# ---- Import your internal modules ----
+# ---- Import your internal routes AFTER mounting ----
 from year_end_planning import year_end_plan
 from withdrawal_optimizer import router as withdrawal_optimizer_router
 from auto_tax_plan import router as auto_tax_plan_router
 from parse_1040 import parse1040
 from report_generator import generate_tax_plan_pdf
+
 
 
 
