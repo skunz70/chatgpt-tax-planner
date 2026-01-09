@@ -4,10 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import io
 
-# ---- ONE FastAPI instance ----
+# ---- ONE FastAPI app ----
 app = FastAPI()
 
-# ---- CORS (optional but often needed) ----
+# ---- CORS (optional) ----
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,8 +21,8 @@ app.add_middleware(
 def serve_plugin_manifest():
     try:
         with open("ai-plugin.json", "r") as f:
-            content = f.read()
-        return Response(content, media_type="application/json")
+            raw = f.read()
+        return Response(raw, media_type="application/json")
     except FileNotFoundError:
         return Response("Plugin manifest not found", media_type="text/plain")
 
@@ -31,10 +31,11 @@ def serve_plugin_manifest():
 def serve_openapi_spec():
     try:
         with open("openapi.yaml", "r") as f:
-            content = f.read()
-        return Response(content, media_type="application/x-yaml")
+            raw = f.read()
+        return Response(raw, media_type="application/x-yaml")
     except FileNotFoundError:
         return Response("OpenAPI spec not found", media_type="text/plain")
+
 
 # ---- Import your internal modules ----
 from year_end_planning import year_end_plan
