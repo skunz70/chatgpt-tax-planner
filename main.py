@@ -1,9 +1,11 @@
-from fastapi import FastAPI, Response, UploadFile, File
-from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
 import os
 import io
+
+from fastapi import FastAPI, Response, UploadFile, File, Depends, HTTPException
+from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import OAuth2PasswordRequestForm
 
 # ---- ONE FastAPI app ----
 app = FastAPI()
