@@ -1,48 +1,49 @@
-from fastapi import FastAPI, status, HTTPException, Depends, UploadFile, File
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import FastAPI, Response, UploadFile, File
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 import os
-import io
 
-# ✅ Only ONE app instance
+# ---- ONE FastAPI app ----
 app = FastAPI()
 
-# ✅ Serve static plugin and schema files BEFORE other routes
-if os.path.exists("openapi.yaml"):
-    app.mount("/openapi.yaml", StaticFiles(directory=".", html=True), name="openapi-file")
-
-if os.path.exists(".well-known"):
-    app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
-from fastapi import Response
-
-# Serve plugin manifest directly
+# ---- Serve plugin manifest at exact URL ----
 @app.get("/.well-known/ai-plugin.json", response_class=Response)
-def get_plugin_manifest():
+def serve_plugin_manifest():
     try:
         with open("ai-plugin.json", "r") as f:
             content = f.read()
-        return Response(content=content, media_type="application/json")
-    except FileNotFoundError:
-        return Response(content="Plugin manifest not found", media_type="text/plain")
+        return Response(content, media_type="application/json")
+    except Exception as e:
+        return Response(f"Error loading plugin manifest: {e}", media_type="text/plain")
 
-# Serve OpenAPI spec directly
+# ---- Serve OpenAPI spec ----
 @app.get("/openapi.yaml", response_class=Response)
-def get_openapi_yaml():
+def serve_openapi_spec():
     try:
         with open("openapi.yaml", "r") as f:
             content = f.read()
-        return Response(content=content, media_type="application/x-yaml")
-    except FileNotFoundError:
-        return Response(content="OpenAPI spec not found", media_type="text/plain")
+        return Response(content, media_type="application/x-yaml")
+    except Exception as e:
+        return Response(f"Error loading openapi spec: {e}", media_type="text/plain")
 
-# ✅ Import everything else AFTER static mounts
+# ---- CORS (optional) ----
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ---- Now import everything else ----
 from year_end_planning import year_end_plan
 from withdrawal_optimizer import router as withdrawal_optimizer_router
 from auto_tax_plan import router as auto_tax_plan_router
 from parse_1040 import parse1040
 from report_generator import generate_tax_plan_pdf
+
+# ---- Continue with your existing routes / included routers below ----
+
 
 app = FastAPI()
 # Serve the openapi.yaml and ai-plugin.json files
