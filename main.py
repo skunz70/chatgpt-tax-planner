@@ -2,31 +2,12 @@ from fastapi import FastAPI, Response, UploadFile, File
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import io
 
-# ---- ONE FastAPI app ----
+# ---- ONE FastAPI instance ----
 app = FastAPI()
 
-# ---- Serve plugin manifest at exact URL ----
-@app.get("/.well-known/ai-plugin.json", response_class=Response)
-def serve_plugin_manifest():
-    try:
-        with open("ai-plugin.json", "r") as f:
-            content = f.read()
-        return Response(content, media_type="application/json")
-    except Exception as e:
-        return Response(f"Error loading plugin manifest: {e}", media_type="text/plain")
-
-# ---- Serve OpenAPI spec ----
-@app.get("/openapi.yaml", response_class=Response)
-def serve_openapi_spec():
-    try:
-        with open("openapi.yaml", "r") as f:
-            content = f.read()
-        return Response(content, media_type="application/x-yaml")
-    except Exception as e:
-        return Response(f"Error loading openapi spec: {e}", media_type="text/plain")
-
-# ---- CORS (optional) ----
+# ---- CORS (optional but often needed) ----
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,14 +16,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---- Now import everything else ----
+# ---- Serve plugin manifest ----
+@app.get("/.well-known/ai-plugin.json", response_class=Response)
+def serve_plugin_manifest():
+    try:
+        with open("ai-plugin.json", "r") as f:
+            content = f.read()
+        return Response(content, media_type="application/json")
+    except FileNotFoundError:
+        return Response("Plugin manifest not found", media_type="text/plain")
+
+# ---- Serve OpenAPI spec ----
+@app.get("/openapi.yaml", response_class=Response)
+def serve_openapi_spec():
+    try:
+        with open("openapi.yaml", "r") as f:
+            content = f.read()
+        return Response(content, media_type="application/x-yaml")
+    except FileNotFoundError:
+        return Response("OpenAPI spec not found", media_type="text/plain")
+
+# ---- Import your internal modules ----
 from year_end_planning import year_end_plan
 from withdrawal_optimizer import router as withdrawal_optimizer_router
 from auto_tax_plan import router as auto_tax_plan_router
 from parse_1040 import parse1040
 from report_generator import generate_tax_plan_pdf
 
-# ---- Continue with your existing routes / included routers below ----
+
 
 
 app = FastAPI()
