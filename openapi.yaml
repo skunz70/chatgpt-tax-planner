@@ -1,7 +1,7 @@
 openapi: 3.0.1
 info:
   title: Tax Planner Upload API
-  description: Upload a tax return PDF and generate a customized planning report.
+  description: Upload a tax return PDF and generate a customized tax planning report.
   version: "1.0.0"
 servers:
   - url: https://chatgpt-tax-planner.onrender.com
@@ -21,10 +21,102 @@ paths:
                   type: string
                   format: binary
       responses:
-        "200":
-          description: Successfully generated report
+        '200':
+          description: Parsed tax data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  filing_status:
+                    type: string
+                  agi:
+                    type: number
+                  taxable_income:
+                    type: number
+                  total_tax:
+                    type: number
+                  withholding:
+                    type: number
+                  estimated_payments:
+                    type: number
+                  total_payments:
+                    type: number
+                  balance_due:
+                    type: number
+
+  /generate_pdf:
+    post:
+      summary: Generate a customized tax plan report
+      operationId: generateTaxPlan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                filing_status:
+                  type: string
+                agi:
+                  type: number
+                taxable_income:
+                  type: number
+                total_tax:
+                  type: number
+                strategies:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: A PDF report of tax strategies
           content:
             application/pdf:
               schema:
                 type: string
                 format: binary
+
+  /year_end_plan:
+    post:
+      summary: Create year-end planning strategy
+      operationId: yearEndPlanning
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agi:
+                  type: number
+                filing_status:
+                  type: string
+                business_income:
+                  type: number
+                retirement_plan_type:
+                  type: string
+      responses:
+        '200':
+          description: Strategy suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  strategies:
+                    type: array
+                    items:
+                      type: string
+
+  /upload:
+    get:
+      summary: HTML upload form for 1040 PDFs
+      operationId: getUploadForm
+      responses:
+        '200':
+          description: HTML form to upload PDF
+          content:
+            text/html:
+              schema:
+                type: string
