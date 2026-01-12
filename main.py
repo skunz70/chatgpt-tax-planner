@@ -20,6 +20,8 @@ app.add_middleware(
 )
 
 # ---- Serve plugin manifest ----
+import pathlib
+
 @app.get("/.well-known/ai-plugin.json", response_class=Response)
 def serve_plugin_manifest():
     manifest_path = pathlib.Path(__file__).parent.joinpath(".well-known/ai-plugin.json")
@@ -29,6 +31,7 @@ def serve_plugin_manifest():
     with open(manifest_path, "r") as f:
         raw = f.read()
     return Response(raw, media_type="application/json")
+
 
 
 # ---- Serve OpenAPI spec ----
