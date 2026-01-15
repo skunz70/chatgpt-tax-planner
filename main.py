@@ -34,6 +34,7 @@ def serve_plugin_manifest():
 
 
 
+
 # ---- Serve OpenAPI spec ----
 import pathlib
 
