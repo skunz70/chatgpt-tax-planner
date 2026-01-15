@@ -24,7 +24,8 @@ import pathlib
 
 @app.get("/.well-known/ai-plugin.json", response_class=Response)
 def serve_plugin_manifest():
-    manifest_path = pathlib.Path(".well-known/ai-plugin.json")
+    manifest_path = pathlib.Path(__file__).parent.joinpath(".well-known", "ai-plugin.json")
+
     if not manifest_path.exists():
         return Response("Plugin manifest not found on server", media_type="text/plain")
 
@@ -69,7 +70,7 @@ from report_generator import generate_tax_plan_pdf
 
 # 2) Expose the .well-known folder
 if os.path.exists(".well-known"):
-    app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
+   
 
     
 
