@@ -41,14 +41,13 @@ import pathlib
 
 @app.get("/openapi.yaml", response_class=Response)
 def serve_openapi_spec():
-    # Use absolute path relative to the project root
-    spec_path = pathlib.Path(__file__).parent.joinpath("openapi.yaml")
-    if not spec_path.exists():
-        return Response("OpenAPI spec not found on server", media_type="text/plain")
+    try:
+        with open("openapi.yaml", "r") as f:
+            content = f.read()
+        return Response(content, media_type="application/x-yaml")
+    except FileNotFoundError:
+        return Response("OpenAPI spec not found", media_type="text/plain")
 
-    with open(spec_path, "r") as f:
-        raw = f.read()
-    return Response(raw, media_type="application/x-yaml")
 
 # ---- Serve static files from .well-known if present ----
 if os.path.exists(".well-known"):
