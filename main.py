@@ -1,10 +1,10 @@
 import os
 import io
 
-from fastapi import FastAPI, Response, UploadFile, File, Depends, HTTPException
+from fastapi import FastAPI, Response, UploadFile, File, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+
 from fastapi.security import OAuth2PasswordRequestForm
 
 # ---- ONE FastAPI app instance ----
@@ -22,37 +22,27 @@ app.add_middleware(
 # ---- Serve plugin manifest ----
 import pathlib
 
-@app.get("/.well-known/ai-plugin.json", response_class=Response)
+@app.get("/.well-known/ai-plugin.json", response_class=Response, include_in_schema=False)
 def serve_plugin_manifest():
     manifest_path = pathlib.Path(__file__).parent.joinpath(".well-known", "ai-plugin.json")
-
-    if not manifest_path.exists():
-        return Response("Plugin manifest not found on server", media_type="text/plain")
-
-    with open(manifest_path, "r") as f:
-        raw = f.read()
-    return Response(raw, media_type="application/json")
+    if not manifest_path.is_file():
+        return Response("Plugin manifest not found", media_type="text/plain", status_code=404)
+    return Response(manifest_path.read_text(encoding="utf-8"), media_type="application/json")
 
 
 
 
 
 # ---- Serve OpenAPI spec ----
-import pathlib
 
-@app.get("/openapi.yaml", response_class=Response)
+@app.get("/openapi.yaml", response_class=Response, include_in_schema=False)
 def serve_openapi_spec():
-    try:
-        with open("openapi.yaml", "r") as f:
-            content = f.read()
-        return Response(content, media_type="application/x-yaml")
-    except FileNotFoundError:
-        return Response("OpenAPI spec not found", media_type="text/plain")
+    spec_path = pathlib.Path(__file__).parent.joinpath("openapi.yaml")
+    if not spec_path.is_file():
+        return Response("OpenAPI spec not found", media_type="text/plain", status_code=404)
+    return Response(spec_path.read_text(encoding="utf-8"), media_type="application/x-yaml")
 
 
-# ---- Serve static files from .well-known if present ----
-if os.path.exists(".well-known"):
-    app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
 
 
 # ---- Import your internal routes AFTER mounting ----
@@ -74,50 +64,12 @@ from report_generator import generate_tax_plan_pdf
 
     
 
-from parse_1040 import parse1040
-
-from report_generator import generate_tax_plan_pdf
-from fastapi.responses import StreamingResponse
-import io
-from fastapi.responses import HTMLResponse
-print("REGISTERING UPLOAD ROUTE")
-
-@app.get("/upload", response_class=HTMLResponse)
-def upload_form():
-    with open("Frontend/upload.html", "r") as f:
-        return f.read()
-
-@app.post("/parse_1040")
-async def parse_1040_endpoint(file: UploadFile = File(...)):
-    contents = await file.read()
-    data = parse1040(contents)
-
-    # Compose report data structure
-    report_data = {
-        "filing_status": "Married Filing Jointly",  # Optional: make dynamic later
-        "agi": float(data.get("agi", 0)),
-        "taxable_income": float(data.get("taxable_income", 0)),
-        "total_tax": float(data.get("tax", 0)),  # Placeholder for now
-        "marginal_rate": "22%",  # Placeholder
-        "strategies": [f"{s['name']}: {s['summary']} (ROI: ${s['roi']:,}, Tax Cost: ${s['tax_cost']:,})" for s in data.get("strategies", [])],
-    }
-
-    # Generate PDF bytes
-    pdf_bytes = generate_tax_plan_pdf(report_data)
-
-    # Return as downloadable PDF
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": "inline; filename=tax_plan_report.pdf"}
-    )
 
 
-# Your upload form route
-@app.get("/upload", response_class=HTMLResponse)
-def upload_form():
-    with open("Frontend/upload.html", "r") as f:
-        return f.read()
+
+
+
+
 
 # Include routers (order matters)
 app.include_router(auto_tax_plan_router)
@@ -193,57 +145,8 @@ class YearEndPlanInput(BaseModel):
     estimated_payments: float = 0
 
 
-from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
 
-# --- ✅ CORS setup starts here ---
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://tax-strategy-frontend.onrender.com"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-# --- ✅ CORS setup ends here ---
-from fastapi.responses import Response
-from report_generator import generate_tax_plan_pdf
-# === Smart Strategy Generator ===
-async def quick_entry_plan(data):
-    w2_income = data.get("w2_income", 0)
-    business_income = data.get("business_income", 0)
-    capital_gains = data.get("capital_gains", 0)
-    dividend_income = data.get("dividend_income", 0)
-    retirement_contributions = data.get("retirement_contributions", 0)
-    itemized_deductions = data.get("itemized_deductions", 0)
-    estimated_payments = data.get("estimated_payments", 0)
-    filing_status = data.get("filing_status", "single")
-
-    agi = w2_income + business_income + capital_gains + dividend_income - retirement_contributions
-
-    threshold_result = await threshold_modeling({
-        "filing_status": filing_status,
-        "agi": agi,
-        "magi": agi
-    })
-
-    strategy_result = await recommend({
-        "agi": agi,
-        "filing_status": filing_status,
-        "business_income": business_income,
-        "retirement_plan_type": "401k"
-    })
-
-    pdf_bytes = generate_smart_strategy_pdf({
-        "filing_status": filing_status,
-        "agi": agi,
-        "taxable_income": agi - 13000,  # This can be refined later with deduction logic
-        "estimated_tax": threshold_result.get("estimated_tax", 0),
-        "strategy_summary": strategy_result.get("strategies", []),
-        "threshold_flags": threshold_result.get("threshold_flags", [])
-    })
-
-    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
 
 import re
 from fpdf import FPDF
@@ -286,37 +189,7 @@ app.include_router(schedule_c_router)
 app.include_router(rental_router)
 app.include_router(year_end_router)
 app.include_router(csv_excel_router)
-async def quick_entry_plan(data):
-    w2_income = data.get("w2_income", 0)
-    business_income = data.get("business_income", 0)
-    capital_gains = data.get("capital_gains", 0)
-    dividend_income = data.get("dividend_income", 0)
-    retirement_contributions = data.get("retirement_contributions", 0)
-    itemized_deductions = data.get("itemized_deductions", 0)
-    estimated_payments = data.get("estimated_payments", 0)
-    filing_status = data.get("filing_status", "single")
-    app.include_router(withdrawal_optimizer_router)
 
-    agi = w2_income + business_income + capital_gains + dividend_income - retirement_contributions
-
-    threshold_result = await threshold_modeling({
-        "filing_status": filing_status,
-        "agi": agi,
-        "magi": agi
-    })
-
-    strategy_result = await recommend({
-        "agi": agi,
-        "filing_status": filing_status,
-        "business_income": business_income,
-        "retirement_plan_type": "401k"
-    })
-
-    return {
-        "agi": agi,
-        "thresholds": threshold_result,
-        "strategies": strategy_result
-    }
 
 @app.post("/gpt-tax-router")
 async def tax_router(request: ActionRequest):
@@ -358,39 +231,7 @@ async def tax_router(request: ActionRequest):
 
 
 
-    selected = brackets.get(filing_status.lower(), brackets["single"])
-    converted_agi = agi + conversion_amount
-
-    for start, end, rate in selected:
-        if start <= converted_agi <= end:
-            return {
-                "original_agi": agi,
-                "new_agi": converted_agi,
-                "marginal_rate": rate,
-                "bracket": f"${start:,} – ${end:,}",
-            }
-
-    return {"error": "Could not determine bracket"}
-
-
-    selected = brackets.get(filing_status.lower(), brackets["single"])
-    converted_agi = agi + conversion_amount
-
-    for start, end, rate in selected:
-        if start <= converted_agi <= end:
-            return {
-                "original_agi": agi,
-                "new_agi": converted_agi,
-                "marginal_rate": rate,
-                "bracket": f"${start:,} – ${end:,}",
-            }
-
-    return {"error": "Could not determine bracket"}
-
-    if request.action not in action_map:
-        raise HTTPException(status_code=400, detail="Invalid action specified.")
-
-    return action_map[request.action](request)
+    
 
 # === Logic for Each Action ===
 
@@ -480,14 +321,14 @@ from pdf2image import convert_from_bytes
 import pytesseract
 import io
 
-from fastapi import FastAPI, UploadFile, File
+
 from PyPDF2 import PdfReader
 import io
 import re
 from pdf2image import convert_from_bytes
 import pytesseract
 
-app = FastAPI()
+
 
 def extract_1040_lines_from_text(text: str) -> dict:
     lines = {
@@ -904,142 +745,35 @@ async def compare_scenarios(data: dict):
         }
     }
     return result
-from fpdf import FPDF
-from fastapi.responses import StreamingResponse
 
-class ScenarioComparisonPDF(FPDF):
-    def header(self):
-        self.set_font("Arial", "B", 14)
-        self.cell(0, 10, "Tax Scenario Comparison", ln=True, align="C")
-        self.ln(5)
-
-    def add_scenario_row(self, label, val1, val2):
-        self.set_font("Arial", "", 12)
-        self.cell(60, 10, label, border=1)
-        self.cell(65, 10, str(val1), border=1)
-        self.cell(65, 10, str(val2), border=1)
-        self.ln()
-
-@app.post("/generate_comparison_pdf", summary="Generate side-by-side tax scenario PDF")
-def generate_comparison_pdf(data: dict):
-    scenario1 = data.get("scenario_1", {})
-    scenario2 = data.get("scenario_2", {})
-
-    pdf = ScenarioComparisonPDF()
-    pdf.add_page()
-
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(60, 10, "", border=1)
-    pdf.cell(65, 10, "Scenario 1", border=1)
-    pdf.cell(65, 10, "Scenario 2", border=1)
-    pdf.ln()
-
-    fields = [
-        ("Filing Status", "filing_status"),
-        ("AGI", "agi"),
-        ("Taxable Income", "taxable_income"),
-        ("Total Tax", "total_tax"),
-        ("Effective Rate", "effective_rate"),
-        ("Marginal Rate", "marginal_rate"),
-        ("Estimated Tax Due", "estimated_tax_due"),
-    ]
-
-    for label, key in fields:
-        val1 = scenario1.get(key, "N/A")
-        val2 = scenario2.get(key, "N/A")
-        pdf.add_scenario_row(label, val1, val2)
-
-    buffer = io.BytesIO()
-    pdf.output(buffer)
-    buffer.seek(0)
-
-    return StreamingResponse(buffer, media_type="application/pdf", headers={
-        "Content-Disposition": "inline; filename=scenario_comparison.pdf"
-    })
 from matplotlib import pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-from fastapi.responses import StreamingResponse
-
-@app.post("/generate_comparison_pdf", summary="Generate a PDF comparing two tax scenarios")
-async def generate_comparison_pdf(data: dict):
-    import io
-
-    s1 = data.get("scenario_1", {})
-    s2 = data.get("scenario_2", {})
-
-    buffer = io.BytesIO()
-    with PdfPages(buffer) as pdf:
-        fig, ax = plt.subplots(figsize=(8.5, 11))
-        ax.set_title("Tax Scenario Comparison", fontsize=16, pad=20)
-        ax.axis("off")
-
-        lines = [
-            f"Filing Status: {s1.get('filing_status', 'N/A')}",
-            "",
-            "Scenario 1",
-            f"AGI: ${s1.get('agi', 0):,.0f}",
-            f"Taxable Income: ${s1.get('taxable_income', 0):,.0f}",
-            f"Total Tax: ${s1.get('total_tax', 0):,.0f}",
-            f"Effective Rate: {s1.get('effective_rate', 'N/A')}",
-            f"Marginal Rate: {s1.get('marginal_rate', 'N/A')}",
-            "",
-            "Scenario 2",
-            f"AGI: ${s2.get('agi', 0):,.0f}",
-            f"Taxable Income: ${s2.get('taxable_income', 0):,.0f}",
-            f"Total Tax: ${s2.get('total_tax', 0):,.0f}",
-            f"Effective Rate: {s2.get('effective_rate', 'N/A')}",
-            f"Marginal Rate: {s2.get('marginal_rate', 'N/A')}",
-            "",
-            "Key Insight:",
-            f"AGI Change: ${s2.get('agi', 0) - s1.get('agi', 0):,.0f}",
-            f"Tax Difference: ${s2.get('total_tax', 0) - s1.get('total_tax', 0):,.0f}",
-        ]
-
-        for i, line in enumerate(lines):
-            ax.text(0.1, 1 - 0.05 * i, line, fontsize=12, va="top")
-
-        pdf.savefig(fig, bbox_inches="tight")
-        plt.close(fig)
-
-    buffer.seek(0)
-    return StreamingResponse(
-        buffer,
-        media_type="application/pdf",
-        headers={"Content-Disposition": "inline; filename=scenario_comparison.pdf"}
-    )
-from matplotlib import pyplot as plt
-from fpdf import FPDF
 from fastapi.responses import StreamingResponse
 
 @app.post("/generate_comparison_pdf", summary="Generate PDF comparing two tax scenarios")
 async def generate_comparison_pdf(data: dict):
-    import io
-
     s1 = data.get("scenario_1", {})
     s2 = data.get("scenario_2", {})
 
-    # Build chart
     fig, ax = plt.subplots(figsize=(6, 4))
-    labels = ['AGI', 'Tax Liability']
+    labels = ["AGI", "Tax Liability"]
     scenario1_vals = [s1.get("agi", 0), s1.get("total_tax", 0)]
     scenario2_vals = [s2.get("agi", 0), s2.get("total_tax", 0)]
 
     x = range(len(labels))
-    ax.bar([i - 0.2 for i in x], scenario1_vals, width=0.4, label='Scenario 1')
-    ax.bar([i + 0.2 for i in x], scenario2_vals, width=0.4, label='Scenario 2')
-    ax.set_ylabel('Dollars')
-    ax.set_title('Tax Comparison')
-    ax.set_xticks(x)
+    ax.bar([i - 0.2 for i in x], scenario1_vals, width=0.4, label="Scenario 1")
+    ax.bar([i + 0.2 for i in x], scenario2_vals, width=0.4, label="Scenario 2")
+    ax.set_ylabel("Dollars")
+    ax.set_title("Tax Comparison")
+    ax.set_xticks(list(x))
     ax.set_xticklabels(labels)
     ax.legend()
 
     chart_buf = io.BytesIO()
     plt.tight_layout()
-    plt.savefig(chart_buf, format='png')
+    plt.savefig(chart_buf, format="png")
     plt.close()
     chart_buf.seek(0)
 
-    # Build PDF
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
@@ -1049,7 +783,9 @@ async def generate_comparison_pdf(data: dict):
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 10, title, ln=True)
         pdf.set_font("Arial", "", 11)
-        pdf.multi_cell(0, 8,
+        pdf.multi_cell(
+            0,
+            8,
             f"Filing Status: {s.get('filing_status', 'N/A')}\n"
             f"AGI: ${s.get('agi', 0):,.0f}\n"
             f"Taxable Income: ${s.get('taxable_income', 0):,.0f}\n"
@@ -1062,25 +798,29 @@ async def generate_comparison_pdf(data: dict):
     add_scenario_block("Scenario 1", s1)
     add_scenario_block("Scenario 2", s2)
 
-    # Add summary
     delta = s2.get("total_tax", 0) - s1.get("total_tax", 0)
-    delta_txt = f"An increase of ${s2.get('agi', 0) - s1.get('agi', 0):,.0f} in AGI resulted in ${delta:,.0f} more in taxes."
+    delta_txt = (
+        f"An increase of ${s2.get('agi', 0) - s1.get('agi', 0):,.0f} in AGI "
+        f"resulted in ${delta:,.0f} more in taxes."
+    )
+
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 10, "Key Insight", ln=True)
     pdf.set_font("Arial", "", 11)
     pdf.multi_cell(0, 8, delta_txt)
     pdf.ln(3)
 
-    # Embed chart image
     pdf.image(chart_buf, x=10, y=pdf.get_y(), w=pdf.w - 20)
-    
-    # Export
+
     output = io.BytesIO()
     pdf.output(output)
     output.seek(0)
-    return StreamingResponse(output, media_type="application/pdf", headers={
-        "Content-Disposition": "inline; filename=comparison.pdf"
-    })
+
+    return StreamingResponse(
+        output,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline; filename=comparison.pdf"},
+    )
 @app.post("/state_tax_arizona", summary="Estimate Arizona state income tax")
 async def state_tax_arizona(data: dict):
     agi = data.get("agi", 0)
@@ -1104,45 +844,9 @@ async def state_tax_estimate(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-@app.post("/generate_pdf")
-def generate_pdf(payload: dict):
-    pdf_bytes = generate_tax_plan_pdf(
-        data=payload,
-        logo_path="Valhalla Logo Eagle-Tax Services.jpg"  # Adjust path if logo is in a subfolder
-    )
-    return Response(content=pdf_bytes, media_type="application/pdf")
-@app.post("/generate_comparison_pdf")
-def generate_comparison_pdf(payload: dict):
-    chart_data = {
-        "labels": [payload["scenario_1"]["label"], payload["scenario_2"]["label"]],
-        "values": [payload["scenario_1"]["tax"], payload["scenario_2"]["tax"]]
-    }
 
-    pdf_payload = {
-        "filing_status": payload["filing_status"],
-        "agi": payload["scenario_1"]["agi"],
-        "taxable_income": payload["scenario_1"]["taxable_income"],
-        "total_tax": payload["scenario_1"]["tax"],
-        "marginal_rate": payload["scenario_1"].get("marginal_rate", "N/A"),
-        "strategies": payload.get("strategies", []),
-        "comparison_chart_data": chart_data
-    }
 
-    pdf_bytes = generate_tax_plan_pdf(
-        data=pdf_payload,
-        logo_path="Valhalla Logo Eagle-Tax Services.jpg"
-    )
 
-    return Response(content=pdf_bytes, media_type="application/pdf")
-from fastapi.responses import Response
-
-@app.post("/generate_pdf")
-def generate_pdf(payload: dict):
-    pdf_bytes = generate_tax_plan_pdf(
-        data=payload,
-        logo_path="Valhalla Logo Eagle-Tax Services.jpg"  # Adjust path if needed
-    )
-    return Response(content=pdf_bytes, media_type="application/pdf")
 @app.post("/multi_year_roth_projection")
 async def multi_year_roth_projection(data: dict):
     agi = data.get("current_agi", 0)
@@ -1543,8 +1247,4 @@ def generate_strategy_with_roi(data: StrategyROIInput):
 
         c.save()
         return FileResponse(tmpfile.name, media_type="application/pdf", filename="strategy_report.pdf")
-from auto_tax_plan import router as auto_tax_plan_router
-app.include_router(auto_tax_plan_router)
-@app.get("/")
-def root():
-    return {"message": "Main.py is active"}
+
