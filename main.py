@@ -456,9 +456,8 @@ from report_generator import generate_tax_plan_pdf
 def generate_pdf(payload: dict):
     try:
         pdf_bytes = generate_tax_plan_pdf(
-            data=payload,
-            logo_path="Valhalla Logo Eagle-Tax Services.jpg"  # ✅ Make sure filename matches
-        )
+    data=payload
+)
         return Response(content=pdf_bytes, media_type="application/pdf")
     except Exception as e:
         return {"error": f"PDF generation failed: {str(e)}"}
