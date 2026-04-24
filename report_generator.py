@@ -4,7 +4,30 @@ from fpdf import FPDF
 import matplotlib.pyplot as plt
 import tempfile
 import os
+import re
 
+def safe_text(value):
+    if value is None:
+        return ""
+    text = str(value)
+    replacements = {
+        "“": '"',
+        "”": '"',
+        "‘": "'",
+        "’": "'",
+        "–": "-",
+        "—": "-",
+        "•": "-",
+        "→": "->",
+        "✅": "",
+        "⚠️": "",
+        "❌": "",
+        "·": "-",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    text = re.sub(r"[^\x00-\x7F]+", "", text)
+    return text.encode("latin-1", "ignore").decode("latin-1")
 class TaxReportPDF(FPDF):
     def header(self):
         if hasattr(self, 'logo_path') and self.logo_path:
@@ -27,10 +50,10 @@ class TaxReportPDF(FPDF):
     def add_section(self, title, content):
         self.set_font("Helvetica", "B", 12)
         self.ln(8)
-        self.cell(0, 10, title, ln=True)
+        self.cell(0, 10, safe_text(title), ln=True)
         self.set_font("Helvetica", "", 11)
-        for line in content.split("\n"):
-            self.multi_cell(0, 8, line)
+        for line in str(content).split("\n"):
+            self.multi_cell(0, 8, safe_text(line))
 
     def add_chart_image(self, img_path):
         self.ln(10)
@@ -65,7 +88,7 @@ def generate_tax_plan_pdf(data, logo_path=None):
 
     # Optional: Add Strategy Recommendations
     if "strategies" in data:
-        strategy_text = "\n".join(f"• {s}" for s in data["strategies"])
+        strategy_text = "\n".join(f"- {safe_text(s)}" for s in data["strategies"])
         pdf.add_section("Recommended Strategies", strategy_text)
 
     # Optional: Add Chart
@@ -109,7 +132,7 @@ def generate_smart_strategy_pdf(payload: dict) -> bytes:
     pdf.cell(0, 10, "Suggested Strategies", ln=True)
     pdf.set_font("Helvetica", "", 11)
     for strategy in payload["strategy_summary"]:
-        pdf.multi_cell(0, 8, f"- {strategy}")
+        pdf.multi_cell(0, 8, safe_text(f"- {strategy}"))
 
     # Section: Phaseout Thresholds
     pdf.ln(5)
@@ -117,11 +140,11 @@ def generate_smart_strategy_pdf(payload: dict) -> bytes:
     pdf.cell(0, 10, "Phaseout/Threshold Alerts", ln=True)
     pdf.set_font("Helvetica", "", 11)
     for flag in payload["threshold_flags"]:
-        pdf.multi_cell(0, 8, f"⚠️ {flag}")
+        pdf.multi_cell(0, 8, safe_text(f"- {flag}"))
 
     # Footer
     pdf.set_y(-30)
     pdf.set_font("Helvetica", "I", 9)
     pdf.cell(0, 10, "Valhalla Tax Services | www.valhallataxservice.com | (623) 887-7921", ln=True, align="C")
 
-    return pdf.output(dest="S").encode("latin-1")
+    return pdf.output(dest="S").encode("latin1")
