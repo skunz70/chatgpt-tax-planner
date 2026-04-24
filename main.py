@@ -428,7 +428,7 @@ async def recommend(data: dict):
     if taxable_income == 0 and agi > 0:
         taxable_income = max(0, agi - 15000)
 
-    # ---- Bracket Logic (Single + MFJ) ----
+        # ---- Bracket Logic (Single + MFJ) ----
     if filing_status == "single" and taxable_income < 103350:
         room = 103350 - taxable_income
         strategies.append(
@@ -462,27 +462,8 @@ async def recommend(data: dict):
         
    
 
-   elif filing_status in ["married_filing_jointly", "mfj"] and taxable_income < 206700:
-    room = 206700 - taxable_income
-    strategies.append(
-        f"Bracket management opportunity: taxable income is approximately ${taxable_income:,.0f}, leaving about ${room:,.0f} of room in the 22% federal bracket before reaching the 24% bracket."
-    )
-# ---- NIIT Warning ----
-    if (filing_status == "single" and agi > 180000) or \
-   (filing_status in ["married_filing_jointly", "mfj"] and agi > 230000):
-    strategies.append(
-        "NIIT warning: income is approaching or exceeding Net Investment Income Tax thresholds. Review capital gains, dividends, and passive income exposure."
-    )
-   # ---- Roth Phaseout Awareness ----
-   if filing_status == "single" and agi > 150000:
-    strategies.append(
-        "Roth IRA eligibility may be limited due to income phaseout. Consider backdoor Roth strategies if applicable."
-    )
-
-   elif filing_status in ["married_filing_jointly", "mfj"] and agi > 236000:
-    strategies.append(
-        "Roth IRA eligibility may be limited for MFJ due to income phaseouts. Review backdoor Roth contribution options."
-    )    
+   
+  
     if retirement_plan_type == "none":
         strategies.append(
             "Retirement planning opportunity: review Traditional IRA, Roth IRA, 401(k), SEP IRA, or Solo 401(k) options to reduce current taxes or improve long-term tax-free income."
