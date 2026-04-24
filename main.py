@@ -417,19 +417,54 @@ async def project_tax(data: dict):
 @app.post("/recommend_strategies", summary="Get strategic tax-saving ideas")
 async def recommend(data: dict):
     strategies = []
-    agi = data.get("agi", 0)
-    filing_status = data.get("filing_status", "")
-    business_income = data.get("business_income", 0)
-    retirement_plan_type = data.get("retirement_plan_type", "none")
 
-    if agi > 100000 and filing_status == "married_filing_jointly":
-        strategies.append("Maximize traditional IRA contributions")
+    agi = float(data.get("agi", 0) or 0)
+    taxable_income = float(data.get("taxable_income", 0) or 0)
+    filing_status = str(data.get("filing_status", "single")).lower()
+    business_income = float(data.get("business_income", 0) or 0)
+    capital_gains = float(data.get("capital_gains", 0) or 0)
+    retirement_plan_type = str(data.get("retirement_plan_type", "none")).lower()
 
-    if business_income > 0:
-        strategies.append("Evaluate S‑Corp election to save on self-employment tax")
+    if taxable_income == 0 and agi > 0:
+        taxable_income = max(0, agi - 15000)
+
+    if filing_status == "single" and taxable_income < 103350:
+        room = 103350 - taxable_income
+        strategies.append(
+            f"Bracket management opportunity: taxable income is approximately ${taxable_income:,.0f}, leaving about ${room:,.0f} of room in the 22% federal bracket before reaching the 24% bracket."
+        )
 
     if retirement_plan_type == "none":
-        strategies.append("Consider a Solo 401(k) or SEP IRA")
+        strategies.append(
+            "Retirement planning opportunity: review Traditional IRA, Roth IRA, 401(k), SEP IRA, or Solo 401(k) options to reduce current taxes or improve long-term tax-free income."
+        )
+
+    if business_income > 0:
+        strategies.append(
+            "Business planning opportunity: review QBI deduction eligibility, deductible business expenses, retirement plan options, and whether S-Corp analysis is appropriate."
+        )
+
+    if business_income >= 30000:
+        strategies.append(
+            "Entity review trigger: business income may be high enough to evaluate an S-Corp election after considering reasonable compensation, payroll costs, and compliance requirements."
+        )
+
+    if capital_gains > 0:
+        strategies.append(
+            "Capital gains planning opportunity: review whether gains can be harvested within the current tax bracket or offset with tax-loss harvesting."
+        )
+    else:
+        strategies.append(
+            "Investment tax review: if the client has a taxable brokerage account, review unrealized gains and losses before year-end."
+        )
+
+    strategies.append(
+        "Withholding review: compare projected tax against federal withholding and estimated payments to avoid a balance due or underpayment penalties."
+    )
+
+    strategies.append(
+        "Deduction review: compare the standard deduction against itemized deductions and consider bunching charitable gifts or deductible expenses if appropriate."
+    )
 
     return {"strategies": strategies}
 
