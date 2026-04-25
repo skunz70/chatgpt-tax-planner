@@ -1274,43 +1274,52 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     from reportlab.lib.pagesizes import landscape, letter
     from reportlab.lib.units import inch
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
-        c = canvas.Canvas(tmpfile.name, pagesize=landscape(letter))
-        width, height = landscape(letter)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
+        file_path = tmpfile.name
 
-        x_margin = 1 * inch
-        y = height - 1 * inch
-        line_height = 14
+    c = canvas.Canvas(file_path, pagesize=landscape(letter))
+    width, height = landscape(letter)
 
-        def draw_line(text, bold=False):
-            nonlocal y
-            if y < 1 * inch:
+    x_margin = 72
+    y = height - 72
+    line_height = 14
+
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(x_margin, y, "TAX STRATEGY REPORT")
+    y -= line_height * 2
+
+    c.setFont("Helvetica", 11)
+    c.drawString(x_margin, y, safe_text(f"Filing Status: {data.filing_status}"))
+    y -= line_height
+    c.drawString(x_margin, y, safe_text(f"Adjusted Gross Income (AGI): ${agi:.2f}"))
+    y -= line_height
+    c.drawString(x_margin, y, safe_text(f"Taxable Income: ${taxable_income:.2f}"))
+    y -= line_height * 2
+
+    if strategies:
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(x_margin, y, "Strategy Recommendations")
+        y -= line_height
+
+        c.setFont("Helvetica", 10)
+        for s in strategies:
+            if y < 72:
                 c.showPage()
-                y = height - 1 * inch
-            c.setFont("Helvetica-Bold", 12 if bold else 11)
-            c.drawString(x_margin, y, safe_text(text))
+                y = height - 72
+                c.setFont("Helvetica", 10)
+
+            c.drawString(x_margin, y, safe_text(str(s.get("name", "Strategy"))))
+            y -= line_height
+            c.drawString(x_margin + 20, y, safe_text(f"Tax Cost: ${s.get('tax_cost', 0):.2f}"))
+            y -= line_height
+            c.drawString(x_margin + 20, y, safe_text(f"ROI: ${s.get('roi', 0):.2f}"))
             y -= line_height
 
-        draw_line("TAX STRATEGY REPORT", bold=True)
-        draw_line(f"Filing Status: {data.filing_status}")
-        draw_line(f"Adjusted Gross Income (AGI): ${agi:.2f}")
-        draw_line(f"Taxable Income: ${taxable_income:.2f}")
-        draw_line("")
+            summary_text = safe_text(str(s.get("summary", "")))
+            c.drawString(x_margin + 20, y, summary_text[:120])
+            y -= line_height * 2
+    else:
+        c.drawString(x_margin, y, "No strategy recommendations available.")
 
-        if strategies:
-            draw_line("Strategy Recommendations", bold=True)
-            for s in strategies:
-                draw_line(f"{s['name']}", bold=True)
-                draw_line(f"  Tax Cost: ${s['tax_cost']:.2f}")
-                draw_line(f"  ROI: ${s['roi']:.2f}")
-                for line in str(s['summary']).splitlines():
-                    draw_line(f"  {line}")
-                draw_line("")
-        else:
-            draw_line("No strategy recommendations available.")
-
-               c.save()
-        return FileResponse(tmpfile.name, media_type="application/pdf", filename="strategy_report.pdf")
-
-    
-      
+    c.save()
+    return FileResponse(file_path, media_type="application/pdf", filename="strategy_report.pdf")
