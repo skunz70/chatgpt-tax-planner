@@ -1262,7 +1262,26 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "summary": f"Retain estimated ACA subsidy of ${subsidy_value:.2f} by keeping income under threshold."
         })
 
-      
+    # ---- Bracket Intelligence ----
+    if data.filing_status == "single":
+        if taxable_income < 103350:
+            room = 103350 - taxable_income
+            strategies.append({
+                "name": "Bracket Optimization",
+                "tax_cost": 0,
+                "roi": 0,
+                "summary": f"You have approximately ${room:,.0f} of room remaining in the 22% bracket before entering the 24% bracket. This creates an opportunity for Roth conversions or capital gain harvesting."
+            })
+
+    elif data.filing_status in ["married_filing_jointly", "mfj"]:
+        if taxable_income < 206700:
+            room = 206700 - taxable_income
+            strategies.append({
+                "name": "Bracket Optimization",
+                "tax_cost": 0,
+                "roi": 0,
+                "summary": f"You have approximately ${room:,.0f} of room remaining in the 22% bracket before entering the 24% bracket. This creates an opportunity for income acceleration strategies."
+            })   
 
     return {
         "agi": round(agi, 2),
