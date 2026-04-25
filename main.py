@@ -1309,11 +1309,8 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         else:
             draw_line("No strategy recommendations available.")
 
-        c.save()
+               c.save()
         return FileResponse(tmpfile.name, media_type="application/pdf", filename="strategy_report.pdf")
-import uvicorn
-import os
 
-      if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    
+      
