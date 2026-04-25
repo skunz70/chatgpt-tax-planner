@@ -1262,64 +1262,10 @@ def generate_strategy_with_roi(data: StrategyROIInput):
             "summary": f"Retain estimated ACA subsidy of ${subsidy_value:.2f} by keeping income under threshold."
         })
 
-    if not data.show_pdf:
-        return {
-            "agi": round(agi, 2),
-            "taxable_income": round(taxable_income, 2),
-            "strategies": strategies
-        }
+      
 
-    # Generate PDF using ReportLab (plain ASCII, landscape, clean formatting)
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.pagesizes import landscape, letter
-    from reportlab.lib.units import inch
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
-        file_path = tmpfile.name
-
-    c = canvas.Canvas(file_path, pagesize=landscape(letter))
-    width, height = landscape(letter)
-
-    x_margin = 72
-    y = height - 72
-    line_height = 14
-
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(x_margin, y, "TAX STRATEGY REPORT")
-    y -= line_height * 2
-
-    c.setFont("Helvetica", 11)
-    c.drawString(x_margin, y, safe_text(f"Filing Status: {data.filing_status}"))
-    y -= line_height
-    c.drawString(x_margin, y, safe_text(f"Adjusted Gross Income (AGI): ${agi:.2f}"))
-    y -= line_height
-    c.drawString(x_margin, y, safe_text(f"Taxable Income: ${taxable_income:.2f}"))
-    y -= line_height * 2
-
-    if strategies:
-        c.setFont("Helvetica-Bold", 11)
-        c.drawString(x_margin, y, "Strategy Recommendations")
-        y -= line_height
-
-        c.setFont("Helvetica", 10)
-        for s in strategies:
-            if y < 72:
-                c.showPage()
-                y = height - 72
-                c.setFont("Helvetica", 10)
-
-            c.drawString(x_margin, y, safe_text(str(s.get("name", "Strategy"))))
-            y -= line_height
-            c.drawString(x_margin + 20, y, safe_text(f"Tax Cost: ${s.get('tax_cost', 0):.2f}"))
-            y -= line_height
-            c.drawString(x_margin + 20, y, safe_text(f"ROI: ${s.get('roi', 0):.2f}"))
-            y -= line_height
-
-            summary_text = safe_text(str(s.get("summary", "")))
-            c.drawString(x_margin + 20, y, summary_text[:120])
-            y -= line_height * 2
-    else:
-        c.drawString(x_margin, y, "No strategy recommendations available.")
-
-    c.save()
-    return FileResponse(file_path, media_type="application/pdf", filename="strategy_report.pdf")
+    return {
+        "agi": round(agi, 2),
+        "taxable_income": round(taxable_income, 2),
+        "strategies": strategies
+    }
