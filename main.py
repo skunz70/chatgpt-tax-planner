@@ -1232,7 +1232,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     taxable_income = max(0, agi - deduction)
 
     strategies = []
-
+    conflicts = []
     if "roth_conversion" in data.strategy_flags and data.business_income > 0:
         roth_tax_cost = 0.22 * data.business_income
         roth_future_savings = roth_tax_cost * 2.5
@@ -1282,9 +1282,24 @@ def generate_strategy_with_roi(data: StrategyROIInput):
                 "roi": 0,
                 "summary": f"You have approximately ${room:,.0f} of room remaining in the 22% bracket before entering the 24% bracket. This creates an opportunity for income acceleration strategies."
             })   
+    # ---- Strategy Conflict Detection ----
+    if "roth_conversion" in data.strategy_flags and "aca_optimization" in data.strategy_flags:
+        conflicts.append(
+            "Conflict detected: Roth conversions increase income and may reduce ACA subsidies."
+        )
 
+    if "s_corp_election" in data.strategy_flags and data.retirement_contributions > 0:
+        conflicts.append(
+            "Conflict detected: S-Corp salary structure can reduce retirement contribution efficiency."
+        )
+
+    if data.capital_gains > 0 and "aca_optimization" in data.strategy_flags:
+        conflicts.append(
+            "Conflict detected: Capital gains increase income and may reduce ACA subsidy eligibility."
+        )
     return {
         "agi": round(agi, 2),
         "taxable_income": round(taxable_income, 2),
-        "strategies": strategies
-    }
+        "strategies": strategies,
+        "conflicts": conflicts
+    }   
