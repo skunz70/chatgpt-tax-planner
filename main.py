@@ -1233,6 +1233,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
 
     strategies = []
     conflicts = []
+    priority_recommendation = "No priority recommendation generated yet."
     if "roth_conversion" in data.strategy_flags and data.business_income > 0:
         roth_tax_cost = 0.22 * data.business_income
         roth_future_savings = roth_tax_cost * 2.5
@@ -1297,9 +1298,35 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         conflicts.append(
             "Conflict detected: Capital gains increase income and may reduce ACA subsidy eligibility."
         )
+   # ---- Priority Recommendation Engine ----
+    if conflicts:
+        priority_recommendation = (
+            "Review strategy conflicts before implementation. Do not automatically pursue every strategy at once; prioritize the strategy that best matches the client's main goal."
+        )
+
+    elif data.business_income > 30000 and "s_corp_election" in data.strategy_flags:
+        priority_recommendation = (
+            "Primary recommendation: review S-Corp election first because business income may create self-employment tax savings opportunities."
+        )
+
+    elif "aca_optimization" in data.strategy_flags and taxable_income < 75000:
+        priority_recommendation = (
+            "Primary recommendation: preserve ACA subsidy eligibility first because increasing income may reduce or eliminate valuable premium tax credits."
+        )
+
+    elif data.filing_status == "single" and taxable_income < 103350:
+        priority_recommendation = (
+            "Primary recommendation: use remaining 22% bracket room strategically through Roth conversion planning, capital gain harvesting, or controlled income timing."
+        )
+
+    else:
+        priority_recommendation = (
+            "Primary recommendation: complete a withholding review and compare current-year income, deductions, and tax payments before implementing advanced strategies."
+        )     
     return {
         "agi": round(agi, 2),
         "taxable_income": round(taxable_income, 2),
         "strategies": strategies,
-        "conflicts": conflicts
-    }   
+        "conflicts": conflicts,
+        "priority_recommendation": priority_recommendation
+    }
