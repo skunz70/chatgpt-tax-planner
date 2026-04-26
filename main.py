@@ -1335,13 +1335,40 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     total_estimated_roi = sum(
         float(s.get("roi", 0) or 0)
         for s in strategies
-    )           
-    return {
+    )
+    # ---- Client Action Steps ----
+    action_steps = []
+
+    if ranked_recommendations:
+        action_steps.append(
+            f"Start with: {ranked_recommendations[0].get('name', 'Top strategy')}."
+        )
+
+    if conflicts:
+        action_steps.append(
+            "Review the listed conflicts before implementing any strategy."
+        )
+
+    if data.business_income > 0:
+        action_steps.append(
+            "Gather Schedule C/K-1 business income details, deductible expenses, and entity records."
+        )
+
+    if data.retirement_contributions == 0:
+        action_steps.append(
+            "Review available retirement plan options and contribution limits before year-end."
+        )
+
+    action_steps.append(
+        "Run a final tax projection before implementing the recommended strategy."
+    )
+     return {
         "agi": round(agi, 2),
         "taxable_income": round(taxable_income, 2),
         "strategies": strategies,
         "conflicts": conflicts,
         "priority_recommendation": priority_recommendation,
         "ranked_recommendations": ranked_recommendations,
-        "total_estimated_roi": round(total_estimated_roi, 2)
+        "total_estimated_roi": round(total_estimated_roi, 2),
+        "action_steps": action_steps
     }
