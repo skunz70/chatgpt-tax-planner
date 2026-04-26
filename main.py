@@ -1338,7 +1338,34 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     )
 
     # ---- Scenario Comparison ----
-    baseline_tax = taxable_income * 0.22
+    # ---- Progressive Federal Tax Estimate ----
+    if data.filing_status == "single":
+        brackets = [
+            (0, 11925, 0.10),
+            (11925, 48475, 0.12),
+            (48475, 103350, 0.22),
+            (103350, 197300, 0.24),
+            (197300, 250525, 0.32),
+            (250525, 626350, 0.35),
+            (626350, float("inf"), 0.37),
+        ]
+    else:
+        brackets = [
+            (0, 23850, 0.10),
+            (23850, 96950, 0.12),
+            (96950, 206700, 0.22),
+            (206700, 394600, 0.24),
+            (394600, 501050, 0.32),
+            (501050, 751600, 0.35),
+            (751600, float("inf"), 0.37),
+        ]
+
+    baseline_tax = 0
+
+    for lower, upper, rate in brackets:
+        if taxable_income > lower:
+            taxed_amount = min(taxable_income, upper) - lower
+            baseline_tax += taxed_amount * rate
     optimized_tax = baseline_tax - total_estimated_roi
     tax_savings = baseline_tax - optimized_tax
 
