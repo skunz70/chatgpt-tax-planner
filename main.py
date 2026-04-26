@@ -1331,12 +1331,17 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         key=lambda s: float(s.get("roi", 0) or 0),
         reverse=True
     )
-             
+    # ---- Total Estimated Planning Value ----
+    total_estimated_roi = sum(
+        float(s.get("roi", 0) or 0)
+        for s in strategies
+    )           
     return {
         "agi": round(agi, 2),
         "taxable_income": round(taxable_income, 2),
         "strategies": strategies,
         "conflicts": conflicts,
         "priority_recommendation": priority_recommendation,
-        "ranked_recommendations": ranked_recommendations
+        "ranked_recommendations": ranked_recommendations,
+        "total_estimated_roi": round(total_estimated_roi, 2)
     }
