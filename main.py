@@ -1333,6 +1333,12 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     )
     # ---- Total Estimated Planning Value ----
     total_estimated_roi = sum(
+    # ---- Scenario Comparison ----
+    baseline_tax = taxable_income * 0.22  # simple baseline estimate
+
+    optimized_tax = baseline_tax - total_estimated_roi
+
+    tax_savings = baseline_tax - optimized_tax
         float(s.get("roi", 0) or 0)
         for s in strategies
     )
@@ -1370,5 +1376,8 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         "priority_recommendation": priority_recommendation,
         "ranked_recommendations": ranked_recommendations,
         "total_estimated_roi": round(total_estimated_roi, 2),
-        "action_steps": action_steps
+        "action_steps": action_steps,
+        "baseline_tax": round(baseline_tax, 2),
+        "optimized_tax": round(optimized_tax, 2),
+        "tax_savings": round(tax_savings, 2)
     }
