@@ -1234,6 +1234,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     strategies = []
     conflicts = []
     priority_recommendation = "No priority recommendation generated yet."
+    ranked_recommendations = []
     if "roth_conversion" in data.strategy_flags and data.business_income > 0:
         roth_tax_cost = 0.22 * data.business_income
         roth_future_savings = roth_tax_cost * 2.5
@@ -1322,11 +1323,20 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     else:
         priority_recommendation = (
             "Primary recommendation: complete a withholding review and compare current-year income, deductions, and tax payments before implementing advanced strategies."
-        )     
+        )
+
+    # ---- Dollar Impact Ranking ----
+    ranked_recommendations = sorted(
+        strategies,
+        key=lambda s: float(s.get("roi", 0) or 0),
+        reverse=True
+    )
+             
     return {
         "agi": round(agi, 2),
         "taxable_income": round(taxable_income, 2),
         "strategies": strategies,
         "conflicts": conflicts,
-        "priority_recommendation": priority_recommendation
+        "priority_recommendation": priority_recommendation,
+        "ranked_recommendations": ranked_recommendations
     }
