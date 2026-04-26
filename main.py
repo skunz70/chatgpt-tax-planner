@@ -1362,7 +1362,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     action_steps.append(
         "Run a final tax projection before implementing the recommended strategy."
     )
-   return {
+    return {
         "agi": round(agi, 2),
         "taxable_income": round(taxable_income, 2),
         "strategies": strategies,
