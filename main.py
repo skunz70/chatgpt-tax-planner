@@ -1235,6 +1235,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     conflicts = []
     priority_recommendation = "No priority recommendation generated yet."
     ranked_recommendations = []
+    threshold_flags = []
     if "roth_conversion" in data.strategy_flags and data.business_income > 0:
         roth_tax_cost = 0.22 * data.business_income
         roth_future_savings = roth_tax_cost * 2.5
@@ -1283,7 +1284,39 @@ def generate_strategy_with_roi(data: StrategyROIInput):
                 "tax_cost": 0,
                 "roi": 0,
                 "summary": f"You have approximately ${room:,.0f} of room remaining in the 22% bracket before entering the 24% bracket. This creates an opportunity for income acceleration strategies."
-            })   
+            })
+    # ---- Threshold / Phaseout Detection ----
+    if data.filing_status == "single":
+        if agi > 161000:
+            threshold_flags.append(
+                "Roth IRA contribution phaseout may apply because AGI is above the Single filer threshold."
+            )
+
+        if agi > 200000:
+            threshold_flags.append(
+                "NIIT risk: Net Investment Income Tax may apply above $200,000 AGI for Single filers."
+            )
+
+        if agi > 60000 and "aca_optimization" in data.strategy_flags:
+            threshold_flags.append(
+                "ACA subsidy risk: income may reduce premium tax credits. Avoid Roth conversions or capital gains without modeling subsidy impact first."
+            )
+
+    elif data.filing_status in ["married_filing_jointly", "mfj"]:
+        if agi > 240000:
+            threshold_flags.append(
+                "Roth IRA contribution phaseout may apply for MFJ."
+            )
+
+        if agi > 250000:
+            threshold_flags.append(
+                "NIIT risk: Net Investment Income Tax may apply above $250,000 AGI for MFJ."
+            )
+
+        if agi > 80000 and "aca_optimization" in data.strategy_flags:
+            threshold_flags.append(
+                "ACA subsidy risk: income may reduce or eliminate premium tax credits."
+            )         
     # ---- Strategy Conflict Detection ----
     if "roth_conversion" in data.strategy_flags and "aca_optimization" in data.strategy_flags:
         conflicts.append(
@@ -1400,6 +1433,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         "taxable_income": round(taxable_income, 2),
         "strategies": strategies,
         "conflicts": conflicts,
+        "threshold_flags": threshold_flags,
         "priority_recommendation": priority_recommendation,
         "ranked_recommendations": ranked_recommendations,
         "total_estimated_roi": round(total_estimated_roi, 2),
