@@ -1428,6 +1428,55 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     action_steps.append(
         "Run a final tax projection before implementing the recommended strategy."
     )
+    # ---- Client Report Text ----
+    strategy_lines = ""
+    for index, strategy in enumerate(ranked_recommendations, start=1):
+        strategy_lines += (
+            f"{index}. {strategy.get('name', 'Strategy')}\n"
+            f"   Estimated Value: ${float(strategy.get('roi', 0) or 0):,.2f}\n"
+            f"   Summary: {strategy.get('summary', '')}\n\n"
+        )
+
+    conflict_lines = "\n".join(f"- {c}" for c in conflicts) if conflicts else "No major strategy conflicts identified."
+
+    threshold_lines = "\n".join(f"- {t}" for t in threshold_flags) if threshold_flags else "No major threshold or phaseout risks identified."
+
+    action_lines = "\n".join(f"- {a}" for a in action_steps)
+
+    client_report_text = f"""
+VALHALLA TAX SERVICES
+STRATEGIC TAX PLANNING REPORT
+
+EXECUTIVE SUMMARY
+Based on the information provided, this analysis identified an estimated planning opportunity of ${total_estimated_roi:,.2f}.
+
+Primary Recommendation:
+{priority_recommendation}
+
+CURRENT TAX POSITION
+Adjusted Gross Income: ${agi:,.2f}
+Taxable Income: ${taxable_income:,.2f}
+Estimated Federal Tax Before Planning: ${baseline_tax:,.2f}
+Estimated Federal Tax After Planning: ${optimized_tax:,.2f}
+Estimated Tax Savings: ${tax_savings:,.2f}
+
+RECOMMENDED STRATEGIES
+{strategy_lines}
+
+CONFLICT AND RISK ANALYSIS
+{conflict_lines}
+
+THRESHOLD AND PHASEOUT REVIEW
+{threshold_lines}
+
+CLIENT ACTION STEPS
+{action_lines}
+
+FINAL RECOMMENDATION
+The recommended next step is to review the highest-impact strategy first, confirm the supporting income and deduction details, and complete a final tax projection before implementation.
+
+Prepared by Valhalla Tax Services
+"""
     return {
         "agi": round(agi, 2),
         "taxable_income": round(taxable_income, 2),
@@ -1441,4 +1490,5 @@ def generate_strategy_with_roi(data: StrategyROIInput):
         "baseline_tax": round(baseline_tax, 2),
         "optimized_tax": round(optimized_tax, 2),
         "tax_savings": round(tax_savings, 2)
+        "client_report_text": client_report_text
     }
