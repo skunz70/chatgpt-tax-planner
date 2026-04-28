@@ -1489,6 +1489,6 @@ Prepared by Valhalla Tax Services
         "action_steps": action_steps,
         "baseline_tax": round(baseline_tax, 2),
         "optimized_tax": round(optimized_tax, 2),
-        "tax_savings": round(tax_savings, 2)
+        "tax_savings": round(tax_savings, 2),
         "client_report_text": client_report_text
     }
