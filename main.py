@@ -1,7 +1,7 @@
 import os
 import io
 
-from fastapi import FastAPI, Response, UploadFile, File, Depends, HTTPException, status
+from fastapi import FastAPI, Response, UploadFile, File, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -365,7 +365,19 @@ def ocr_extract_text(pdf_bytes: bytes) -> str:
     return text
 
 @app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF with OCR fallback")
-async def parse_1040(file: UploadFile = File(...)):
+async def parse_1040(request: Request, file: UploadFile = File(None)):
+    if file is None:
+        form = await request.form()
+        for value in form.values():
+            if hasattr(value, "filename") and hasattr(value, "read"):
+                file = value
+                break
+
+    if file is None:
+        return {
+            "error": "No file was received by the API.",
+            "message": "The GPT action called /parse_1040, but did not send a PDF file in the multipart upload."
+        }    
     pdf_bytes = await file.read()
 
     # Try OCR first
