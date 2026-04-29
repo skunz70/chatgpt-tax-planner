@@ -365,34 +365,59 @@ def ocr_extract_text(pdf_bytes: bytes) -> str:
     return text
 
 @app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF with OCR fallback")
-async def parse_1040(request: Request, file: UploadFile = File(None)):
-    if file is None:
-        form = await request.form()
-        for value in form.values():
-            if hasattr(value, "filename") and hasattr(value, "read"):
-                file = value
-                break
+async def parse_1040(request: Request):
+    pdf_bytes = None
+    received_filename = None
+    content_type = request.headers.get("content-type", "")
 
-    if file is None:
+    try:
+        # Accept multipart uploads from GPT Actions / Swagger / frontend
+        if "multipart/form-data" in content_type:
+            form = await request.form()
+
+            for key, value in form.items():
+                if hasattr(value, "filename") and hasattr(value, "read"):
+                    received_filename = value.filename
+                    pdf_bytes = await value.read()
+                    break
+
+        # Accept raw PDF body as fallback
+        if pdf_bytes is None:
+            raw_body = await request.body()
+            if raw_body:
+                pdf_bytes = raw_body
+
+    except Exception as e:
+        return {
+            "error": "Upload parsing failed.",
+            "detail": str(e),
+            "content_type": content_type
+        }
+
+    if not pdf_bytes:
         return {
             "error": "No file was received by the API.",
-            "message": "The GPT action called /parse_1040, but did not send a PDF file in the multipart upload."
-        }    
-    pdf_bytes = await file.read()
+            "message": "The /parse_1040 endpoint was called, but no readable PDF bytes were received.",
+            "content_type": content_type
+        }
 
     # Try OCR first
     text = ocr_extract_text(pdf_bytes)
 
-    # Fallback: try reading embedded text
-    if not text.strip():
+    # Fallback: try reading embedded PDF text
+    if not text or not text.strip():
         try:
             reader = PdfReader(io.BytesIO(pdf_bytes))
             pages_text = [page.extract_text() or "" for page in reader.pages]
             text = "\n".join(pages_text)
-        except:
-            pass
+        except Exception as e:
+            return {
+                "error": "PDF text extraction failed.",
+                "detail": str(e),
+                "received_filename": received_filename,
+                "content_type": content_type
+            }
 
-    # Parse key 1040 values
     lines = extract_1040_lines_from_text(text)
 
     validation_warnings = []
@@ -440,6 +465,9 @@ async def parse_1040(request: Request, file: UploadFile = File(None)):
     planner_result = generate_strategy_with_roi(planner_input)
 
     return {
+        "status": "success",
+        "received_filename": received_filename,
+        "content_type": content_type,
         "filing_status": "unknown",
         "agi": agi,
         "taxable_income": taxable_income,
