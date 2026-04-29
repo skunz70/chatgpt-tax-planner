@@ -381,17 +381,42 @@ async def parse_1040(file: UploadFile = File(...)):
             pass
 
     # Now parse the key 1040 values
-    lines = extract_1040_lines_from_text(text)
-    # Return what we can
+        lines = extract_1040_lines_from_text(text)
+
+    validation_warnings = []
+
+    agi = lines.get("agi")
+    taxable_income = lines.get("taxable_income")
+    total_tax = lines.get("total_tax")
+    withholding = lines.get("withholding")
+    total_payments = lines.get("total_payments")
+    balance_due = lines.get("balance_due")
+
+    if agi is None:
+        validation_warnings.append("AGI could not be confidently detected from Form 1040 Line 11.")
+
+    if taxable_income is None:
+        validation_warnings.append("Taxable income could not be confidently detected from Form 1040 Line 15.")
+
+    if total_tax is None:
+        validation_warnings.append("Total tax could not be confidently detected from Form 1040 Line 24.")
+
+    if agi is not None and taxable_income is not None and taxable_income > agi:
+        validation_warnings.append("Taxable income appears higher than AGI. Verify OCR extraction.")
+
+    if agi is not None and total_tax is not None and total_tax > agi:
+        validation_warnings.append("Total tax appears unusually high compared to AGI. Verify OCR extraction.")
+
     return {
-        "filing_status": "unknown",  # you can improve this logic if “Married,” etc. appears in text
-        "agi": lines["agi"],
-        "taxable_income": lines["taxable_income"],
-        "total_tax": lines["total_tax"],
-        "withholding": lines["withholding"],
-        "estimated_payments": lines["estimated_payments"],
-        "total_payments": lines["total_payments"],
-        "balance_due": lines["balance_due"]
+        "filing_status": "unknown",
+        "agi": agi,
+        "taxable_income": taxable_income,
+        "total_tax": total_tax,
+        "withholding": withholding,
+        "estimated_payments": lines.get("estimated_payments"),
+        "total_payments": total_payments,
+        "balance_due": balance_due,
+        "validation_warnings": validation_warnings
     }
 
    
