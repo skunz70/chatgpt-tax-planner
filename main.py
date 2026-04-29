@@ -407,6 +407,26 @@ async def parse_1040(file: UploadFile = File(...)):
     if agi is not None and total_tax is not None and total_tax > agi:
         validation_warnings.append("Total tax appears unusually high compared to AGI. Verify OCR extraction.")
 
+        planner_input = StrategyROIInput(
+        filing_status="single",
+        w2_income=float(agi or 0),
+        business_income=0,
+        capital_gains=0,
+        dividend_income=0,
+        retirement_contributions=0,
+        itemized_deductions=0,
+        estimated_payments=float(total_payments or 0),
+        state="AZ",
+        show_pdf=False,
+        strategy_flags=[
+            "roth_conversion",
+            "s_corp_election",
+            "aca_optimization"
+        ]
+    )
+
+    planner_result = generate_strategy_with_roi(planner_input)
+
     return {
         "filing_status": "unknown",
         "agi": agi,
@@ -416,7 +436,8 @@ async def parse_1040(file: UploadFile = File(...)):
         "estimated_payments": lines.get("estimated_payments"),
         "total_payments": total_payments,
         "balance_due": balance_due,
-        "validation_warnings": validation_warnings
+        "validation_warnings": validation_warnings,
+        "planner_result": planner_result
     }
 
    
