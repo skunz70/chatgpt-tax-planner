@@ -366,6 +366,8 @@ def ocr_extract_text(pdf_bytes: bytes) -> str:
 
 @app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF with OCR fallback")
 async def parse_1040(request: Request):
+    print("====== /parse_1040 HIT ======", flush=True)
+    print("CONTENT TYPE:", request.headers.get("content-type"), flush=True)
     pdf_bytes = None
     received_filename = None
     content_type = request.headers.get("content-type", "")
