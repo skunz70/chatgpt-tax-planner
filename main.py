@@ -1,7 +1,7 @@
 import os
 import io
 
-from fastapi import FastAPI, Response, UploadFile, File, Depends, HTTPException, Request
+from fastapi import FastAPI, Response, UploadFile, File, Depends, HTTPException, Request, Body
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -365,43 +365,42 @@ def ocr_extract_text(pdf_bytes: bytes) -> str:
     return text
 
 @app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF with OCR fallback")
-async def parse_1040(request: Request):
+async def parse_1040(request: Request, body: dict = Body(default=None)):
     print("====== /parse_1040 HIT ======", flush=True)
     print("CONTENT TYPE:", request.headers.get("content-type"), flush=True)
+
     pdf_bytes = None
     received_filename = None
-    content_type = request.headers.get("content-type", "")
 
     try:
-        # Accept multipart uploads from GPT Actions / Swagger / frontend
-        if "multipart/form-data" in content_type:
-            form = await request.form()
-
-            for key, value in form.items():
-                if hasattr(value, "filename") and hasattr(value, "read"):
-                    received_filename = value.filename
-                    pdf_bytes = await value.read()
-                    break
-
-        # Accept raw PDF body as fallback
-        if pdf_bytes is None:
-            raw_body = await request.body()
-            if raw_body:
-                pdf_bytes = raw_body
-
+        form = await request.form()
+        for value in form.values():
+            if hasattr(value, "filename") and hasattr(value, "read"):
+                received_filename = value.filename
+                pdf_bytes = await value.read()
+                print("FILE FOUND VIA FORM", flush=True)
+                break
     except Exception as e:
-        return {
-            "error": "Upload parsing failed.",
-            "detail": str(e),
-            "content_type": content_type
-        }
+        print("FORM PARSE FAILED:", str(e), flush=True)
+
+    if pdf_bytes is None and body:
+        print("BODY RECEIVED:", body, flush=True)
+
+        if "file_base64" in body:
+            import base64
+            pdf_bytes = base64.b64decode(body["file_base64"])
+            print("FILE FOUND VIA BASE64", flush=True)
 
     if not pdf_bytes:
         return {
-            "error": "No file was received by the API.",
-            "message": "The /parse_1040 endpoint was called, but no readable PDF bytes were received.",
-            "content_type": content_type
+            "error": "No file detected",
+            "debug": {
+                "content_type": request.headers.get("content-type"),
+                "body": body
+            }
         }
+
+    # keep the rest of your existing route below this line
 
     # Try OCR first
     text = ocr_extract_text(pdf_bytes)
