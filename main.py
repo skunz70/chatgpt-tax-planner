@@ -368,10 +368,10 @@ def ocr_extract_text(pdf_bytes: bytes) -> str:
 async def parse_1040(file: UploadFile = File(...)):
     pdf_bytes = await file.read()
 
-    # Try OCR first (since your forms are scanned)
+    # Try OCR first
     text = ocr_extract_text(pdf_bytes)
 
-    # Then fallback: try reading embedded text
+    # Fallback: try reading embedded text
     if not text.strip():
         try:
             reader = PdfReader(io.BytesIO(pdf_bytes))
@@ -380,8 +380,8 @@ async def parse_1040(file: UploadFile = File(...)):
         except:
             pass
 
-    # Now parse the key 1040 values
-        lines = extract_1040_lines_from_text(text)
+    # Parse key 1040 values
+    lines = extract_1040_lines_from_text(text)
 
     validation_warnings = []
 
@@ -407,7 +407,7 @@ async def parse_1040(file: UploadFile = File(...)):
     if agi is not None and total_tax is not None and total_tax > agi:
         validation_warnings.append("Total tax appears unusually high compared to AGI. Verify OCR extraction.")
 
-        planner_input = StrategyROIInput(
+    planner_input = StrategyROIInput(
         filing_status="single",
         w2_income=float(agi or 0),
         business_income=0,
@@ -439,7 +439,6 @@ async def parse_1040(file: UploadFile = File(...)):
         "validation_warnings": validation_warnings,
         "planner_result": planner_result
     }
-
    
 
 
