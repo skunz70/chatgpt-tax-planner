@@ -1577,3 +1577,7 @@ Prepared by Valhalla Tax Services
         "tax_savings": round(tax_savings, 2),
         "client_report_text": client_report_text
     }
+@app.get("/action_ping")
+async def action_ping():
+    print("====== ACTION PING HIT ======", flush=True)
+    return {"status": "ok", "message": "GPT action reached Render"}
