@@ -1,5 +1,7 @@
 import os
 import io
+from fpdf import FPDF
+import tempfile
 
 from fastapi import FastAPI, Response, UploadFile, File, Depends, HTTPException, Request, Body
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
@@ -899,77 +901,54 @@ async def compare_scenarios(data: dict):
 from matplotlib import pyplot as plt
 from fastapi.responses import StreamingResponse
 
-@app.post("/generate_comparison_pdf", summary="Generate PDF comparing two tax scenarios")
-async def generate_comparison_pdf(data: dict):
-    s1 = data.get("scenario_1", {})
-    s2 = data.get("scenario_2", {})
+@app.post("/generate_strategy_pdf")
+async def generate_strategy_pdf(data: dict):
+    report_text = data.get("report_text", "No report content provided.")
+    client_name = data.get("client_name", "Client")
+    tax_year = data.get("tax_year", "Tax Year")
 
-    fig, ax = plt.subplots(figsize=(6, 4))
-    labels = ["AGI", "Tax Liability"]
-    scenario1_vals = [s1.get("agi", 0), s1.get("total_tax", 0)]
-    scenario2_vals = [s2.get("agi", 0), s2.get("total_tax", 0)]
-
-    x = range(len(labels))
-    ax.bar([i - 0.2 for i in x], scenario1_vals, width=0.4, label="Scenario 1")
-    ax.bar([i + 0.2 for i in x], scenario2_vals, width=0.4, label="Scenario 2")
-    ax.set_ylabel("Dollars")
-    ax.set_title("Tax Comparison")
-    ax.set_xticks(list(x))
-    ax.set_xticklabels(labels)
-    ax.legend()
-
-    chart_buf = io.BytesIO()
-    plt.tight_layout()
-    plt.savefig(chart_buf, format="png")
-    plt.close()
-    chart_buf.seek(0)
-
-    pdf = FPDF()
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=12)
     pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Tax Scenario Comparison", ln=True, align="C")
 
-    def add_scenario_block(title, s):
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 10, title, ln=True)
-        pdf.set_font("Arial", "", 11)
-        pdf.multi_cell(
-            0,
-            8,
-            f"Filing Status: {s.get('filing_status', 'N/A')}\n"
-            f"AGI: ${s.get('agi', 0):,.0f}\n"
-            f"Taxable Income: ${s.get('taxable_income', 0):,.0f}\n"
-            f"Total Tax: ${s.get('total_tax', 0):,.0f}\n"
-            f"Effective Tax Rate: {s.get('effective_rate', 'N/A')}\n"
-            f"Marginal Rate: {s.get('marginal_rate', 'N/A')}\n"
-        )
-        pdf.ln(2)
+    pdf.set_font("Arial", "B", 18)
+    pdf.cell(0, 10, "Valhalla Tax Services", ln=True)
 
-    add_scenario_block("Scenario 1", s1)
-    add_scenario_block("Scenario 2", s2)
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 8, "Tax Planning Report", ln=True)
 
-    delta = s2.get("total_tax", 0) - s1.get("total_tax", 0)
-    delta_txt = (
-        f"An increase of ${s2.get('agi', 0) - s1.get('agi', 0):,.0f} in AGI "
-        f"resulted in ${delta:,.0f} more in taxes."
-    )
-
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, "Key Insight", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(0, 8, delta_txt)
-    pdf.ln(3)
+    pdf.cell(0, 7, f"Client: {client_name}", ln=True)
+    pdf.cell(0, 7, f"Tax Year: {tax_year}", ln=True)
+    pdf.ln(5)
 
-    pdf.image(chart_buf, x=10, y=pdf.get_y(), w=pdf.w - 20)
+    pdf.set_font("Arial", "", 10)
 
-    output = io.BytesIO()
-    pdf.output(output)
-    output.seek(0)
+    for line in report_text.split("\n"):
+        clean_line = line.strip()
 
-    return StreamingResponse(
-        output,
+        if not clean_line:
+            pdf.ln(3)
+            continue
+
+        # Bold section headers
+        if clean_line.upper() == clean_line and len(clean_line) < 60:
+            pdf.set_font("Arial", "B", 12)
+            pdf.multi_cell(0, 7, clean_line)
+            pdf.set_font("Arial", "", 10)
+        else:
+            pdf.multi_cell(0, 6, clean_line)
+
+    temp_dir = tempfile.gettempdir()
+    filename = f"valhalla_tax_plan_{client_name.replace(' ', '_')}.pdf"
+    file_path = os.path.join(temp_dir, filename)
+
+    pdf.output(file_path)
+
+    return FileResponse(
+        file_path,
         media_type="application/pdf",
-        headers={"Content-Disposition": "inline; filename=comparison.pdf"},
+        filename=filename
     )
 @app.post("/state_tax_arizona", summary="Estimate Arizona state income tax")
 async def state_tax_arizona(data: dict):
