@@ -912,7 +912,7 @@ async def generate_strategy_pdf(data: dict):
     pdf.add_page()
 
     # --- LOGO (top right) ---
-    logo_path = os.path.join(os.path.dirname(__file__), "valhalla_logo.png")
+    logo_path = os.path.join(os.path.dirname(__file__), "valhalla_logo.jpg")
     if os.path.exists(logo_path):
         pdf.image(logo_path, x=240, y=10, w=40)
 
