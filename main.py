@@ -930,7 +930,7 @@ async def generate_strategy_pdf(data: dict):
 
     pdf.set_font("Arial", "", 10)
 
-        for line in report_text.split("\n"):
+    for line in report_text.split("\n"):
         clean_line = line.strip()
 
         if "Valhalla Tax Services" in clean_line or "Tax Planning Report" in clean_line:
