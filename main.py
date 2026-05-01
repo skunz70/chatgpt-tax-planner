@@ -912,7 +912,7 @@ async def generate_strategy_pdf(data: dict):
     pdf.add_page()
 
 # --- LOGO (top right) ---
-logo_path = os.path.join(os.getcwd(), "valhalla_logo.jpg")
+logo_path = os.path.join(os.getcwd(), "valhalla_logo.png")
 if os.path.exists(logo_path):
     pdf.image(logo_path, x=240, y=10, w=40)
 
@@ -930,17 +930,25 @@ pdf.cell(0, 10, "Valhalla Tax Services", ln=True)
 
     pdf.set_font("Arial", "", 10)
 
-    for line in report_text.split("\n"):
-        
+        for line in report_text.split("\n"):
         clean_line = line.strip()
-        if "Valhalla Tax Services" in line or "Tax Planning Report" in line:
+
+        if "Valhalla Tax Services" in clean_line or "Tax Planning Report" in clean_line:
             continue
+
         if not clean_line:
             pdf.ln(3)
             continue
 
         # Bold section headers
-        if clean_line.isupper() or "Summary" in clean_line or "Position" in clean_line or "Analysis" in clean_line or "Steps" in clean_line or "Recommendation" in clean_line:
+        if (
+            clean_line.isupper()
+            or "Summary" in clean_line
+            or "Position" in clean_line
+            or "Analysis" in clean_line
+            or "Steps" in clean_line
+            or "Recommendation" in clean_line
+        ):
             pdf.set_font("Arial", "B", 13)
             pdf.ln(2)
             pdf.multi_cell(0, 7, clean_line)
