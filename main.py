@@ -928,8 +928,21 @@ async def generate_strategy_pdf(data: dict):
     pdf.cell(0, 7, f"Tax Year: {tax_year}", ln=True)
     pdf.ln(5)
 
+    # --- EXECUTIVE SUMMARY ---
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 8, "Executive Summary", ln=True)
+
     pdf.set_font("Arial", "", 10)
 
+    summary_text = (
+        f"This report outlines key tax planning opportunities for {client_name}. "
+        f"Based on current income levels and tax position, there are opportunities "
+        f"to reduce tax liability and improve long-term tax efficiency."
+    )
+
+    pdf.multi_cell(0, 6, summary_text)
+    pdf.ln(5)
+    
     for line in report_text.split("\n"):
         clean_line = line.strip()
 
