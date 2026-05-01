@@ -927,7 +927,7 @@ async def generate_strategy_pdf(data: dict):
     for line in report_text.split("\n"):
         
         clean_line = line.strip()
-        if "Valhalla Tax Services" in line:
+        if "Valhalla Tax Services" in line or "Tax Planning Report" in line:
             continue
         if not clean_line:
             pdf.ln(3)
@@ -935,8 +935,10 @@ async def generate_strategy_pdf(data: dict):
 
         # Bold section headers
         if clean_line.isupper() or "Summary" in clean_line or "Position" in clean_line or "Analysis" in clean_line or "Steps" in clean_line or "Recommendation" in clean_line:
-            pdf.set_font("Arial", "B", 12)
+            pdf.set_font("Arial", "B", 13)
+            pdf.ln(2)
             pdf.multi_cell(0, 7, clean_line)
+            pdf.ln(1)
             pdf.set_font("Arial", "", 10)
         else:
             pdf.multi_cell(0, 6, clean_line)
