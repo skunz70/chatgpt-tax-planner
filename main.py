@@ -925,19 +925,22 @@ async def generate_strategy_pdf(data: dict):
     pdf.set_font("Arial", "", 10)
 
     for line in report_text.split("\n"):
+        
         clean_line = line.strip()
-
+        if "Valhalla Tax Services" in line:
+            continue
         if not clean_line:
             pdf.ln(3)
             continue
 
         # Bold section headers
-        if clean_line.upper() == clean_line and len(clean_line) < 60:
+        if clean_line.isupper() or "Summary" in clean_line or "Position" in clean_line or "Analysis" in clean_line or "Steps" in clean_line or "Recommendation" in clean_line:
             pdf.set_font("Arial", "B", 12)
             pdf.multi_cell(0, 7, clean_line)
             pdf.set_font("Arial", "", 10)
         else:
             pdf.multi_cell(0, 6, clean_line)
+            pdf.ln(1)
 
     temp_dir = tempfile.gettempdir()
     filename = f"valhalla_tax_plan_{client_name.replace(' ', '_')}.pdf"
