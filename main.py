@@ -911,14 +911,14 @@ async def generate_strategy_pdf(data: dict):
     pdf.set_auto_page_break(auto=True, margin=12)
     pdf.add_page()
 
-# --- LOGO (top right) ---
-logo_path = os.path.join(os.getcwd(), "valhalla_logo.png")
-if os.path.exists(logo_path):
-    pdf.image(logo_path, x=240, y=10, w=40)
+    # --- LOGO (top right) ---
+    logo_path = os.path.join(os.getcwd(), "valhalla_logo.png")
+    if os.path.exists(logo_path):
+        pdf.image(logo_path, x=240, y=10, w=40)
 
-# --- HEADER TEXT ---
-pdf.set_font("Arial", "B", 18)
-pdf.cell(0, 10, "Valhalla Tax Services", ln=True)
+    # --- HEADER TEXT ---
+    pdf.set_font("Arial", "B", 18)
+    pdf.cell(0, 10, "Valhalla Tax Services", ln=True)
 
     pdf.set_font("Arial", "B", 14)
     pdf.cell(0, 8, "Tax Planning Report", ln=True)
