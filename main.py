@@ -1688,8 +1688,7 @@ VALHALLA TAX SERVICES
 STRATEGIC TAX PLANNING REPORT
 
 EXECUTIVE SUMMARY
-Based on the information provided, this analysis identified an estimated planning opportunity of ${total_estimated_roi:,.2f}.
-
+roi_summary = f"Based on the information provided, this analysis identified an estimated planning opportunity of ${total_estimated_roi:,.2f}."
 Primary Recommendation:
 {priority_recommendation}
 
