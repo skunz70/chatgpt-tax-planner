@@ -226,10 +226,13 @@ async def tax_router(request: ActionRequest):
 
     }
 
-    if request.action not in action_map:
-        raise HTTPException(status_code=400, detail="Invalid action specified.")
+if request.action not in action_map:
+    raise HTTPException(status_code=400, detail="Invalid action specified.")
 
-    return await action_map[request.action](data)
+return {
+    "DEBUG": "NEW_CODE_IS_RUNNING",
+    "action_received": request.action
+}
 
 async def generate_full_valhalla_pdf_report(data: dict):
     """
