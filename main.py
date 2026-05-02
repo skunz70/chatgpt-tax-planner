@@ -219,7 +219,7 @@ async def tax_router(request: ActionRequest):
         "dependent_credit_review": dependent_credit_review,
         "prompt_helper": prompt_helper,
         "quick_entry_plan": quick_entry_plan,  # ✅ NEW shortcut action
-        "smart_strategy_report": smart_strategy_report,
+        "smart_strategy_report": generate_full_valhalla_pdf_report,
         "scenario_comparison": compare_scenarios,
         "generate_strategy_with_roi": year_end_plan,
 
