@@ -237,7 +237,10 @@ async def generate_full_valhalla_pdf_report(data: dict):
     """
 
     # 1. Run the strategy engine
-    strategy_result = await smart_strategy_report(data)
+    strategy_result = smart_strategy_report(data)
+
+    if inspect.isawaitable(strategy_result):
+    strategy_result = await strategy_result
 
     if isinstance(strategy_result, dict):
         strategy_text = (
@@ -306,11 +309,16 @@ The client should focus first on the highest-value planning items supported by t
 """
 
     # 4. Always generate PDF
-    return await generate_strategy_pdf({
-        "report_text": full_report_text,
-        "client_name": client_name,
-        "tax_year": tax_year,
-    })
+    pdf_result = generate_strategy_pdf({
+    "report_text": full_report_text,
+    "client_name": client_name,
+    "tax_year": tax_year,
+})
+
+if inspect.isawaitable(pdf_result):
+    pdf_result = await pdf_result
+
+return pdf_result
 
     
 
