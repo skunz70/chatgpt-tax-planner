@@ -197,38 +197,38 @@ app.include_router(csv_excel_router)
 async def tax_router(request: ActionRequest):
     data = request.dict()
 
-   action_map = {
-    "tax_snapshot_summary": tax_snapshot_summary,
-    "roth_conversion": roth_conversion,
-    "multi_year_bracket": multi_year_bracket,
-    "capital_gains_review": capital_gains_review,
-    "withholding_review": withholding_review,
-    "ira_hsa_review": ira_hsa_review,
-    "deduction_bunching": deduction_bunching,
-    "charitable_giving": charitable_giving,
-    "business_tax_snapshot": business_tax_snapshot,
-    "self_employed_optimizer": self_employed_optimizer,
-    "social_security_planner": social_security_planner,
-    "state_tax_strategy": state_tax_strategy,
-    "aca_health_review": aca_health_review,
-    "real_estate_passive": real_estate_passive,
-    "bracket_analyzer": bracket_analyzer,
-    "year_end_moves": year_end_moves,
-    "client_specific": client_specific,
-    "doc_risk_review": doc_risk_review,
-    "dependent_credit_review": dependent_credit_review,
-    "prompt_helper": prompt_helper,
-    "quick_entry_plan": quick_entry_plan,
-    "smart_strategy_report": generate_full_valhalla_pdf_report,
-    "scenario_comparison": compare_scenarios,
-    "generate_strategy_with_roi": year_end_plan
-}
-if request.action not in action_map:
-    raise HTTPException(status_code=400, detail="Invalid action specified.")
+    action_map = {
+        "tax_snapshot_summary": tax_snapshot_summary,
+        "roth_conversion": roth_conversion,
+        "multi_year_bracket": multi_year_bracket,
+        "capital_gains_review": capital_gains_review,
+        "withholding_review": withholding_review,
+        "ira_hsa_review": ira_hsa_review,
+        "deduction_bunching": deduction_bunching,
+        "charitable_giving": charitable_giving,
+        "business_tax_snapshot": business_tax_snapshot,
+        "self_employed_optimizer": self_employed_optimizer,
+        "social_security_planner": social_security_planner,
+        "state_tax_strategy": state_tax_strategy,
+        "aca_health_review": aca_health_review,
+        "real_estate_passive": real_estate_passive,
+        "bracket_analyzer": bracket_analyzer,
+        "year_end_moves": year_end_moves,
+        "client_specific": client_specific,
+        "doc_risk_review": doc_risk_review,
+        "dependent_credit_review": dependent_credit_review,
+        "prompt_helper": prompt_helper,
+        "quick_entry_plan": quick_entry_plan,
+        "smart_strategy_report": generate_full_valhalla_pdf_report,
+        "scenario_comparison": compare_scenarios,
+        "generate_strategy_with_roi": year_end_plan,
+    }
 
-return await action_map[request.action](data)
+    if request.action not in action_map:
+        raise HTTPException(status_code=400, detail="Invalid action specified.")
 
-
+    return await action_map[request.action](data)
+    
 async def generate_full_valhalla_pdf_report(data: dict):
     """
     Master report workflow.
