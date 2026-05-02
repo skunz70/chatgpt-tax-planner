@@ -231,7 +231,87 @@ async def tax_router(request: ActionRequest):
 
     return await action_map[request.action](data)
 
+async def generate_full_valhalla_pdf_report(data: dict):
+    """
+    Master report workflow.
+    This prevents the GPT from returning a plain, cookie-cutter text report.
+    """
 
+    # 1. Run the strategy engine
+    strategy_result = await smart_strategy_report(data)
+
+    if isinstance(strategy_result, dict):
+        strategy_text = (
+            strategy_result.get("report_text")
+            or strategy_result.get("report")
+            or strategy_result.get("summary")
+            or str(strategy_result)
+        )
+    else:
+        strategy_text = str(strategy_result)
+
+    client_name = data.get("client_name", "Client")
+    tax_year = data.get("tax_year", "2024")
+
+    agi = data.get("agi", "N/A")
+    taxable_income = data.get("taxable_income", "N/A")
+    total_tax = data.get("total_tax", "N/A")
+    refund = data.get("refund", None)
+    balance_due = data.get("balance_due", None)
+
+    # 2. Force executive summary
+    executive_summary = f"""
+Executive Summary
+
+This report summarizes the client's current tax position, key planning opportunities, and recommended next steps based on the available {tax_year} tax return data.
+
+The client has adjusted gross income of ${agi}, taxable income of ${taxable_income}, and total federal tax of ${total_tax}. The planning focus is to identify available tax bracket capacity, reduce avoidable tax drag, improve withholding accuracy, and coordinate federal and Arizona tax planning opportunities.
+
+This report is intended to provide a prioritized, client-facing tax planning roadmap rather than a generic tax summary.
+"""
+
+    # 3. Force polished Valhalla structure
+    full_report_text = f"""
+Valhalla Tax Services
+Tax Planning Report
+
+Client: {client_name}
+Tax Year: {tax_year}
+
+{executive_summary}
+
+Confirmed Tax Data Summary
+
+Filing Status: {data.get("filing_status", "N/A")}
+State: {data.get("state", "Arizona")}
+Adjusted Gross Income: ${agi}
+Taxable Income: ${taxable_income}
+Total Federal Tax: ${total_tax}
+Federal Withholding: ${data.get("federal_withholding", "N/A")}
+Refund: ${refund if refund is not None else "N/A"}
+Balance Due: ${balance_due if balance_due is not None else "N/A"}
+
+Current Tax Position
+
+The client’s current tax position should be evaluated based on marginal bracket, unused bracket capacity, tax credits, withholding position, investment income, retirement income, and Arizona state tax impact.
+
+Priority Planning Opportunities
+
+The following strategies are ranked based on potential tax impact, timing sensitivity, and relevance to the tax return data.
+
+{strategy_text}
+
+Final Recommendation
+
+The client should focus first on the highest-value planning items supported by the return data. Priority should be given to strategies that reduce avoidable tax, improve long-term tax efficiency, and correct withholding issues before the next filing season.
+"""
+
+    # 4. Always generate PDF
+    return await generate_strategy_pdf({
+        "report_text": full_report_text,
+        "client_name": client_name,
+        "tax_year": tax_year,
+    })
 
     
 
