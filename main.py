@@ -2,6 +2,7 @@ import os
 import io
 from fpdf import FPDF
 import tempfile
+import inspect
 
 from fastapi import FastAPI, Response, UploadFile, File, Depends, HTTPException, Request, Body
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
