@@ -218,21 +218,19 @@ async def tax_router(request: ActionRequest):
         "doc_risk_review": doc_risk_review,
         "dependent_credit_review": dependent_credit_review,
         "prompt_helper": prompt_helper,
-        "quick_entry_plan": quick_entry_plan,  # ✅ NEW shortcut action
-        "smart_strategy_report": generate_full_valhalla_pdf_report,
+        "quick_entry_plan": quick_entry_plan,
+        "smart_strategy_report": smart_strategy_report,
         "scenario_comparison": compare_scenarios,
         "generate_strategy_with_roi": year_end_plan,
-
-
     }
 
-if request.action not in action_map:
-    raise HTTPException(status_code=400, detail="Invalid action specified.")
+    if request.action not in action_map:
+        raise HTTPException(status_code=400, detail="Invalid action specified.")
 
-return {
-    "DEBUG": "NEW_CODE_IS_RUNNING",
-    "action_received": request.action
-}
+    return {
+        "DEBUG": "NEW_CODE_IS_RUNNING",
+        "action_received": request.action
+    }
 
 async def generate_full_valhalla_pdf_report(data: dict):
     """
