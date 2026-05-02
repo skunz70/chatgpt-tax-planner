@@ -1686,7 +1686,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
 client_report_text = f"""
 STRATEGIC TAX PLANNING REPORT
 
-Based on the information provided, this analysis identified an estimated planning opportunity of ${total_estimated_roi:,.2f}.
+
 
 Primary Recommendation:
 {priority_recommendation}
