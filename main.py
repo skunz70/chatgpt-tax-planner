@@ -1693,7 +1693,7 @@ Primary Recommendation:
 {priority_recommendation}
 
 CURRENT TAX POSITION
-Adjusted Gross Income: ${agi:,.2f}
+agi_summary = f"Adjusted Gross Income: ${agi:,.2f}"
 Taxable Income: ${taxable_income:,.2f}
 Estimated Federal Tax Before Planning: ${baseline_tax:,.2f}
 Estimated Federal Tax After Planning: ${optimized_tax:,.2f}
