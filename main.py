@@ -1688,12 +1688,14 @@ VALHALLA TAX SERVICES
 STRATEGIC TAX PLANNING REPORT
 
 EXECUTIVE SUMMARY
-roi_summary = f"Based on the information provided, this analysis identified an estimated planning opportunity of ${total_estimated_roi:,.2f}."
+client_report_text = f"""
+Based on the information provided, this analysis identified an estimated planning opportunity of ${total_estimated_roi:,.2f}.
+
 Primary Recommendation:
 {priority_recommendation}
 
 CURRENT TAX POSITION
-agi_summary = f"Adjusted Gross Income: ${agi:,.2f}"
+Adjusted Gross Income: ${agi:,.2f}
 Taxable Income: ${taxable_income:,.2f}
 Estimated Federal Tax Before Planning: ${baseline_tax:,.2f}
 Estimated Federal Tax After Planning: ${optimized_tax:,.2f}
