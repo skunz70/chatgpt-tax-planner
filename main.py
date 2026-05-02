@@ -1684,7 +1684,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
     action_lines = "\n".join(f"- {a}" for a in action_steps)
 
     client_report_text = f"""
-VALHALLA TAX SERVICES
+
 STRATEGIC TAX PLANNING REPORT
 
 EXECUTIVE SUMMARY
