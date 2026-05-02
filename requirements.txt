@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+pdfplumber
+python-multipart
+PyPDF2
+fpdf
+pytesseract
+pdf2image
+pydantic[email]
+email-validator
+python-dotenv
+passlib
+python-jose[cryptography]
+pandas
+matplotlib
+reportlab==3.6.12

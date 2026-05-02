@@ -1,0 +1,2 @@
+run = "python3 runserver.py"
+language = "python3"
