@@ -309,7 +309,7 @@ The client should focus first on the highest-value planning items supported by t
 """
 
     # 4. Always generate PDF
-    pdf_result = generate_strategy_pdf({
+pdf_result = generate_strategy_pdf({
     "report_text": full_report_text,
     "client_name": client_name,
     "tax_year": tax_year,
