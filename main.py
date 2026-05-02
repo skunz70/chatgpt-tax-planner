@@ -722,13 +722,13 @@ import io
 
 class PDFReport(FPDF):
     def header(self):
-        self.set_font("Arial", "B", 16)
+        self.set_font("Helvetica", "B", 16)
         self.cell(0, 10, "Tax Planning Report", ln=True, align="C")
 
     def add_section(self, title, content):
-        self.set_font("Arial", "B", 12)
+        self.set_font("Helvetica", "B", 12)
         self.cell(0, 10, title, ln=True)
-        self.set_font("Arial", "", 12)
+        self.set_font("Helvetica", size=12)
         self.multi_cell(0, 10, content)
         self.ln()
 
