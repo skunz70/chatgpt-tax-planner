@@ -240,7 +240,7 @@ async def generate_full_valhalla_pdf_report(data: dict):
     strategy_result = smart_strategy_report(data)
 
     if inspect.isawaitable(strategy_result):
-    strategy_result = await strategy_result
+        strategy_result = await strategy_result
 
     if isinstance(strategy_result, dict):
         strategy_text = (
