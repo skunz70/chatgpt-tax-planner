@@ -342,7 +342,7 @@ async def generate_full_valhalla_pdf_report(data: dict):
             "detail": str(e)
         }
 
-    if isinstance(strategy_result, dict) and strategy_result.get("status") == "needs_tax_data":
+    if isinstance(strategy_result, dict) and strategy_result.get("status") == "needs_parsed_1040":
         # Pass through structured validation feedback for GPT router clients.
         return strategy_result
 
@@ -1733,35 +1733,53 @@ async def smart_strategy_report(data):
     def _has_value(value):
         return value not in (None, "", "N/A")
 
-    received_fields = [field for field in required_fields if _has_value(data.get(field))]
-    missing_fields = [field for field in required_fields if field not in received_fields]
+    # Strict flow: smart_strategy_report must only use values from a successful /parse_1040 response object.
+    parsed_data = None
+    possible_parsed_payloads = [
+        data.get("parsed_1040"),
+        data.get("parse_1040_result"),
+        data.get("parsed_data"),
+        data if data.get("status") == "success" else None,
+    ]
+    for payload in possible_parsed_payloads:
+        if isinstance(payload, dict) and payload.get("status") == "success":
+            parsed_data = payload
+            break
 
-    if missing_fields:
-        confidence_engine = data.get("confidence_engine")
-        planning_status = data.get("planning_status")
-
+    if parsed_data is None:
         response = {
-            "status": "needs_tax_data",
-            "message": "Please parse the uploaded 1040 first, then generate the tax plan using the extracted data.",
-            "required_fields": required_fields,
-            "received_fields": received_fields,
+            "status": "needs_parsed_1040",
+            "message": "Please upload and parse a Form 1040 before generating a full tax plan."
         }
-        if confidence_engine is not None:
-            response["confidence_engine"] = confidence_engine
-        if planning_status is not None:
-            response["planning_status"] = planning_status
+        if data.get("confidence_engine") is not None:
+            response["confidence_engine"] = data.get("confidence_engine")
+        if data.get("planning_status") is not None:
+            response["planning_status"] = data.get("planning_status")
         return response
 
-    agi = data.get("agi", 0)
-    filing_status = data.get("filing_status", "single")
-    taxable_income = data.get("taxable_income", max(0, (agi or 0) - 13000))
-    total_tax = data.get("total_tax", data.get("estimated_tax", 0))
-    marginal_rate = data.get("marginal_rate", "22%")
+    received_fields = [field for field in required_fields if _has_value(parsed_data.get(field))]
+    missing_fields = [field for field in required_fields if field not in received_fields]
+    if missing_fields:
+        response = {
+            "status": "needs_parsed_1040",
+            "message": "Please upload and parse a Form 1040 before generating a full tax plan."
+        }
+        if parsed_data.get("confidence_engine") is not None:
+            response["confidence_engine"] = parsed_data.get("confidence_engine")
+        if parsed_data.get("planning_status") is not None:
+            response["planning_status"] = parsed_data.get("planning_status")
+        return response
+
+    agi = parsed_data.get("agi", 0)
+    filing_status = parsed_data.get("filing_status", "single")
+    taxable_income = parsed_data.get("taxable_income", max(0, (agi or 0) - 13000))
+    total_tax = parsed_data.get("total_tax", parsed_data.get("estimated_tax", 0))
+    marginal_rate = parsed_data.get("marginal_rate", "22%")
 
     strategy_result = await recommend({
         "agi": agi,
         "filing_status": filing_status,
-        "business_income": data.get("business_income", 0),
+        "business_income": parsed_data.get("business_income", 0),
         "retirement_plan_type": "401k"
     })
 
@@ -1794,9 +1812,9 @@ async def smart_strategy_report(data):
                 f"- {strategy}\n  Example: An additional {_fmt_currency(hsa_add)} HSA contribution may save roughly {_fmt_currency(hsa_savings)} in federal tax. Impact: immediate deduction plus tax-free medical reimbursement potential."
             )
         elif "estimated tax payment" in lowered:
-            projected_shortfall = max(0, (estimated_tax or 0) - data.get("estimated_payments", 0))
+            projected_shortfall = max(0, (estimated_tax or 0) - parsed_data.get("estimated_payments", 0))
             strategy_lines.append(
-                f"- {strategy}\n  Example: If projected tax is {_fmt_currency(estimated_tax)} and paid-in amounts are {_fmt_currency(data.get('estimated_payments', 0))}, a catch-up payment of about {_fmt_currency(projected_shortfall)} can reduce underpayment risk. Impact: avoids penalties and smooths cash flow."
+                f"- {strategy}\n  Example: If projected tax is {_fmt_currency(estimated_tax)} and paid-in amounts are {_fmt_currency(parsed_data.get('estimated_payments', 0))}, a catch-up payment of about {_fmt_currency(projected_shortfall)} can reduce underpayment risk. Impact: avoids penalties and smooths cash flow."
             )
         else:
             strategy_lines.append(
