@@ -1681,7 +1681,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
 
     action_lines = "\n".join(f"- {a}" for a in action_steps)
 
-       client_report_text = (
+    client_report_text = (
         "STRATEGIC TAX PLANNING REPORT\n\n"
         f"Primary Recommendation:\n{priority_recommendation}\n\n"
         "CURRENT TAX POSITION\n"
