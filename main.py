@@ -233,6 +233,98 @@ async def tax_router(request: ActionRequest):
         return await action_result
     return action_result
     
+
+
+def _to_float(value):
+    try:
+        if value is None or value == "":
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_strategy_priorities(data: dict):
+    priorities = []
+
+    balance_due = _to_float(data.get("balance_due"))
+    taxable_income = _to_float(data.get("taxable_income"))
+    retirement_contributions = _to_float(data.get("retirement_contributions"))
+    agi = _to_float(data.get("agi"))
+    business_income = _to_float(data.get("business_income"))
+    rental_income = _to_float(data.get("rental_income"))
+    capital_gains = _to_float(data.get("capital_gains"))
+
+    if balance_due is not None and balance_due > 0:
+        priorities.append({
+            "strategy_name": "Withholding Optimization",
+            "why_it_matters": "A current balance due indicates underwithholding or underpayment risk that can continue into next year.",
+            "estimated_tax_impact": f"Potentially reduce next filing season balance due by up to ${balance_due:,.0f} through W-4 and estimate adjustments.",
+            "difficulty_level": "Low",
+            "recommended_timing": "Immediately; update withholding before the next payroll cycle.",
+            "advisor_note": "Coordinate paycheck withholding and quarterly estimates to smooth cash flow and reduce penalty risk."
+        })
+
+    if taxable_income is not None:
+        priorities.append({
+            "strategy_name": "Bracket Management",
+            "why_it_matters": "Taxable income determines marginal rate exposure and where proactive income and deduction timing can help.",
+            "estimated_tax_impact": "Moderate; typically 1-3% of taxable income through timing and bracket-capacity planning.",
+            "difficulty_level": "Medium",
+            "recommended_timing": "During mid-year and year-end projection cycles.",
+            "advisor_note": "Model income acceleration/deferral and deduction timing to avoid unnecessary marginal-rate creep."
+        })
+
+    low_retirement = retirement_contributions is None
+    if not low_retirement and agi is not None:
+        low_retirement = retirement_contributions < max(6000.0, agi * 0.05)
+
+    if low_retirement:
+        priorities.append({
+            "strategy_name": "Retirement Contribution Optimization",
+            "why_it_matters": "Tax-deferred or tax-free retirement contributions can lower current taxable income and improve long-term compounding.",
+            "estimated_tax_impact": "Moderate to high depending on contribution room and marginal bracket.",
+            "difficulty_level": "Low to Medium",
+            "recommended_timing": "Increase deferrals now; finalize contribution limits before year-end deadlines.",
+            "advisor_note": "Prioritize employer-plan deferrals and evaluate IRA/HSA eligibility for additional tax leverage."
+        })
+
+    if rental_income is not None and rental_income != 0:
+        priorities.append({
+            "strategy_name": "Rental Activity Optimization",
+            "why_it_matters": "Rental activity can create deduction timing opportunities and passive-loss planning considerations.",
+            "estimated_tax_impact": "Varies; depends on depreciation, repairs, and passive-loss utilization.",
+            "difficulty_level": "Medium",
+            "recommended_timing": "Before major property expenses and before year-end close.",
+            "advisor_note": "Review Schedule E treatment, documentation, and depreciation strategy to maximize allowable deductions."
+        })
+
+    if business_income is not None and business_income > 0:
+        priorities.append({
+            "strategy_name": "Business Tax Optimization",
+            "why_it_matters": "Business income may qualify for planning across deductions, entity structure, and retirement plan design.",
+            "estimated_tax_impact": "Moderate to high, especially when QBI and deduction planning are available.",
+            "difficulty_level": "Medium to High",
+            "recommended_timing": "Quarterly, with a deeper review before year-end.",
+            "advisor_note": "Evaluate QBI-sensitive planning, accountable-plan use, and retirement contributions tied to business cash flow."
+        })
+
+    if not priorities and capital_gains is not None and capital_gains > 0:
+        priorities.append({
+            "strategy_name": "Capital Gains Coordination",
+            "why_it_matters": "Realized gains can increase current-year tax and interact with bracket thresholds.",
+            "estimated_tax_impact": "Moderate; depends on gain size and holding period.",
+            "difficulty_level": "Medium",
+            "recommended_timing": "Before additional asset sales and at year-end.",
+            "advisor_note": "Use gain/loss netting and holding-period review to improve after-tax results."
+        })
+
+    top_priorities = priorities[:3]
+    for idx, item in enumerate(top_priorities, start=1):
+        item["priority_rank"] = idx
+
+    return top_priorities
+
 async def generate_full_valhalla_pdf_report(data: dict):
     """
     Master report workflow.
@@ -335,6 +427,7 @@ The client should focus first on the highest-value planning items supported by t
             "tax_year": tax_year,
             "report_text": full_report_text,
             "message": "Planning report text generated successfully. Use /generate_strategy_pdf separately to create a downloadable PDF.",
+            "strategy_priorities": _build_strategy_priorities(data),
         }
     except Exception as e:
         return {
