@@ -308,28 +308,27 @@ Final Recommendation
 The client should focus first on the highest-value planning items supported by the return data. Priority should be given to strategies that reduce avoidable tax, improve long-term tax efficiency, and correct withholding issues before the next filing season.
 """
 
-    
-full_report_text = (
-    full_report_text
-    .replace("’", "'")
-    .replace("‘", "'")
-    .replace("“", '"')
-    .replace("”", '"')
-    .replace("–", "-")
-    .replace("—", "-")
-)
+    full_report_text = (
+        full_report_text
+        .replace("’", "'")
+        .replace("‘", "'")
+        .replace("“", '"')
+        .replace("”", '"')
+        .replace("–", "-")
+        .replace("—", "-")
+    )
 
-# 4. Always generate PDF
-pdf_result = generate_strategy_pdf({
-    "report_text": full_report_text,
-    "client_name": client_name,
-    "tax_year": tax_year,
-})
+    # 4. Always generate PDF
+    pdf_result = generate_strategy_pdf({
+        "report_text": full_report_text,
+        "client_name": client_name,
+        "tax_year": tax_year,
+    })
 
-if inspect.isawaitable(pdf_result):
-    pdf_result = await pdf_result
+    if inspect.isawaitable(pdf_result):
+        pdf_result = await pdf_result
 
-return pdf_result
+    return pdf_result
     
 
 # === Logic for Each Action ===
