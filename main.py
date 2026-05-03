@@ -1683,36 +1683,35 @@ def generate_strategy_with_roi(data: StrategyROIInput):
 
     action_lines = "\n".join(f"- {a}" for a in action_steps)
 
-    client_report_text = f"""
-    STRATEGIC TAX PLANNING REPORT
+    client_report_text = f"""STRATEGIC TAX PLANNING REPORT
 
-    Primary Recommendation:
-    {priority_recommendation}
+Primary Recommendation:
+{priority_recommendation}
 
-    CURRENT TAX POSITION
-    Adjusted Gross Income: ${agi:,.2f}
-    Taxable Income: ${taxable_income:,.2f}
-    Estimated Federal Tax Before Planning: ${baseline_tax:,.2f}
-    Estimated Federal Tax After Planning: ${optimized_tax:,.2f}
-    Estimated Tax Savings: ${tax_savings:,.2f}
+CURRENT TAX POSITION
+Adjusted Gross Income: ${agi:,.2f}
+Taxable Income: ${taxable_income:,.2f}
+Estimated Federal Tax Before Planning: ${baseline_tax:,.2f}
+Estimated Federal Tax After Planning: ${optimized_tax:,.2f}
+Estimated Tax Savings: ${tax_savings:,.2f}
 
-    RECOMMENDED STRATEGIES
-    {strategy_lines}
+RECOMMENDED STRATEGIES
+{strategy_lines}
 
-    CONFLICT AND RISK ANALYSIS
-    {conflict_lines}
+CONFLICT AND RISK ANALYSIS
+{conflict_lines}
 
-    THRESHOLD AND PHASEOUT REVIEW
-    {threshold_lines}
+THRESHOLD AND PHASEOUT REVIEW
+{threshold_lines}
 
-    CLIENT ACTION STEPS
-    {action_lines}
+CLIENT ACTION STEPS
+{action_lines}
 
-    FINAL RECOMMENDATION
-    The recommended next step is to review the highest-impact strategy first, confirm the supporting income and deduction details, and complete a final tax projection before implementation.
+FINAL RECOMMENDATION
+The recommended next step is to review the highest-impact strategy first, confirm the supporting income and deduction details, and complete a final tax projection before implementation.
 
-    Prepared by Valhalla Tax Services
-    """
+Prepared by Valhalla Tax Services
+"""
     return {
         "agi": round(agi, 2),
         "taxable_income": round(taxable_income, 2),
