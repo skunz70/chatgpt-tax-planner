@@ -694,7 +694,21 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
     planner_error = None
     try:
         planner_result = generate_strategy_with_roi(planner_input)
+        if inspect.isawaitable(planner_result):
+            planner_result = await planner_result
+
+        if isinstance(planner_result, (StreamingResponse, FileResponse, Response)):
+            planner_result = {
+                "status": "report_generation_skipped",
+                "message": "Tax data was extracted successfully. Generate the client report as a separate PDF action."
+            }
+        else:
+            jsonable_encoder(planner_result)
     except Exception as e:
+        planner_result = {
+            "status": "report_generation_skipped",
+            "message": "Tax data was extracted successfully. Generate the client report as a separate PDF action."
+        }
         planner_error = "Tax planning report generation failed. Extracted tax data is still available."
         print(f"PLANNER GENERATION FAILED: {str(e)}", flush=True)
 
