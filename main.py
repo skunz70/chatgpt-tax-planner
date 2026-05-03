@@ -326,18 +326,16 @@ The client should focus first on the highest-value planning items supported by t
         .replace("—", "-")
     )
 
-    # 4. Always generate PDF
+    # 4. For GPT router, return JSON (PDF generation remains available via /generate_strategy_pdf)
     try:
-        pdf_result = generate_strategy_pdf({
-            "report_text": full_report_text,
+        return {
+            "status": "success",
+            "report_type": "valhalla_tax_plan",
             "client_name": client_name,
             "tax_year": tax_year,
-        })
-
-        if inspect.isawaitable(pdf_result):
-            pdf_result = await pdf_result
-
-        return pdf_result
+            "report_text": full_report_text,
+            "message": "Planning report text generated successfully. Use /generate_strategy_pdf separately to create a downloadable PDF.",
+        }
     except Exception as e:
         return {
             "error": "The backend tax planning report failed to generate.",
