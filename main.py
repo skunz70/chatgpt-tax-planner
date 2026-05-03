@@ -338,7 +338,8 @@ async def generate_full_valhalla_pdf_report(data: dict):
             strategy_result = await strategy_result
     except Exception as e:
         return {
-            "error": "The backend tax planning report failed to generate.",
+            "status": "error",
+            "error": "Unable to generate the Valhalla comprehensive tax plan.",
             "detail": str(e)
         }
 
@@ -445,6 +446,34 @@ The following strategies are ranked based on potential tax impact, timing sensit
 
 {strategy_text}
 
+Withholding Correction Strategy
+
+Current withholding is {_money(data.get("federal_withholding", "N/A"))} against total tax of {_money(total_tax)}. Net position check: withholding minus total tax = {_money((_to_number(data.get("federal_withholding")) or 0) - (total_tax_num or 0))}. If this value trends negative during the year, increase W-4 withholding or estimated payments to avoid underpayment penalties.
+
+Retirement Contribution Optimization
+
+Reported retirement contributions: {_money(data.get("retirement_contributions", "N/A"))}. At an assumed marginal rate of {marginal_rate}, each additional $1,000 pre-tax contribution may reduce federal tax by approximately {_money(1000 * (0.22 if "22" in str(marginal_rate) else 0.24))}.
+
+Bracket Filling Strategy
+
+Use current taxable income of {_money(taxable_income)} to evaluate remaining room in the current bracket. Where room exists, fill deliberately with lower-tax-rate income events (e.g., Roth conversions or capital gain realization) before year-end bracket compression.
+
+Deduction Timing Strategy
+
+Standard deduction reported: {_money(data.get("standard_deduction", "N/A"))}. Itemized deductions reported: {_money(data.get("itemized_deductions", "N/A"))}. Mortgage interest: {_money(data.get("mortgage_interest", "N/A"))}. Charitable contributions: {_money(data.get("charitable_contributions", "N/A"))}. Timing deductions into one tax year can increase the marginal value of deductible dollars.
+
+Income and Benefit Coordination
+
+Business income: {_money(data.get("business_income", "N/A"))}; Rental income: {_money(data.get("rental_income", "N/A"))}; Capital gains: {_money(data.get("capital_gains", "N/A"))}. Coordinate recognition timing with retirement contributions and withholding changes to smooth effective rate volatility.
+
+Estimated Tax and Cash Flow Planning
+
+Refund currently reported: {_money(refund)}; balance due reported: {_money(balance_due)}. If balance due is present, convert to quarterly catch-up targets. Example quarterly catch-up: {_money((_to_number(balance_due) or 0) / 4)}.
+
+Arizona State Strategy
+
+State listed: {data.get("state", "Arizona")}. Integrate Arizona planning with federal moves by confirming state treatment of deductions, retirement contributions, and estimated payment schedules.
+
 Action Plan Timeline
 
 Immediate (next 30 days): Validate missing fields, confirm withholding-to-liability alignment, and prioritize the top one to two tax-saving actions with the strongest projected after-tax value.
@@ -470,7 +499,7 @@ The client should focus first on the highest-value planning items supported by t
     try:
         return {
             "status": "success",
-            "report_type": "valhalla_tax_plan",
+            "report_type": "valhalla_comprehensive_tax_plan",
             "client_name": client_name,
             "tax_year": tax_year,
             "report_text": full_report_text,
@@ -479,7 +508,8 @@ The client should focus first on the highest-value planning items supported by t
         }
     except Exception as e:
         return {
-            "error": "The backend tax planning report failed to generate.",
+            "status": "error",
+            "error": "Unable to package the Valhalla comprehensive tax plan response.",
             "detail": str(e)
         }
     
@@ -1733,7 +1763,7 @@ async def smart_strategy_report(data):
     def _has_value(value):
         return value not in (None, "", "N/A")
 
-    # Strict flow: smart_strategy_report must only use values from a successful /parse_1040 response object.
+    # Prefer parsed payloads when present, but allow direct extracted fields from GPT.
     parsed_data = None
     possible_parsed_payloads = [
         data.get("parsed_1040"),
@@ -1746,40 +1776,31 @@ async def smart_strategy_report(data):
             parsed_data = payload
             break
 
-    if parsed_data is None:
-        response = {
-            "status": "needs_parsed_1040",
-            "message": "Please upload and parse a Form 1040 before generating a full tax plan."
-        }
-        if data.get("confidence_engine") is not None:
-            response["confidence_engine"] = data.get("confidence_engine")
-        if data.get("planning_status") is not None:
-            response["planning_status"] = data.get("planning_status")
-        return response
-
-    received_fields = [field for field in required_fields if _has_value(parsed_data.get(field))]
+    source_data = parsed_data if parsed_data is not None else data
+    received_fields = [field for field in required_fields if _has_value(source_data.get(field))]
     missing_fields = [field for field in required_fields if field not in received_fields]
     if missing_fields:
         response = {
-            "status": "needs_parsed_1040",
-            "message": "Please upload and parse a Form 1040 before generating a full tax plan."
+            "status": "insufficient_data",
+            "message": "Missing core tax inputs required for planning.",
+            "missing_fields": missing_fields,
         }
-        if parsed_data.get("confidence_engine") is not None:
-            response["confidence_engine"] = parsed_data.get("confidence_engine")
-        if parsed_data.get("planning_status") is not None:
-            response["planning_status"] = parsed_data.get("planning_status")
+        if source_data.get("confidence_engine") is not None:
+            response["confidence_engine"] = source_data.get("confidence_engine")
+        if source_data.get("planning_status") is not None:
+            response["planning_status"] = source_data.get("planning_status")
         return response
 
-    agi = parsed_data.get("agi", 0)
-    filing_status = parsed_data.get("filing_status", "single")
-    taxable_income = parsed_data.get("taxable_income", max(0, (agi or 0) - 13000))
-    total_tax = parsed_data.get("total_tax", parsed_data.get("estimated_tax", 0))
-    marginal_rate = parsed_data.get("marginal_rate", "22%")
+    agi = source_data.get("agi", 0)
+    filing_status = source_data.get("filing_status", "single")
+    taxable_income = source_data.get("taxable_income", max(0, (agi or 0) - 13000))
+    total_tax = source_data.get("total_tax", source_data.get("estimated_tax", 0))
+    marginal_rate = source_data.get("marginal_rate", "22%")
 
     strategy_result = await recommend({
         "agi": agi,
         "filing_status": filing_status,
-        "business_income": parsed_data.get("business_income", 0),
+        "business_income": source_data.get("business_income", 0),
         "retirement_plan_type": "401k"
     })
 
@@ -1812,9 +1833,9 @@ async def smart_strategy_report(data):
                 f"- {strategy}\n  Example: An additional {_fmt_currency(hsa_add)} HSA contribution may save roughly {_fmt_currency(hsa_savings)} in federal tax. Impact: immediate deduction plus tax-free medical reimbursement potential."
             )
         elif "estimated tax payment" in lowered:
-            projected_shortfall = max(0, (estimated_tax or 0) - parsed_data.get("estimated_payments", 0))
+            projected_shortfall = max(0, (estimated_tax or 0) - source_data.get("estimated_payments", 0))
             strategy_lines.append(
-                f"- {strategy}\n  Example: If projected tax is {_fmt_currency(estimated_tax)} and paid-in amounts are {_fmt_currency(parsed_data.get('estimated_payments', 0))}, a catch-up payment of about {_fmt_currency(projected_shortfall)} can reduce underpayment risk. Impact: avoids penalties and smooths cash flow."
+                f"- {strategy}\n  Example: If projected tax is {_fmt_currency(estimated_tax)} and paid-in amounts are {_fmt_currency(source_data.get('estimated_payments', 0))}, a catch-up payment of about {_fmt_currency(projected_shortfall)} can reduce underpayment risk. Impact: avoids penalties and smooths cash flow."
             )
         else:
             strategy_lines.append(
