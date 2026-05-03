@@ -625,32 +625,69 @@ import pytesseract
 
 
 
-def extract_1040_lines_from_text(text: str) -> dict:
-    lines = {
-        "agi": None,
-        "taxable_income": None,
-        "total_tax": None,
-        "withholding": None,
-        "estimated_payments": None,
-        "total_payments": None,
-        "balance_due": None,
+def extract_1040_lines_from_text(text: str) -> tuple[dict, dict]:
+    clean_text = text.replace("\r", "\n")
+    normalized_lines = [line.strip() for line in clean_text.split("\n") if line.strip()]
+
+    def _parse_amount(raw_amount: str):
+        cleaned = re.sub(r"[^\d\-]", "", raw_amount or "")
+        if cleaned in {"", "-"}:
+            return None
+        try:
+            return int(cleaned)
+        except ValueError:
+            return None
+
+    def _find_line_amount(line_number_pattern: str, line_label_patterns: list[str]):
+        number_regex = r"\(?-?\$?\s*([0-9][0-9,]*)\)?"
+        candidates = []
+        for idx, line in enumerate(normalized_lines):
+            line_ok = re.search(line_number_pattern, line, flags=re.IGNORECASE)
+            label_ok = any(re.search(lp, line, flags=re.IGNORECASE) for lp in line_label_patterns)
+            if not line_ok or not label_ok:
+                continue
+            found = re.findall(number_regex, line)
+            if found:
+                value = _parse_amount(found[-1])
+                if value is not None:
+                    candidates.append((value, idx, line))
+
+        if not candidates:
+            return None, None
+        value, idx, matched_line = candidates[-1]
+        excerpt = " ".join(normalized_lines[max(0, idx - 1): min(len(normalized_lines), idx + 2)])
+        return value, excerpt
+
+    field_rules = {
+        "w2_wages_line_1a": (r"\b1a\b|\b1\s*a\b", [r"wages", r"w-?2"]),
+        "additional_income_line_8": (r"\b8\b", [r"additional income", r"schedule\s*1"]),
+        "total_income_line_9": (r"\b9\b", [r"total income"]),
+        "agi": (r"\b11\b", [r"adjusted gross income", r"\bagi\b"]),
+        "taxable_income": (r"\b15\b", [r"taxable income"]),
+        "line_16_tax": (r"\b16\b", [r"\btax\b"]),
+        "total_tax": (r"\b24\b", [r"total tax"]),
+        "withholding": (r"\b25d\b|\b25\s*d\b", [r"withheld", r"withholding"]),
+        "total_payments": (r"\b33\b", [r"total payments"]),
+        "refund_line_34": (r"\b34\b", [r"refund"]),
+        "balance_due": (r"\b37\b", [r"amount you owe", r"amount owed"]),
     }
-    patterns = {
-        "agi": r"11\s+.*?\$?\s*([\d,]+)",
-        "taxable_income": r"15\s+.*?\$?\s*([\d,]+)",
-        "total_tax": r"24\s+.*?\$?\s*([\d,]+)",
-        "withholding": r"25d\s+.*?\$?\s*([\d,]+)",
-        "estimated_payments": r"33\s+.*?\$?\s*([\d,]+)",  # sometimes 33 is “total payments”
-        "balance_due": r"37\s+.*?\$?\s*([\d,]+)",
+
+    extracted = {}
+    extraction_debug = {}
+    for field, (line_pattern, labels) in field_rules.items():
+        amount, excerpt = _find_line_amount(line_pattern, labels)
+        extracted[field] = amount
+        extraction_debug[field] = {
+            "matched_excerpt": excerpt,
+            "value": amount
+        }
+
+    extracted["estimated_payments"] = 0
+    extraction_debug["estimated_payments"] = {
+        "matched_excerpt": "Defaulted to 0. Form 1040 line 33 already includes withholding + all payment credits.",
+        "value": 0
     }
-    for key, pat in patterns.items():
-        m = re.search(pat, text)
-        if m:
-            try:
-                lines[key] = int(m.group(1).replace(",", ""))
-            except:
-                pass
-    return lines
+    return extracted, extraction_debug
 
 def ocr_extract_text(pdf_bytes: bytes) -> str:
     text = ""
@@ -715,7 +752,7 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
                 "content_type": content_type
             }
 
-    lines = extract_1040_lines_from_text(text)
+    lines, extraction_debug = extract_1040_lines_from_text(text)
 
     validation_warnings = []
 
@@ -725,6 +762,11 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
     withholding = lines.get("withholding")
     total_payments = lines.get("total_payments")
     balance_due = lines.get("balance_due")
+    total_income = lines.get("total_income_line_9")
+    additional_income = lines.get("additional_income_line_8")
+    w2_income = lines.get("w2_wages_line_1a")
+    refund = lines.get("refund_line_34")
+    line_16_tax = lines.get("line_16_tax")
 
     if agi is None:
         validation_warnings.append("AGI could not be confidently detected from Form 1040 Line 11.")
@@ -740,6 +782,12 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
 
     if agi is not None and total_tax is not None and total_tax > agi:
         validation_warnings.append("Total tax appears unusually high compared to AGI. Verify OCR extraction.")
+    if agi is not None and agi < 0:
+        validation_warnings.append("AGI is negative. Verify Form 1040 line 11 extraction before planning.")
+    if agi is not None and agi > 0 and taxable_income == 0:
+        validation_warnings.append("Taxable income is zero while AGI is positive. Verify Form 1040 line 15.")
+    if (agi or 0) > 0 and (total_income or 0) > 0 and total_tax == 0:
+        validation_warnings.append("Total tax is zero while income exists. Verify Form 1040 lines 16 and 24.")
 
     missing_fields = []
     for field_name in ["agi", "taxable_income", "total_tax", "withholding", "estimated_payments", "total_payments"]:
@@ -796,6 +844,15 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
     confidence_score = 100
     confidence_score -= len(missing_fields) * 7
     confidence_score -= (len(validation_warnings) + len(reconciliation_warnings)) * 5
+    if agi is not None and agi < 0:
+        confidence_score -= 18
+    if agi is not None and agi > 0 and taxable_income == 0:
+        confidence_score -= 14
+    if (agi or 0) > 0 and (total_income or 0) > 0 and total_tax == 0:
+        confidence_score -= 16
+    if taxable_income is not None and total_income is not None and taxable_income > total_income:
+        confidence_score -= 10
+        validation_warnings.append("Taxable income exceeds total income. Verify line mapping and OCR quality.")
     confidence_score = max(0, min(100, confidence_score))
 
     safe_to_plan = (
@@ -841,24 +898,33 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
 
     planner_result = None
     planner_error = None
-    try:
-        planner_result = generate_strategy_with_roi(planner_input)
-    except Exception as e:
-        planner_error = "Tax planning report generation failed. Extracted tax data is still available."
-        print(f"PLANNER GENERATION FAILED: {str(e)}", flush=True)
+    if safe_to_plan:
+        try:
+            planner_result = generate_strategy_with_roi(planner_input)
+        except Exception as e:
+            planner_error = "Tax planning report generation failed. Extracted tax data is still available."
+            print(f"PLANNER GENERATION FAILED: {str(e)}", flush=True)
+    else:
+        planner_error = "Planning not generated because extraction confidence is below safe threshold."
 
     return {
         "status": "success",
         "received_filename": received_filename,
         "content_type": content_type,
         "filing_status": "unknown",
+        "w2_income": w2_income,
+        "additional_income": additional_income,
+        "total_income": total_income,
         "agi": agi,
         "taxable_income": taxable_income,
+        "line_16_tax": line_16_tax,
         "total_tax": total_tax,
         "withholding": withholding,
         "estimated_payments": estimated_payments,
         "total_payments": total_payments,
+        "refund": refund,
         "balance_due": balance_due,
+        "extraction_debug": extraction_debug,
         "validation_warnings": validation_warnings,
         "planning_status": planning_status,
         "planning_recommendation": planning_recommendation,
