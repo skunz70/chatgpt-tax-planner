@@ -4,7 +4,7 @@ from fpdf import FPDF
 import tempfile
 import inspect
 
-from fastapi import FastAPI, Response, UploadFile, File, Depends, HTTPException, Request, Body
+from fastapi import FastAPI, Response, UploadFile, File, Depends, HTTPException, Request, Body, status
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -228,7 +228,10 @@ async def tax_router(request: ActionRequest):
     if request.action not in action_map:
         raise HTTPException(status_code=400, detail="Invalid action specified.")
 
-    return await action_map[request.action](data)
+    action_result = action_map[request.action](data)
+    if inspect.isawaitable(action_result):
+        return await action_result
+    return action_result
     
 async def generate_full_valhalla_pdf_report(data: dict):
     """
@@ -333,9 +336,9 @@ The client should focus first on the highest-value planning items supported by t
 
 # === Logic for Each Action ===
 
-def tax_snapshot_summary(req): return {"summary": f"Tax summary for {req.tax_year or 'current year'}"}
+def tax_snapshot_summary(req): return {"summary": f"Tax summary for {req.get('tax_year') or 'current year'}"}
 
-def roth_conversion(req): return {"conversion": f"Roth analysis for income {req.income or 'N/A'}"}
+def roth_conversion(req): return {"conversion": f"Roth analysis for income {req.get('income') or 'N/A'}"}
 
 def multi_year_bracket(req): return {"multi_year": "Multi-year bracket forecast"}
 
@@ -377,9 +380,9 @@ def prompt_helper(req): return {"prompts": "Reusable prompt guidance"}
 
 # === Logic for Each Action ===
 
-def tax_snapshot_summary(req): return {"summary": f"Tax summary for {req.tax_year or 'current year'}"}
+def tax_snapshot_summary(req): return {"summary": f"Tax summary for {req.get('tax_year') or 'current year'}"}
 
-def roth_conversion(req): return {"conversion": f"Roth analysis for income {req.income or 'N/A'}"}
+def roth_conversion(req): return {"conversion": f"Roth analysis for income {req.get('income') or 'N/A'}"}
 
 def multi_year_bracket(req): return {"multi_year": "Multi-year bracket forecast"}
 
@@ -511,6 +514,7 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
     print("====== /parse_1040 HIT ======", flush=True)
     print("CONTENT TYPE:", request.headers.get("content-type"), flush=True)
 
+    content_type = request.headers.get("content-type")
     pdf_bytes = None
     received_filename = None
 
@@ -537,7 +541,7 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
         return {
             "error": "No file detected",
             "debug": {
-                "content_type": request.headers.get("content-type"),
+                "content_type": content_type,
                 "body": body
             }
         }
