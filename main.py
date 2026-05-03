@@ -342,6 +342,10 @@ async def generate_full_valhalla_pdf_report(data: dict):
             "detail": str(e)
         }
 
+    if isinstance(strategy_result, dict) and strategy_result.get("status") == "needs_tax_data":
+        # Pass through structured validation feedback for GPT router clients.
+        return strategy_result
+
     if isinstance(strategy_result, dict):
         strategy_text = (
             strategy_result.get("report_text")
@@ -1658,6 +1662,30 @@ async def quick_entry_plan(data: dict):
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
 # === Smart Strategy PDF Report Handler ===
 async def smart_strategy_report(data):
+    required_fields = ["agi", "taxable_income", "total_tax", "filing_status"]
+
+    def _has_value(value):
+        return value not in (None, "", "N/A")
+
+    received_fields = [field for field in required_fields if _has_value(data.get(field))]
+    missing_fields = [field for field in required_fields if field not in received_fields]
+
+    if missing_fields:
+        confidence_engine = data.get("confidence_engine")
+        planning_status = data.get("planning_status")
+
+        response = {
+            "status": "needs_tax_data",
+            "message": "Please parse the uploaded 1040 first, then generate the tax plan using the extracted data.",
+            "required_fields": required_fields,
+            "received_fields": received_fields,
+        }
+        if confidence_engine is not None:
+            response["confidence_engine"] = confidence_engine
+        if planning_status is not None:
+            response["planning_status"] = planning_status
+        return response
+
     agi = data.get("agi", 0)
     filing_status = data.get("filing_status", "single")
     taxable_income = data.get("taxable_income", max(0, (agi or 0) - 13000))
