@@ -670,6 +670,16 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
         else "Review missing Form 1040 fields before generating planning report"
     )
 
+    if confidence_score >= 85 and safe_to_plan:
+        planning_status = "ready_for_planning"
+        planning_recommendation = "Data is clean. Proceed with full tax planning."
+    elif 60 <= confidence_score <= 84:
+        planning_status = "needs_review"
+        planning_recommendation = "Some key fields are missing. Review before planning."
+    else:
+        planning_status = "insufficient_data"
+        planning_recommendation = "Insufficient data for reliable planning. Upload a clearer return."
+
     planner_input = StrategyROIInput(
         filing_status="single",
         w2_income=float(agi or 0),
@@ -709,6 +719,8 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
         "total_payments": total_payments,
         "balance_due": balance_due,
         "validation_warnings": validation_warnings,
+        "planning_status": planning_status,
+        "planning_recommendation": planning_recommendation,
         "confidence_engine": {
             "extracted_lines": {
                 "agi": agi,
