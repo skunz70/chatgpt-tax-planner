@@ -308,6 +308,16 @@ Final Recommendation
 The client should focus first on the highest-value planning items supported by the return data. Priority should be given to strategies that reduce avoidable tax, improve long-term tax efficiency, and correct withholding issues before the next filing season.
 """
 
+    full_report_text = (
+        full_report_text
+        .replace("’", "'")
+        .replace("‘", "'")
+        .replace("“", '"')
+        .replace("”", '"')
+        .replace("–", "-")
+        .replace("—", "-")
+    )
+
     # 4. Always generate PDF
     pdf_result = generate_strategy_pdf({
         "report_text": full_report_text,
@@ -722,13 +732,13 @@ import io
 
 class PDFReport(FPDF):
     def header(self):
-        self.set_font("Arial", "B", 16)
+        self.set_font("Helvetica", "B", 16)
         self.cell(0, 10, "Tax Planning Report", ln=True, align="C")
 
     def add_section(self, title, content):
-        self.set_font("Arial", "B", 12)
+        self.set_font("Helvetica", "B", 12)
         self.cell(0, 10, title, ln=True)
-        self.set_font("Arial", "", 12)
+        self.set_font("Helvetica", size=12)
         self.multi_cell(0, 10, content)
         self.ln()
 
@@ -1670,40 +1680,28 @@ def generate_strategy_with_roi(data: StrategyROIInput):
 
     action_lines = "\n".join(f"- {a}" for a in action_steps)
 
-    client_report_text = f"""
-VALHALLA TAX SERVICES
-STRATEGIC TAX PLANNING REPORT
-
-EXECUTIVE SUMMARY
-Based on the information provided, this analysis identified an estimated planning opportunity of ${total_estimated_roi:,.2f}.
-
-Primary Recommendation:
-{priority_recommendation}
-
-CURRENT TAX POSITION
-Adjusted Gross Income: ${agi:,.2f}
-Taxable Income: ${taxable_income:,.2f}
-Estimated Federal Tax Before Planning: ${baseline_tax:,.2f}
-Estimated Federal Tax After Planning: ${optimized_tax:,.2f}
-Estimated Tax Savings: ${tax_savings:,.2f}
-
-RECOMMENDED STRATEGIES
-{strategy_lines}
-
-CONFLICT AND RISK ANALYSIS
-{conflict_lines}
-
-THRESHOLD AND PHASEOUT REVIEW
-{threshold_lines}
-
-CLIENT ACTION STEPS
-{action_lines}
-
-FINAL RECOMMENDATION
-The recommended next step is to review the highest-impact strategy first, confirm the supporting income and deduction details, and complete a final tax projection before implementation.
-
-Prepared by Valhalla Tax Services
-"""
+    client_report_text = (
+        "STRATEGIC TAX PLANNING REPORT\n\n"
+        f"Primary Recommendation:\n{priority_recommendation}\n\n"
+        "CURRENT TAX POSITION\n"
+        f"Adjusted Gross Income: ${agi:,.2f}\n"
+        f"Taxable Income: ${taxable_income:,.2f}\n"
+        f"Estimated Federal Tax Before Planning: ${baseline_tax:,.2f}\n"
+        f"Estimated Federal Tax After Planning: ${optimized_tax:,.2f}\n"
+        f"Estimated Tax Savings: ${tax_savings:,.2f}\n\n"
+        "RECOMMENDED STRATEGIES\n"
+        f"{strategy_lines}\n"
+        "CONFLICT AND RISK ANALYSIS\n"
+        f"{conflict_lines}\n\n"
+        "THRESHOLD AND PHASEOUT REVIEW\n"
+        f"{threshold_lines}\n\n"
+        "CLIENT ACTION STEPS\n"
+        f"{action_lines}\n\n"
+        "FINAL RECOMMENDATION\n"
+        "The recommended next step is to review the highest-impact strategy first, "
+        "confirm the supporting income and deduction details, and complete a final tax projection before implementation.\n\n"
+        "Prepared by Valhalla Tax Services"
+    )
     return {
         "agi": round(agi, 2),
         "taxable_income": round(taxable_income, 2),
