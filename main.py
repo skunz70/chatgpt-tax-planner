@@ -591,6 +591,76 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
     if agi is not None and total_tax is not None and total_tax > agi:
         validation_warnings.append("Total tax appears unusually high compared to AGI. Verify OCR extraction.")
 
+    missing_fields = []
+    for field_name in ["agi", "taxable_income", "total_tax", "withholding", "estimated_payments", "total_payments"]:
+        if lines.get(field_name) is None:
+            missing_fields.append(field_name)
+
+    reconciliation_warnings = []
+    reconciliation_checks = {
+        "taxable_income_greater_than_agi": {
+            "applicable": agi is not None and taxable_income is not None,
+            "passed": not (agi is not None and taxable_income is not None and taxable_income > agi),
+            "detail": "Taxable income should generally not exceed AGI."
+        },
+        "total_tax_greater_than_agi": {
+            "applicable": agi is not None and total_tax is not None,
+            "passed": not (agi is not None and total_tax is not None and total_tax > agi),
+            "detail": "Total tax should generally not exceed AGI."
+        },
+        "payments_match_total": {
+            "applicable": withholding is not None and lines.get("estimated_payments") is not None and total_payments is not None,
+            "passed": None,
+            "detail": "Withholding + estimated payments should roughly match total payments."
+        },
+        "balance_due_refund_logic": {
+            "applicable": total_tax is not None and total_payments is not None and balance_due is not None,
+            "passed": None,
+            "detail": "If total payments are less than total tax, balance due should be positive."
+        }
+    }
+
+    estimated_payments = lines.get("estimated_payments")
+
+    if reconciliation_checks["payments_match_total"]["applicable"]:
+        combined_payments = withholding + estimated_payments
+        diff = abs(combined_payments - total_payments)
+        payments_ok = diff <= 5
+        reconciliation_checks["payments_match_total"]["passed"] = payments_ok
+        reconciliation_checks["payments_match_total"]["difference"] = diff
+        if not payments_ok:
+            reconciliation_warnings.append(
+                "Withholding plus estimated payments does not match total payments. Verify Form 1040 lines 25 and 33."
+            )
+
+    if reconciliation_checks["balance_due_refund_logic"]["applicable"]:
+        expected_balance_due = total_tax - total_payments
+        balance_ok = (expected_balance_due <= 0 and balance_due == 0) or (expected_balance_due > 0 and balance_due > 0)
+        reconciliation_checks["balance_due_refund_logic"]["passed"] = balance_ok
+        reconciliation_checks["balance_due_refund_logic"]["expected_balance_due"] = expected_balance_due
+        if not balance_ok:
+            reconciliation_warnings.append(
+                "Balance due/refund logic appears inconsistent with total tax versus total payments."
+            )
+
+    confidence_score = 100
+    confidence_score -= len(missing_fields) * 7
+    confidence_score -= (len(validation_warnings) + len(reconciliation_warnings)) * 5
+    confidence_score = max(0, min(100, confidence_score))
+
+    safe_to_plan = (
+        confidence_score >= 75
+        and agi is not None
+        and taxable_income is not None
+        and total_tax is not None
+    )
+
+    next_best_action = (
+        "Safe to generate planning report"
+        if safe_to_plan
+        else "Review missing Form 1040 fields before generating planning report"
+    )
+
     planner_input = StrategyROIInput(
         filing_status="single",
         w2_income=float(agi or 0),
@@ -620,10 +690,27 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
         "taxable_income": taxable_income,
         "total_tax": total_tax,
         "withholding": withholding,
-        "estimated_payments": lines.get("estimated_payments"),
+        "estimated_payments": estimated_payments,
         "total_payments": total_payments,
         "balance_due": balance_due,
         "validation_warnings": validation_warnings,
+        "confidence_engine": {
+            "extracted_lines": {
+                "agi": agi,
+                "taxable_income": taxable_income,
+                "total_tax": total_tax,
+                "withholding": withholding,
+                "estimated_payments": estimated_payments,
+                "total_payments": total_payments,
+                "balance_due": balance_due
+            },
+            "missing_fields": missing_fields,
+            "validation_warnings": validation_warnings + reconciliation_warnings,
+            "reconciliation_checks": reconciliation_checks,
+            "confidence_score": confidence_score,
+            "safe_to_plan": safe_to_plan,
+            "next_best_action": next_best_action
+        },
         "planner_result": planner_result
     }
    
