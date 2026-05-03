@@ -360,6 +360,32 @@ async def generate_full_valhalla_pdf_report(data: dict):
     total_tax = data.get("total_tax", "N/A")
     refund = data.get("refund", None)
     balance_due = data.get("balance_due", None)
+    marginal_rate = data.get("marginal_rate", "N/A")
+    effective_rate = data.get("effective_rate")
+    confidence_engine = data.get("confidence_engine", {}) or {}
+    confidence_score = confidence_engine.get("confidence_score", data.get("confidence_score", "N/A"))
+    missing_fields = confidence_engine.get("missing_fields", [])
+    planning_status = data.get("planning_status", "unknown")
+
+    def _to_number(value):
+        try:
+            if value in (None, "", "N/A"):
+                return None
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _money(value):
+        value_num = _to_number(value)
+        return f"${value_num:,.2f}" if value_num is not None else "N/A"
+
+    agi_num = _to_number(agi)
+    taxable_num = _to_number(taxable_income)
+    total_tax_num = _to_number(total_tax)
+    effective_rate_num = _to_number(effective_rate)
+    if effective_rate_num is None and agi_num and agi_num > 0 and total_tax_num is not None:
+        effective_rate_num = round((total_tax_num / agi_num) * 100, 2)
+    effective_rate_display = f"{effective_rate_num:.2f}%" if effective_rate_num is not None else "N/A"
 
     # 2. Force executive summary
     executive_summary = f"""
@@ -367,7 +393,7 @@ Executive Summary
 
 This report summarizes the client's current tax position, key planning opportunities, and recommended next steps based on the available {tax_year} tax return data.
 
-The client has adjusted gross income of ${agi}, taxable income of ${taxable_income}, and total federal tax of ${total_tax}. The planning focus is to identify available tax bracket capacity, reduce avoidable tax drag, improve withholding accuracy, and coordinate federal and Arizona tax planning opportunities.
+The client has adjusted gross income of {_money(agi)}, taxable income of {_money(taxable_income)}, and total federal tax of {_money(total_tax)}. The planning focus is to identify available tax bracket capacity, reduce avoidable tax drag, improve withholding accuracy, and coordinate federal and Arizona tax planning opportunities.
 
 This report is intended to provide a prioritized, client-facing tax planning roadmap rather than a generic tax summary.
 """
@@ -382,30 +408,48 @@ Tax Year: {tax_year}
 
 {executive_summary}
 
+Data Reliability Assessment
+
+Confidence Score: {confidence_score}
+Planning Status: {planning_status}
+Missing Fields: {", ".join(missing_fields) if missing_fields else "None identified"}
+
 Confirmed Tax Data Summary
 
 Filing Status: {data.get("filing_status", "N/A")}
 State: {data.get("state", "Arizona")}
-Adjusted Gross Income: ${agi}
-Taxable Income: ${taxable_income}
-Total Federal Tax: ${total_tax}
-Federal Withholding: ${data.get("federal_withholding", "N/A")}
-Refund: ${refund if refund is not None else "N/A"}
-Balance Due: ${balance_due if balance_due is not None else "N/A"}
+Adjusted Gross Income: {_money(agi)}
+Taxable Income: {_money(taxable_income)}
+Total Federal Tax: {_money(total_tax)}
+Federal Withholding: {_money(data.get("federal_withholding", "N/A"))}
+Refund: {_money(refund)}
+Balance Due: {_money(balance_due)}
+Marginal Rate: {marginal_rate}
+Effective Rate: {effective_rate_display}
 
 Current Tax Position
 
-The client’s current tax position should be evaluated based on marginal bracket, unused bracket capacity, tax credits, withholding position, investment income, retirement income, and Arizona state tax impact.
+The client's current tax position should be evaluated based on marginal bracket, unused bracket capacity, tax credits, withholding position, investment income, retirement income, and Arizona state tax impact. With current AGI of {_money(agi)} and taxable income of {_money(taxable_income)}, the effective federal tax burden is {effective_rate_display}, and the marginal rate indicator is {marginal_rate}. This framing supports cash-flow planning, estimated payment calibration, and year-end optimization decisions.
 
-Priority Planning Opportunities
+Tax Bracket Analysis (with calculations)
 
-The following strategies are ranked based on potential tax impact, timing sensitivity, and relevance to the tax return data.
+Using the available data, the current effective rate is calculated as Total Tax ÷ AGI = {_money(total_tax)} ÷ {_money(agi)} = {effective_rate_display}. This baseline helps compare the tax cost of additional income and the savings from deductions, deferrals, and credits. Marginal-rate decisions should prioritize strategies that reduce income taxed at the top bracket first while preserving flexibility for future years.
+
+Strategic Tax Plan (detailed strategies with math)
+
+The following strategies are ranked based on potential tax impact, timing sensitivity, and relevance to the tax return data. Each strategy includes a practical calculation example, estimated dollar impact, and an explanation of why it matters for the client.
 
 {strategy_text}
 
+Action Plan Timeline
+
+Immediate (next 30 days): Validate missing fields, confirm withholding-to-liability alignment, and prioritize the top one to two tax-saving actions with the strongest projected after-tax value.
+Mid-Year (next 3-6 months): Implement income-timing and deduction-lever strategies while tracking estimated payments against projected total tax.
+Year-End (Q4 execution): Finalize bracket management actions, complete contribution-based strategies, and run a pre-filing projection to reduce surprises at filing time.
+
 Final Recommendation
 
-The client should focus first on the highest-value planning items supported by the return data. Priority should be given to strategies that reduce avoidable tax, improve long-term tax efficiency, and correct withholding issues before the next filing season.
+The client should focus first on the highest-value planning items supported by the return data. Priority should be given to strategies that reduce avoidable tax, improve long-term tax efficiency, and correct withholding issues before the next filing season. The confidence and planning status indicators should be used as guardrails: when reliability is high, move forward with execution; when reliability is mixed, resolve missing data first and then finalize implementation.
 """
 
     full_report_text = (
@@ -1616,6 +1660,9 @@ async def quick_entry_plan(data: dict):
 async def smart_strategy_report(data):
     agi = data.get("agi", 0)
     filing_status = data.get("filing_status", "single")
+    taxable_income = data.get("taxable_income", max(0, (agi or 0) - 13000))
+    total_tax = data.get("total_tax", data.get("estimated_tax", 0))
+    marginal_rate = data.get("marginal_rate", "22%")
 
     strategy_result = await recommend({
         "agi": agi,
@@ -1629,20 +1676,47 @@ async def smart_strategy_report(data):
         "magi": agi,
         "filing_status": filing_status
     })
+    estimated_tax = threshold_result.get("estimated_tax", total_tax)
+    top_rate = 0.22 if "22" in str(marginal_rate) else 0.24
+    strategy_lines = []
+    def _fmt_currency(value):
+        try:
+            return f"${float(value):,.2f}"
+        except (TypeError, ValueError):
+            return "N/A"
 
-    # 📄 Step 3 – Build PDF payload
-    pdf_payload = {
-        "filing_status": filing_status,
-        "agi": agi,
-        "taxable_income": agi - 13000,  # TODO: refine logic for deductions
-        "estimated_tax": threshold_result.get("estimated_tax", 0),
-        "strategy_summary": strategy_result.get("strategies", []),
-        "threshold_flags": threshold_result.get("threshold_flags", [])
+    for strategy in strategy_result.get("strategies", []):
+        lowered = strategy.lower()
+        if "401(k)" in strategy:
+            sample_contribution = min(5000, max(0, agi * 0.05))
+            est_savings = sample_contribution * top_rate
+            strategy_lines.append(
+                f"- {strategy}\n  Example: Contributing {_fmt_currency(sample_contribution)} to pre-tax retirement can reduce current federal tax by approximately {_fmt_currency(est_savings)} at a {int(top_rate*100)}% marginal rate. Impact: lower current-year tax while increasing long-term retirement assets."
+            )
+        elif "HSA" in strategy:
+            hsa_add = 3000
+            hsa_savings = hsa_add * top_rate
+            strategy_lines.append(
+                f"- {strategy}\n  Example: An additional {_fmt_currency(hsa_add)} HSA contribution may save roughly {_fmt_currency(hsa_savings)} in federal tax. Impact: immediate deduction plus tax-free medical reimbursement potential."
+            )
+        elif "estimated tax payment" in lowered:
+            projected_shortfall = max(0, (estimated_tax or 0) - data.get("estimated_payments", 0))
+            strategy_lines.append(
+                f"- {strategy}\n  Example: If projected tax is {_fmt_currency(estimated_tax)} and paid-in amounts are {_fmt_currency(data.get('estimated_payments', 0))}, a catch-up payment of about {_fmt_currency(projected_shortfall)} can reduce underpayment risk. Impact: avoids penalties and smooths cash flow."
+            )
+        else:
+            strategy_lines.append(
+                f"- {strategy}\n  Example: Apply this strategy at the current marginal rate of {marginal_rate} to prioritize dollars that would otherwise be taxed at the highest current bracket. Impact: targeted tax reduction with measurable annual benefit."
+            )
+
+    return {
+        "report_text": "\n\n".join(strategy_lines) if strategy_lines else "No tax strategies were generated from the current input data.",
+        "strategy_count": len(strategy_lines),
+        "threshold_flags": threshold_result.get("threshold_flags", []),
+        "estimated_tax": estimated_tax,
+        "taxable_income": taxable_income,
+        "total_tax": total_tax
     }
-
-    # 📄 Step 4 – Generate PDF file
-    pdf_bytes = generate_smart_strategy_pdf(pdf_payload)
-    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional, List
