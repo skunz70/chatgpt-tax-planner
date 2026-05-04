@@ -482,14 +482,29 @@ Focus first on the highest-value planning items supported by return data. Priori
             .replace("—", "-")
         )
 
-        # 4. For GPT router, return JSON (PDF generation remains available via /generate_strategy_pdf)
+        pdf_available = False
+        pdf_message = "PDF generation failed, but your report is available above."
+        try:
+            pdf_result = await generate_strategy_pdf({
+                "report_text": full_report_text,
+                "client_name": client_name,
+                "tax_year": tax_year,
+            })
+            if pdf_result is not None:
+                pdf_available = True
+                pdf_message = "Your PDF report is ready."
+        except Exception:
+            pdf_available = False
+            pdf_message = "PDF generation failed, but your report is available above."
+
         return {
             "status": "success",
             "report_type": "valhalla_comprehensive_tax_plan",
+            "report_text": full_report_text,
+            "pdf_available": pdf_available,
+            "pdf_message": pdf_message,
             "client_name": client_name,
             "tax_year": tax_year,
-            "report_text": full_report_text,
-            "message": "Planning report text generated successfully. Use /generate_strategy_pdf separately to create a downloadable PDF.",
             "strategy_priorities": _build_strategy_priorities(data),
             "missing_fields": combined_missing_fields,
         }
