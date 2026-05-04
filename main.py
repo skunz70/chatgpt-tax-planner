@@ -394,6 +394,7 @@ async def generate_full_valhalla_pdf_report(data: dict):
             effective_rate_num = round((total_tax_num / agi_num) * 100, 2)
         effective_rate_display = _percent(effective_rate_num)
         marginal_rate_display = _percent(str(marginal_rate).replace("%", "")) if marginal_rate not in (None, "N/A") else "N/A"
+        marginal_rate_decimal = (_to_number(str(marginal_rate).replace("%", "")) or 0) / 100
 
         # 2. Force polished Valhalla structure
         full_report_text = f"""
@@ -436,7 +437,7 @@ STRATEGIC TAX PLAN
 This section prioritizes practical tax strategies with concise calculations and implementation context.
 
 1. **Retirement Contribution Optimization**
-Reported retirement contributions are {_money(data.get("retirement_contributions", "N/A"))}. At a marginal rate of {marginal_rate_display}, each additional $1,000 pre-tax contribution may reduce federal tax by approximately {_money(1000 * (0.22 if "22" in str(marginal_rate) else 0.24))}.
+Reported retirement contributions are {_money(data.get("retirement_contributions", "N/A"))}. At a marginal rate of {marginal_rate_display}, each additional $1,000 pre-tax contribution may reduce federal income tax by approximately {_money(1000 * marginal_rate_decimal)}. Retirement contributions generally reduce income tax, not self-employment tax.
 
 2. **Roth Conversion Strategy**
 Use current taxable income of {_money(taxable_income)} to evaluate bracket capacity for partial Roth conversions before year-end bracket compression.
@@ -445,7 +446,7 @@ Use current taxable income of {_money(taxable_income)} to evaluate bracket capac
 Current withholding is {_money(data.get("federal_withholding", "N/A"))} against total tax of {_money(total_tax)}. Net position check: {_money((_to_number(data.get("federal_withholding")) or 0) - (total_tax_num or 0))}. If negative, increase W-4 withholding or estimated payments.
 
 4. **Deduction Timing Strategy**
-Standard deduction: {_money(data.get("standard_deduction", "N/A"))}; Itemized deductions: {_money(data.get("itemized_deductions", "N/A"))}; Mortgage interest: {_money(data.get("mortgage_interest", "N/A"))}; Charitable contributions: {_money(data.get("charitable_contributions", "N/A"))}. Timing deductions into one year can increase marginal deduction value.
+Standard deduction: {_money(data.get("standard_deduction", "N/A"))}; Itemized deductions: {_money(data.get("itemized_deductions", "N/A"))}; Mortgage interest: {_money(data.get("mortgage_interest", "N/A"))}; Charitable contributions: {_money(data.get("charitable_contributions", "N/A"))}. Timing deductions into one year can increase marginal deduction value. For Schedule C deductions, rough planning math can include income-tax savings (deduction x marginal rate) plus self-employment tax savings (deduction x 15.3%).
 
 5. **Income and Benefit Coordination**
 Business income: {_money(data.get("business_income", "N/A"))}; Rental income: {_money(data.get("rental_income", "N/A"))}; Capital gains: {_money(data.get("capital_gains", "N/A"))}. Coordinate timing with retirement contributions and withholding updates.
@@ -1806,11 +1807,18 @@ async def smart_strategy_report(data):
 
     for strategy in strategy_result.get("strategies", []):
         lowered = strategy.lower()
-        if "401(k)" in strategy:
+        if any(keyword in lowered for keyword in ["401(k)", "solo 401", "sep", "ira", "retirement"]):
             sample_contribution = min(5000, max(0, agi * 0.05))
             est_savings = sample_contribution * top_rate
             strategy_lines.append(
-                f"- {strategy}\n  Example: Contributing {_fmt_currency(sample_contribution)} to pre-tax retirement can reduce current federal tax by approximately {_fmt_currency(est_savings)} at a {int(top_rate*100)}% marginal rate. Impact: lower current-year tax while increasing long-term retirement assets."
+                f"- {strategy}\n  Example: Contributing {_fmt_currency(sample_contribution)} to pre-tax retirement can reduce current federal income tax by approximately {_fmt_currency(est_savings)} at a {int(top_rate*100)}% marginal rate. Impact: lower current-year income tax while increasing long-term retirement assets. Note: retirement contributions are not treated here as self-employment tax savings."
+            )
+        elif "schedule c" in lowered or ("business" in lowered and "deduction" in lowered):
+            sample_deduction = 5000
+            income_tax_savings = sample_deduction * top_rate
+            se_tax_savings = sample_deduction * 0.153
+            strategy_lines.append(
+                f"- {strategy}\n  Example: A {_fmt_currency(sample_deduction)} Schedule C deduction may reduce income tax by about {_fmt_currency(income_tax_savings)} ({int(top_rate*100)}% marginal rate) plus about {_fmt_currency(se_tax_savings)} in self-employment tax (15.3% planning estimate). Impact: lowers both income-tax and SE-tax exposure when the deduction is business-related."
             )
         elif "HSA" in strategy:
             hsa_add = 3000
