@@ -1906,6 +1906,9 @@ async def smart_strategy_report(data):
             )
 
     return {
+        "status": "success",
+        "message": "Strategy report generated successfully",
+        "report_type": "valhalla_comprehensive_tax_plan",
         "report_text": "\n\n".join(strategy_lines) if strategy_lines else "No tax strategies were generated from the current input data.",
         "strategy_count": len(strategy_lines),
         "threshold_flags": threshold_result.get("threshold_flags", []),
