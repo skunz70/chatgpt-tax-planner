@@ -499,7 +499,7 @@ This section evaluates standard vs itemized timing and bunching opportunities.
 Where business deductions apply, savings are discussed separately for income tax and potential self-employment tax impact.
 
 INVESTMENT AND CAPITAL GAIN STRATEGY
-Applicable when capital gains are present: pair gain realization with bracket monitoring and loss-netting opportunities.
+Harvest long-term capital gains while remaining in the 0% capital gains bracket when possible, and manage gains carefully before entering the 15% capital gains bracket. Long-term capital gains generally use 0%, 15%, and 20% brackets, while short-term gains are taxed as ordinary income.
 
 BUSINESS OR SCHEDULE 1 INCOME REVIEW
 Applicable when business or additional Schedule 1 income is present: review deduction quality, documentation, and estimated payment support.
