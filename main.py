@@ -514,7 +514,7 @@ Focus first on the highest-value planning items supported by return data. Priori
         )
 
         pdf_available = False
-        pdf_message = "PDF generation failed, but your report is available above."
+        pdf_message = "PDF generation failed, but text report returned successfully."
         try:
             pdf_result = await generate_strategy_pdf({
                 "report_text": full_report_text,
@@ -523,10 +523,10 @@ Focus first on the highest-value planning items supported by return data. Priori
             })
             if pdf_result is not None:
                 pdf_available = True
-                pdf_message = "Your PDF report is ready."
+                pdf_message = "PDF report generated successfully"
         except Exception:
             pdf_available = False
-            pdf_message = "PDF generation failed, but your report is available above."
+            pdf_message = "PDF generation failed, but text report returned successfully."
 
         return {
             "status": "success",
@@ -1464,31 +1464,39 @@ async def generate_strategy_pdf(data: dict):
     tax_year = data.get("tax_year", "Tax Year")
 
     pdf = FPDF(orientation="L", unit="mm", format="A4")
-    pdf.set_auto_page_break(auto=True, margin=12)
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_margins(left=15, top=12, right=15)
     pdf.add_page()
 
     # --- LOGO (top right) ---
-    logo_path = os.path.join(os.path.dirname(__file__), "valhalla_logo.jpg")
+    logo_path = os.path.join(os.path.dirname(__file__), "Valhalla Logo Eagle-Tax Services.jpg")
     if os.path.exists(logo_path):
-        pdf.image(logo_path, x=240, y=10, w=40)
+        try:
+            page_width = pdf.w
+            right_margin = 15
+            logo_width = 45
+            logo_x = page_width - right_margin - logo_width
+            pdf.image(logo_path, x=logo_x, y=10, w=logo_width)
+        except Exception:
+            pass
 
     # --- HEADER TEXT ---
     pdf.set_font("Arial", "B", 18)
     pdf.cell(0, 10, "Valhalla Tax Services", ln=True)
 
     pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 8, "Tax Planning Report", ln=True)
+    pdf.cell(0, 8, "Comprehensive Tax Planning Report", ln=True)
 
     pdf.set_font("Arial", "", 11)
     pdf.cell(0, 7, f"Client: {client_name}", ln=True)
     pdf.cell(0, 7, f"Tax Year: {tax_year}", ln=True)
-    pdf.ln(5)
+    pdf.ln(6)
 
     # --- EXECUTIVE SUMMARY ---
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 8, "Executive Summary", ln=True)
 
-    pdf.set_font("Arial", "", 10)
+    pdf.set_font("Arial", "", 11)
 
     summary_text = (
         f"This report outlines key tax planning opportunities for {client_name}. "
@@ -1496,7 +1504,7 @@ async def generate_strategy_pdf(data: dict):
         f"to reduce tax liability and improve long-term tax efficiency."
     )
 
-    pdf.multi_cell(0, 6, summary_text)
+    pdf.multi_cell(0, 7, summary_text)
     pdf.ln(5)
     
     for line in report_text.split("\n"):
@@ -1506,7 +1514,7 @@ async def generate_strategy_pdf(data: dict):
             continue
 
         if not clean_line:
-            pdf.ln(3)
+            pdf.ln(4)
             continue
 
         # Bold section headers
@@ -1518,14 +1526,14 @@ async def generate_strategy_pdf(data: dict):
             or "Steps" in clean_line
             or "Recommendation" in clean_line
         ):
-            pdf.set_font("Arial", "B", 13)
+            pdf.set_font("Arial", "B", 12)
             pdf.ln(2)
-            pdf.multi_cell(0, 7, clean_line)
+            pdf.multi_cell(0, 8, clean_line)
             pdf.ln(1)
-            pdf.set_font("Arial", "", 10)
+            pdf.set_font("Arial", "", 11)
         else:
-            pdf.multi_cell(0, 6, clean_line)
-            pdf.ln(1)
+            pdf.multi_cell(0, 7, clean_line)
+            pdf.ln(1.5)
 
     temp_dir = tempfile.gettempdir()
     filename = f"valhalla_tax_plan_{client_name.replace(' ', '_')}.pdf"
