@@ -331,69 +331,67 @@ async def generate_full_valhalla_pdf_report(data: dict):
     This prevents the GPT from returning a plain, cookie-cutter text report.
     """
 
-    # 1. Run the strategy engine
     try:
+        # 1. Run the strategy engine
         strategy_result = smart_strategy_report(data)
         if inspect.isawaitable(strategy_result):
             strategy_result = await strategy_result
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": "Unable to generate the Valhalla comprehensive tax plan.",
-            "detail": str(e)
-        }
 
-    if isinstance(strategy_result, dict) and strategy_result.get("status") == "needs_parsed_1040":
-        # Pass through structured validation feedback for GPT router clients.
-        return strategy_result
+        if isinstance(strategy_result, dict) and strategy_result.get("status") == "needs_parsed_1040":
+            # Pass through structured validation feedback for GPT router clients.
+            return strategy_result
 
-    if isinstance(strategy_result, dict):
-        strategy_text = (
-            strategy_result.get("report_text")
-            or strategy_result.get("report")
-            or strategy_result.get("summary")
-            or str(strategy_result)
-        )
-    else:
-        strategy_text = str(strategy_result)
+        if isinstance(strategy_result, dict):
+            strategy_text = (
+                strategy_result.get("report_text")
+                or strategy_result.get("report")
+                or strategy_result.get("summary")
+                or str(strategy_result)
+            )
+        else:
+            strategy_text = str(strategy_result)
 
-    client_name = data.get("client_name", "Client")
-    tax_year = data.get("tax_year", "2024")
+        client_name = data.get("client_name", "Client")
+        tax_year = data.get("tax_year", "2024")
 
-    agi = data.get("agi", "N/A")
-    taxable_income = data.get("taxable_income", "N/A")
-    total_tax = data.get("total_tax", "N/A")
-    refund = data.get("refund", None)
-    balance_due = data.get("balance_due", None)
-    marginal_rate = data.get("marginal_rate", "N/A")
-    effective_rate = data.get("effective_rate")
-    confidence_engine = data.get("confidence_engine", {}) or {}
-    confidence_score = confidence_engine.get("confidence_score", data.get("confidence_score", "N/A"))
-    missing_fields = confidence_engine.get("missing_fields", [])
-    planning_status = data.get("planning_status", "unknown")
+        agi = data.get("agi") or 0
+        taxable_income = data.get("taxable_income") or 0
+        total_tax = data.get("total_tax") or 0
+        filing_status = data.get("filing_status") or "Unknown"
+        refund = data.get("refund", None)
+        balance_due = data.get("balance_due", None)
+        marginal_rate = data.get("marginal_rate", "N/A")
+        effective_rate = data.get("effective_rate")
+        confidence_engine = data.get("confidence_engine", {}) or {}
+        confidence_score = confidence_engine.get("confidence_score", data.get("confidence_score", "N/A"))
+        missing_fields = confidence_engine.get("missing_fields", [])
+        planning_status = data.get("planning_status", "unknown")
+        core_fields = ["agi", "taxable_income", "total_tax", "filing_status"]
+        missing_core_fields = [field for field in core_fields if not data.get(field)]
+        combined_missing_fields = list(dict.fromkeys([*missing_fields, *missing_core_fields]))
 
-    def _to_number(value):
-        try:
-            if value in (None, "", "N/A"):
+        def _to_number(value):
+            try:
+                if value in (None, "", "N/A"):
+                    return None
+                return float(value)
+            except (TypeError, ValueError):
                 return None
-            return float(value)
-        except (TypeError, ValueError):
-            return None
 
-    def _money(value):
-        value_num = _to_number(value)
-        return f"${value_num:,.2f}" if value_num is not None else "N/A"
+        def _money(value):
+            value_num = _to_number(value)
+            return f"${value_num:,.2f}" if value_num is not None else "N/A"
 
-    agi_num = _to_number(agi)
-    taxable_num = _to_number(taxable_income)
-    total_tax_num = _to_number(total_tax)
-    effective_rate_num = _to_number(effective_rate)
-    if effective_rate_num is None and agi_num and agi_num > 0 and total_tax_num is not None:
-        effective_rate_num = round((total_tax_num / agi_num) * 100, 2)
-    effective_rate_display = f"{effective_rate_num:.2f}%" if effective_rate_num is not None else "N/A"
+        agi_num = _to_number(agi)
+        taxable_num = _to_number(taxable_income)
+        total_tax_num = _to_number(total_tax)
+        effective_rate_num = _to_number(effective_rate)
+        if effective_rate_num is None and agi_num and agi_num > 0 and total_tax_num is not None:
+            effective_rate_num = round((total_tax_num / agi_num) * 100, 2)
+        effective_rate_display = f"{effective_rate_num:.2f}%" if effective_rate_num is not None else "N/A"
 
-    # 2. Force executive summary
-    executive_summary = f"""
+        # 2. Force executive summary
+        executive_summary = f"""
 Executive Summary
 
 This report summarizes the client's current tax position, key planning opportunities, and recommended next steps based on the available {tax_year} tax return data.
@@ -403,8 +401,8 @@ The client has adjusted gross income of {_money(agi)}, taxable income of {_money
 This report is intended to provide a prioritized, client-facing tax planning roadmap rather than a generic tax summary.
 """
 
-    # 3. Force polished Valhalla structure
-    full_report_text = f"""
+        # 3. Force polished Valhalla structure
+        full_report_text = f"""
 Valhalla Tax Services
 Tax Planning Report
 
@@ -417,11 +415,11 @@ Data Reliability Assessment
 
 Confidence Score: {confidence_score}
 Planning Status: {planning_status}
-Missing Fields: {", ".join(missing_fields) if missing_fields else "None identified"}
+Missing Fields: {", ".join(combined_missing_fields) if combined_missing_fields else "None identified"}
 
 Confirmed Tax Data Summary
 
-Filing Status: {data.get("filing_status", "N/A")}
+Filing Status: {filing_status}
 State: {data.get("state", "Arizona")}
 Adjusted Gross Income: {_money(agi)}
 Taxable Income: {_money(taxable_income)}
@@ -485,18 +483,17 @@ Final Recommendation
 The client should focus first on the highest-value planning items supported by the return data. Priority should be given to strategies that reduce avoidable tax, improve long-term tax efficiency, and correct withholding issues before the next filing season. The confidence and planning status indicators should be used as guardrails: when reliability is high, move forward with execution; when reliability is mixed, resolve missing data first and then finalize implementation.
 """
 
-    full_report_text = (
-        full_report_text
-        .replace("’", "'")
-        .replace("‘", "'")
-        .replace("“", '"')
-        .replace("”", '"')
-        .replace("–", "-")
-        .replace("—", "-")
-    )
+        full_report_text = (
+            full_report_text
+            .replace("’", "'")
+            .replace("‘", "'")
+            .replace("“", '"')
+            .replace("”", '"')
+            .replace("–", "-")
+            .replace("—", "-")
+        )
 
-    # 4. For GPT router, return JSON (PDF generation remains available via /generate_strategy_pdf)
-    try:
+        # 4. For GPT router, return JSON (PDF generation remains available via /generate_strategy_pdf)
         return {
             "status": "success",
             "report_type": "valhalla_comprehensive_tax_plan",
@@ -505,14 +502,15 @@ The client should focus first on the highest-value planning items supported by t
             "report_text": full_report_text,
             "message": "Planning report text generated successfully. Use /generate_strategy_pdf separately to create a downloadable PDF.",
             "strategy_priorities": _build_strategy_priorities(data),
+            "missing_fields": combined_missing_fields,
         }
     except Exception as e:
         return {
             "status": "error",
-            "error": "Unable to package the Valhalla comprehensive tax plan response.",
-            "detail": str(e)
+            "message": "Report generation failed",
+            "debug": str(e)
         }
-    
+
 
 # === Logic for Each Action ===
 
