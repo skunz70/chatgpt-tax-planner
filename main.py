@@ -227,7 +227,7 @@ app.include_router(csv_excel_router)
 
 @app.post("/gpt-tax-router")
 async def tax_router(request: ActionRequest):
-    data = request.dict()
+    data = request.model_dump()
 
     action_map = {
         "tax_snapshot_summary": tax_snapshot_summary,
@@ -368,10 +368,6 @@ async def generate_full_valhalla_pdf_report(data: dict):
         if inspect.isawaitable(strategy_result):
             strategy_result = await strategy_result
 
-        if isinstance(strategy_result, dict) and strategy_result.get("status") == "needs_parsed_1040":
-            # Pass through structured validation feedback for GPT router clients.
-            return strategy_result
-
         if isinstance(strategy_result, dict):
             strategy_text = (
                 strategy_result.get("report_text")
@@ -430,7 +426,7 @@ async def generate_full_valhalla_pdf_report(data: dict):
         # 2. Force polished Valhalla structure
         full_report_text = f"""
 Valhalla Tax Services
-Tax Planning Report
+Comprehensive Tax Planning Report
 
 Client: {client_name}
 Tax Year: {tax_year}
@@ -490,6 +486,27 @@ State listed: {data.get("state", "Arizona")}. Align federal moves with Arizona t
 
 {strategy_text}
 
+WITHHOLDING ANALYSIS
+This section evaluates payment alignment against projected federal tax.
+Withholding and paid-in tax entries are compared against total tax to flag overpayment or underpayment patterns early.
+
+RETIREMENT CONTRIBUTION OPTIMIZATION
+This section focuses on reducing taxable income through eligible pre-tax retirement contributions.
+Retirement contributions are modeled as income-tax reduction opportunities and are not treated as self-employment tax reductions.
+
+DEDUCTION TIMING STRATEGY
+This section evaluates standard vs itemized timing and bunching opportunities.
+Where business deductions apply, savings are discussed separately for income tax and potential self-employment tax impact.
+
+INVESTMENT AND CAPITAL GAIN STRATEGY
+Applicable when capital gains are present: pair gain realization with bracket monitoring and loss-netting opportunities.
+
+BUSINESS OR SCHEDULE 1 INCOME REVIEW
+Applicable when business or additional Schedule 1 income is present: review deduction quality, documentation, and estimated payment support.
+
+RENTAL STRATEGY REVIEW
+Applicable when rental income is present: review depreciation posture, passive-loss limits, and documentation discipline.
+
 ACTION PLAN TIMELINE
 This section defines execution sequencing across immediate, mid-year, and year-end windows.
 
@@ -518,6 +535,7 @@ Focus first on the highest-value planning items supported by return data. Priori
 
         return {
             "status": "success",
+            "message": "Strategy report generated successfully",
             "report_type": "valhalla_comprehensive_tax_plan",
             "report_text": full_report_text,
             "pdf_available": pdf_available,
@@ -526,6 +544,7 @@ Focus first on the highest-value planning items supported by return data. Priori
             "tax_year": tax_year,
             "strategy_priorities": _build_strategy_priorities(data),
             "missing_fields": combined_missing_fields,
+            "debug_received_fields": sorted(list(data.keys())),
         }
     except Exception as e:
         return {
@@ -1819,20 +1838,13 @@ async def smart_strategy_report(data):
     def _has_value(value):
         return value not in (None, "", "N/A")
 
-    # Prefer parsed payloads when present, but allow direct extracted fields from GPT.
-    parsed_data = None
-    possible_parsed_payloads = [
-        data.get("parsed_1040"),
-        data.get("parse_1040_result"),
-        data.get("parsed_data"),
-        data if data.get("status") == "success" else None,
-    ]
-    for payload in possible_parsed_payloads:
-        if isinstance(payload, dict) and payload.get("status") == "success":
-            parsed_data = payload
-            break
-
-    source_data = parsed_data if parsed_data is not None else data
+    # Prefer direct extracted fields from GPT; optionally merge parsed payload details.
+    source_data = dict(data)
+    for key in ("parsed_1040", "parse_1040_result", "parsed_data"):
+        payload = data.get(key)
+        if isinstance(payload, dict):
+            for field, value in payload.items():
+                source_data.setdefault(field, value)
     received_fields = [field for field in required_fields if _has_value(source_data.get(field))]
     missing_fields = [field for field in required_fields if field not in received_fields]
     if missing_fields:
