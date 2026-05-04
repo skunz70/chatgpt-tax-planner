@@ -514,19 +514,7 @@ Focus first on the highest-value planning items supported by return data. Priori
         )
 
         pdf_available = False
-        pdf_message = "PDF generation failed, but text report returned successfully."
-        try:
-            pdf_result = await generate_strategy_pdf({
-                "report_text": full_report_text,
-                "client_name": client_name,
-                "tax_year": tax_year,
-            })
-            if pdf_result is not None:
-                pdf_available = True
-                pdf_message = "PDF report generated successfully"
-        except Exception:
-            pdf_available = False
-            pdf_message = "PDF generation failed, but text report returned successfully."
+        pdf_message = "PDF generation is available as a separate action."
 
         return {
             "status": "success",
