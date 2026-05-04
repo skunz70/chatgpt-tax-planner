@@ -702,18 +702,19 @@ def extract_1040_lines_from_text(text: str) -> tuple[dict, dict]:
             return None
 
     def _find_line_amount(line_number_pattern: str, line_label_patterns: list[str]):
-        number_regex = r"\(?-?\$?\s*([0-9][0-9,]*)\)?"
+        number_regex = r"\(?-?\$?\s*([0-9][0-9,]*(?:\.\d{1,2})?)\)?"
         candidates = []
         for idx, line in enumerate(normalized_lines):
-            line_ok = re.search(line_number_pattern, line, flags=re.IGNORECASE)
-            label_ok = any(re.search(lp, line, flags=re.IGNORECASE) for lp in line_label_patterns)
+            compressed_line = re.sub(r"[\s_]+", " ", line)
+            line_ok = re.search(line_number_pattern, compressed_line, flags=re.IGNORECASE)
+            label_ok = any(re.search(lp, compressed_line, flags=re.IGNORECASE) for lp in line_label_patterns)
             if not line_ok or not label_ok:
                 continue
-            found = re.findall(number_regex, line)
+            found = re.findall(number_regex, compressed_line)
             if found:
                 value = _parse_amount(found[-1])
                 if value is not None:
-                    candidates.append((value, idx, line))
+                    candidates.append((value, idx, compressed_line))
 
         if not candidates:
             return None, None
@@ -725,14 +726,20 @@ def extract_1040_lines_from_text(text: str) -> tuple[dict, dict]:
         "w2_wages_line_1a": (r"\b1a\b|\b1\s*a\b", [r"wages", r"w-?2"]),
         "additional_income_line_8": (r"\b8\b", [r"additional income", r"schedule\s*1"]),
         "total_income_line_9": (r"\b9\b", [r"total income"]),
-        "agi": (r"\b11\b", [r"adjusted gross income", r"\bagi\b"]),
-        "taxable_income": (r"\b15\b", [r"taxable income"]),
+        "agi": (
+            r"^\s*1[1Il]\s*(?:\b|[\.\-:])",
+            [r"adjusted\s+gros+s?\s+income", r"\bagi\b"]
+        ),
+        "taxable_income": (r"^\s*15\s*(?:\b|[\.\-:])", [r"taxable\s+income"]),
         "line_16_tax": (r"\b16\b", [r"\btax\b"]),
-        "total_tax": (r"\b24\b", [r"total tax"]),
-        "withholding": (r"\b25d\b|\b25\s*d\b", [r"withheld", r"withholding"]),
-        "total_payments": (r"\b33\b", [r"total payments"]),
-        "refund_line_34": (r"\b34\b", [r"refund"]),
-        "balance_due": (r"\b37\b", [r"amount you owe", r"amount owed"]),
+        "total_tax": (r"^\s*24\s*(?:\b|[\.\-:])", [r"total\s+tax"]),
+        "withholding": (
+            r"^\s*25\s*[dD]\s*(?:\b|[\.\-:])|^\s*25[dD]\s*(?:\b|[\.\-:])",
+            [r"withh?e?ld", r"withholding", r"federal income tax withheld"]
+        ),
+        "total_payments": (r"^\s*33\s*(?:\b|[\.\-:])", [r"total\s+payments"]),
+        "refund_line_34": (r"^\s*34\s*(?:\b|[\.\-:])", [r"refund"]),
+        "balance_due": (r"^\s*37\s*(?:\b|[\.\-:])", [r"amount\s+(?:you\s+)?owe|amount\s+owed"]),
     }
 
     extracted = {}
@@ -798,22 +805,29 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
 
     # keep the rest of your existing route below this line
 
-    # Try OCR first
-    text = ocr_extract_text(pdf_bytes)
-
-    # Fallback: try reading embedded PDF text
+    # Prefer embedded PDF text so we can prioritize Form 1040 page 1 over schedules.
+    text = ""
+    pages_text = []
     if not text or not text.strip():
         try:
             reader = PdfReader(io.BytesIO(pdf_bytes))
             pages_text = [page.extract_text() or "" for page in reader.pages]
-            text = "\n".join(pages_text)
+            form_1040_page_1 = []
+            other_pages = []
+            for page in pages_text:
+                normalized = re.sub(r"\s+", " ", page).lower()
+                if "form 1040" in normalized and "page 1" in normalized:
+                    form_1040_page_1.append(page)
+                else:
+                    other_pages.append(page)
+            ordered_pages = form_1040_page_1 + other_pages
+            text = "\n".join(ordered_pages)
         except Exception as e:
-            return {
-                "error": "PDF text extraction failed.",
-                "detail": str(e),
-                "received_filename": received_filename,
-                "content_type": content_type
-            }
+            print(f"PDF TEXT EXTRACTION FAILED: {str(e)}", flush=True)
+
+    # OCR fallback when embedded text is unavailable.
+    if not text or not text.strip():
+        text = ocr_extract_text(pdf_bytes)
 
     lines, extraction_debug = extract_1040_lines_from_text(text)
 
@@ -918,12 +932,7 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
         validation_warnings.append("Taxable income exceeds total income. Verify line mapping and OCR quality.")
     confidence_score = max(0, min(100, confidence_score))
 
-    safe_to_plan = (
-        confidence_score >= 75
-        and agi is not None
-        and taxable_income is not None
-        and total_tax is not None
-    )
+    safe_to_plan = agi is not None and taxable_income is not None and total_tax is not None
 
     next_best_action = (
         "Safe to generate planning report"
@@ -988,6 +997,24 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
         "refund": refund,
         "balance_due": balance_due,
         "extraction_debug": extraction_debug,
+        "extracted_fields": {
+            "agi": agi,
+            "taxable_income": taxable_income,
+            "total_tax": total_tax,
+            "withholding": withholding,
+            "total_payments": total_payments,
+            "refund": refund,
+            "amount_owed": balance_due
+        },
+        "confidence_flags": {
+            "agi_found": agi is not None,
+            "taxable_income_found": taxable_income is not None,
+            "total_tax_found": total_tax is not None,
+            "withholding_found": withholding is not None,
+            "total_payments_found": total_payments is not None,
+            "refund_found": refund is not None,
+            "amount_owed_found": balance_due is not None
+        },
         "validation_warnings": validation_warnings,
         "planning_status": planning_status,
         "planning_recommendation": planning_recommendation,
