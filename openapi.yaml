@@ -6,6 +6,23 @@ info:
 servers:
   - url: https://chatgpt-tax-planner.onrender.com
 paths:
+  /gpt-tax-router:
+    post:
+      summary: GPT tax action router
+      operationId: gptTaxRouter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionRequest'
+      responses:
+        '200':
+          description: Action result payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GptTaxRouterResponse'
   /parse_1040:
     post:
       summary: Upload and parse a 1040 tax return
@@ -120,3 +137,60 @@ paths:
             text/html:
               schema:
                 type: string
+
+components:
+  schemas:
+    ActionRequest:
+      type: object
+      required:
+        - action
+      additionalProperties: true
+      properties:
+        action: { type: string }
+        income: { type: number }
+        client_name: { type: string }
+        tax_year: { type: string }
+        filing_status: { type: string }
+        state: { type: string }
+        agi: { type: number }
+        taxable_income: { type: number }
+        total_tax: { type: number }
+        federal_withholding: { type: number }
+        estimated_payments: { type: number }
+        total_payments: { type: number }
+        refund: { type: number }
+        balance_due: { type: number }
+        standard_deduction: { type: number }
+        marginal_rate: { type: number }
+        effective_rate: { type: number }
+        w2_income: { type: number }
+        interest_income: { type: number }
+        dividend_income: { type: number }
+        capital_gains: { type: number }
+        ira_distributions: { type: number }
+        pension_income: { type: number }
+        business_income: { type: number }
+        rental_income: { type: number }
+        self_employment_tax: { type: number }
+        retirement_contributions: { type: number }
+        itemized_deductions: { type: number }
+        mortgage_interest: { type: number }
+        charitable_contributions: { type: number }
+        credits: { type: number }
+        confidence_engine: {}
+        planning_status: { type: string }
+    GptTaxRouterResponse:
+      type: object
+      additionalProperties: true
+      properties:
+        status: { type: string }
+        message: { type: string }
+        report_type: { type: string }
+        report_text: { type: string }
+        pdf_available: { type: boolean }
+        pdf_message: { type: string }
+        missing_fields:
+          type: array
+          items: { type: string }
+        confidence_engine: {}
+        planning_status: { type: string }
