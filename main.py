@@ -133,9 +133,40 @@ from pydantic import BaseModel
 class ActionRequest(BaseModel):
     action: str
     income: float | None = None
-    filing_status: str | None = None
+    client_name: str | None = None
     tax_year: str | None = "2025"
+    filing_status: str | None = None
+    state: str | None = None
+    agi: float | None = None
+    taxable_income: float | None = None
+    total_tax: float | None = None
+    federal_withholding: float | None = None
+    estimated_payments: float | None = None
+    total_payments: float | None = None
+    refund: float | None = None
+    balance_due: float | None = None
+    standard_deduction: float | None = None
+    marginal_rate: float | None = None
+    effective_rate: float | None = None
+    w2_income: float | None = None
+    interest_income: float | None = None
+    dividend_income: float | None = None
+    capital_gains: float | None = None
+    ira_distributions: float | None = None
+    pension_income: float | None = None
+    business_income: float | None = None
+    rental_income: float | None = None
+    self_employment_tax: float | None = None
+    retirement_contributions: float | None = None
+    itemized_deductions: float | None = None
+    mortgage_interest: float | None = None
+    charitable_contributions: float | None = None
+    credits: float | None = None
+    confidence_engine: str | None = None
+    planning_status: str | None = None
     additional_input: str | None = None
+
+    model_config = {"extra": "allow"}
 
 class YearEndPlanInput(BaseModel):
     filing_status: str
