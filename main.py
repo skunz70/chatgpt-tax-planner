@@ -552,23 +552,15 @@ This section evaluates standard vs itemized timing and bunching opportunities.
 Where business deductions apply, savings are discussed separately for income tax and potential self-employment tax impact.
 
 INVESTMENT AND CAPITAL GAIN STRATEGY
-Capital Gain Strategy (Opportunity)
-
-You currently show no capital gains.
+You are currently in a favorable position for long-term capital gain planning.
 
 Opportunity:
-You may be able to realize long-term capital gains within the 0% capital gains bracket, depending on your total taxable income and filing status.
 
-For married filing jointly taxpayers, the 0% capital gains threshold is significantly higher than your current taxable income, which creates room to harvest gains without triggering federal tax.
+Long-term capital gains are taxed under their own preferential rate system: 0%, 15%, or 20%.
 
-Planning note:
-Long-term capital gains are taxed at preferential rates of 0%, 15%, or 20% depending on taxable income. These are separate from ordinary income tax brackets such as 10%, 12%, or 22%.
+Based on the taxable income shown in this return, there may be room to realize long-term capital gains within the 0% capital gains range before additional gains move into the 15% capital gains bracket.
 
-Strategy:
-- Review unrealized gains before year-end
-- Determine how much gain can be realized within the 0% capital gains range
-- Use gain harvesting to rebalance positions without creating unnecessary tax
-- Avoid increasing income to a level that impacts Social Security taxation or Medicare thresholds
+This allows investments to be repositioned with minimal federal tax impact, but it should be coordinated with Social Security taxation, Medicare thresholds, and overall taxable income.
 
 BUSINESS OR SCHEDULE 1 INCOME REVIEW
 Applicable when business or additional Schedule 1 income is present: review deduction quality, documentation, and estimated payment support.
