@@ -477,6 +477,20 @@ Recommended timing: {priority.get("recommended_timing", "Coordinate timing with 
         )
 
         # 2. Force polished Valhalla structure
+        EXECUTIVE_SUMMARY_HEADER = "==================================================\nEXECUTIVE SUMMARY\n=================================================="
+        CONFIRMED_TAX_DATA_SUMMARY_HEADER = "==================================================\nCONFIRMED TAX DATA SUMMARY\n=================================================="
+        CURRENT_TAX_POSITION_HEADER = "==================================================\nCURRENT TAX POSITION\n=================================================="
+        TAX_BRACKET_ANALYSIS_HEADER = "==================================================\nTAX BRACKET ANALYSIS\n=================================================="
+        STRATEGIC_TAX_PLAN_HEADER = "==================================================\nSTRATEGIC TAX PLAN\n=================================================="
+        WITHHOLDING_ANALYSIS_HEADER = "==================================================\nWITHHOLDING ANALYSIS\n=================================================="
+        RETIREMENT_CONTRIBUTION_OPTIMIZATION_HEADER = "==================================================\nRETIREMENT CONTRIBUTION OPTIMIZATION\n=================================================="
+        DEDUCTION_TIMING_STRATEGY_HEADER = "==================================================\nDEDUCTION TIMING STRATEGY\n=================================================="
+        INVESTMENT_AND_CAPITAL_GAIN_STRATEGY_HEADER = "==================================================\nINVESTMENT AND CAPITAL GAIN STRATEGY\n=================================================="
+        BUSINESS_SCHEDULE_1_REVIEW_HEADER = "==================================================\nBUSINESS / SCHEDULE 1 REVIEW\n=================================================="
+        ARIZONA_STATE_STRATEGY_HEADER = "==================================================\nARIZONA STATE STRATEGY\n=================================================="
+        ACTION_PLAN_TIMELINE_HEADER = "==================================================\nACTION PLAN TIMELINE\n=================================================="
+        FINAL_RECOMMENDATION_HEADER = "==================================================\nFINAL RECOMMENDATION\n=================================================="
+
         full_report_text = f"""
 Valhalla Tax Services
 Comprehensive Tax Planning Report
@@ -484,12 +498,12 @@ Comprehensive Tax Planning Report
 Client: {client_name}
 Tax Year: {tax_year}
 
-EXECUTIVE SUMMARY
+{EXECUTIVE_SUMMARY_HEADER}
 This section provides a high-level overview of the client's tax profile and planning focus.
 
 The client has adjusted gross income of {_money(agi)}, taxable income of {_money(taxable_income)}, and total federal tax of {_money(total_tax)}. The primary focus is to reduce avoidable tax drag, improve withholding accuracy, and coordinate federal and Arizona planning opportunities.
 
-CONFIRMED TAX DATA SUMMARY
+{CONFIRMED_TAX_DATA_SUMMARY_HEADER}
 This section lists the validated tax inputs used to prepare this planning report.
 
 Filing Status: {filing_status}
@@ -503,17 +517,17 @@ Balance Due: {_money(balance_due)}
 Marginal Rate: {marginal_rate_display}
 Effective Rate: {effective_rate_display}
 
-CURRENT TAX POSITION
+{CURRENT_TAX_POSITION_HEADER}
 This section explains the current federal tax posture and cash-flow implications.
 
 With AGI of {_money(agi)} and taxable income of {_money(taxable_income)}, the current effective federal tax burden is {effective_rate_display}. The marginal rate indicator is {marginal_rate_display}. This supports estimated payment calibration and year-end optimization decisions.
 
-TAX BRACKET ANALYSIS
+{TAX_BRACKET_ANALYSIS_HEADER}
 This section shows the core tax-rate math used to frame strategy decisions.
 
 Current effective rate calculation: Total Tax ÷ AGI = {_money(total_tax)} ÷ {_money(agi)} = {effective_rate_display}. This baseline helps compare the cost of additional income versus tax savings from deductions, deferrals, and credits.
 
-STRATEGIC TAX PLAN
+{STRATEGIC_TAX_PLAN_HEADER}
 This section prioritizes practical tax strategies with concise calculations and implementation context.
 
 1. **Retirement Contribution Optimization**
@@ -539,19 +553,19 @@ State listed: {data.get("state", "Arizona")}. Align federal moves with Arizona t
 
 {strategy_text}
 
-WITHHOLDING ANALYSIS
+{WITHHOLDING_ANALYSIS_HEADER}
 This section evaluates payment alignment against projected federal tax.
 Withholding and paid-in tax entries are compared against total tax to flag overpayment or underpayment patterns early.
 
-RETIREMENT CONTRIBUTION OPTIMIZATION
+{RETIREMENT_CONTRIBUTION_OPTIMIZATION_HEADER}
 This section focuses on reducing taxable income through eligible pre-tax retirement contributions.
 Retirement contributions are modeled as income-tax reduction opportunities and are not treated as self-employment tax reductions.
 
-DEDUCTION TIMING STRATEGY
+{DEDUCTION_TIMING_STRATEGY_HEADER}
 This section evaluates standard vs itemized timing and bunching opportunities.
 Where business deductions apply, savings are discussed separately for income tax and potential self-employment tax impact.
 
-INVESTMENT AND CAPITAL GAIN STRATEGY
+{INVESTMENT_AND_CAPITAL_GAIN_STRATEGY_HEADER}
 You are currently in a favorable position for long-term capital gain planning.
 
 Opportunity:
@@ -562,25 +576,28 @@ Based on the taxable income shown in this return, there may be room to realize l
 
 This allows investments to be repositioned with minimal federal tax impact, but it should be coordinated with Social Security taxation, Medicare thresholds, and overall taxable income.
 
-BUSINESS OR SCHEDULE 1 INCOME REVIEW
+{BUSINESS_SCHEDULE_1_REVIEW_HEADER}
 Applicable when business or additional Schedule 1 income is present: review deduction quality, documentation, and estimated payment support.
 
 RENTAL STRATEGY REVIEW
 Applicable when rental income is present: review depreciation posture, passive-loss limits, and documentation discipline.
+
+{ARIZONA_STATE_STRATEGY_HEADER}
+State listed: {data.get("state", "Arizona")}. Align federal moves with Arizona treatment of deductions, retirement contributions, and payment schedules.
 
 TOP 3 PRIORITY ACTIONS
 This section ranks near-term planning actions using available client facts and conservative assumptions where data is incomplete.
 
 {priority_section_text}
 
-ACTION PLAN TIMELINE
+{ACTION_PLAN_TIMELINE_HEADER}
 This section defines execution sequencing across immediate, mid-year, and year-end windows.
 
 Immediate (next 30 days): Validate missing fields, confirm withholding-to-liability alignment, and prioritize top projected after-tax actions.
 Mid-Year (next 3-6 months): Implement income-timing and deduction strategies while tracking estimated payments versus projected total tax.
 Year-End (Q4 execution): Finalize bracket actions, complete contribution-based strategies, and run a pre-filing projection.
 
-FINAL RECOMMENDATION
+{FINAL_RECOMMENDATION_HEADER}
 This section summarizes the client-ready execution focus.
 
 Focus first on the highest-value planning items supported by return data. Prioritize strategies that reduce avoidable tax, improve long-term efficiency, and correct withholding issues before the next filing season.
