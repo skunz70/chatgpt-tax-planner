@@ -1921,6 +1921,22 @@ async def smart_strategy_report(data):
     def _has_value(value):
         return value not in (None, "", "N/A")
 
+    def _to_number(value):
+        if value in (None, "", "N/A"):
+            return None
+        if isinstance(value, (int, float)):
+            return value
+        if isinstance(value, str):
+            cleaned = value.strip().replace(",", "").replace("$", "")
+            if cleaned.startswith("(") and cleaned.endswith(")"):
+                cleaned = f"-{cleaned[1:-1]}"
+            try:
+                number = float(cleaned)
+                return int(number) if number.is_integer() else number
+            except ValueError:
+                return None
+        return None
+
     # Prefer direct extracted fields from GPT; optionally merge parsed payload details.
     source_data = dict(data)
     for key in ("parsed_1040", "parse_1040_result", "parsed_data"):
@@ -1928,6 +1944,67 @@ async def smart_strategy_report(data):
         if isinstance(payload, dict):
             for field, value in payload.items():
                 source_data.setdefault(field, value)
+
+    extracted_values = source_data.get("extracted_fields")
+    if not isinstance(extracted_values, dict):
+        extracted_values = {}
+
+    confidence_lines = source_data.get("confidence_engine", {}).get("extracted_lines", {})
+    if isinstance(confidence_lines, dict):
+        for field, value in confidence_lines.items():
+            extracted_values.setdefault(field, value)
+
+    if not _has_value(source_data.get("agi")):
+        source_data["agi"] = (
+            source_data.get("adjusted_gross_income")
+            or source_data.get("line_11")
+            or extracted_values.get("agi")
+            or extracted_values.get("adjusted_gross_income")
+            or extracted_values.get("line_11")
+        )
+    if not _has_value(source_data.get("taxable_income")):
+        source_data["taxable_income"] = (
+            source_data.get("line_15")
+            or extracted_values.get("taxable_income")
+            or extracted_values.get("line_15")
+        )
+    if not _has_value(source_data.get("total_tax")):
+        source_data["total_tax"] = (
+            source_data.get("line_24")
+            or source_data.get("line_16_tax")
+            or extracted_values.get("total_tax")
+            or extracted_values.get("line_24")
+            or extracted_values.get("line_16_tax")
+        )
+    if not _has_value(source_data.get("federal_withholding")):
+        source_data["federal_withholding"] = (
+            source_data.get("withholding")
+            or source_data.get("line_25d")
+            or extracted_values.get("federal_withholding")
+            or extracted_values.get("withholding")
+            or extracted_values.get("line_25d")
+        )
+    if not _has_value(source_data.get("balance_due")):
+        source_data["balance_due"] = (
+            source_data.get("line_37")
+            or extracted_values.get("balance_due")
+            or extracted_values.get("amount_owed")
+            or extracted_values.get("line_37")
+        )
+
+    for numeric_field in (
+        "agi",
+        "taxable_income",
+        "total_tax",
+        "estimated_tax",
+        "federal_withholding",
+        "withholding",
+        "balance_due",
+    ):
+        numeric_value = _to_number(source_data.get(numeric_field))
+        if numeric_value is not None:
+            source_data[numeric_field] = numeric_value
+
     received_fields = [field for field in required_fields if _has_value(source_data.get(field))]
     missing_fields = [field for field in required_fields if field not in received_fields]
     if missing_fields:
