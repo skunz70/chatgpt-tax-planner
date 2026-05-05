@@ -285,6 +285,12 @@ def _build_strategy_priorities(data: dict):
     business_income = _to_float(data.get("business_income"))
     rental_income = _to_float(data.get("rental_income"))
     capital_gains = _to_float(data.get("capital_gains"))
+    dividend_income = _to_float(data.get("dividend_income"))
+    refund = _to_float(data.get("refund"))
+    federal_withholding = _to_float(data.get("federal_withholding"))
+    total_tax = _to_float(data.get("total_tax"))
+    total_credits = _to_float(data.get("total_credits"))
+    estimated_credits = _to_float(data.get("credits"))
 
     if balance_due is not None and balance_due > 0:
         priorities.append({
@@ -294,6 +300,16 @@ def _build_strategy_priorities(data: dict):
             "difficulty_level": "Low",
             "recommended_timing": "Immediately; update withholding before the next payroll cycle.",
             "advisor_note": "Coordinate paycheck withholding and quarterly estimates to smooth cash flow and reduce penalty risk."
+        })
+
+    if refund is not None and refund > 0:
+        priorities.append({
+            "strategy_name": "Cash-Flow and Withholding Calibration",
+            "why_it_matters": "A material refund can indicate overwithholding and reduced in-year cash flow.",
+            "estimated_tax_impact": f"Cash-flow impact of about ${refund:,.0f} that may be redirected during the year if withholding is adjusted.",
+            "difficulty_level": "Low",
+            "recommended_timing": "Before the next payroll cycle; reassess after mid-year projections.",
+            "advisor_note": "Calibrate withholding conservatively to avoid a large refund while keeping enough cushion for safe-harbor targets."
         })
 
     if taxable_income is not None:
@@ -340,14 +356,35 @@ def _build_strategy_priorities(data: dict):
             "advisor_note": "Evaluate QBI-sensitive planning, accountable-plan use, and retirement contributions tied to business cash flow."
         })
 
-    if not priorities and capital_gains is not None and capital_gains > 0:
+    if (capital_gains is not None and capital_gains > 0) or (dividend_income is not None and dividend_income > 0):
         priorities.append({
-            "strategy_name": "Capital Gains Coordination",
-            "why_it_matters": "Realized gains can increase current-year tax and interact with bracket thresholds.",
-            "estimated_tax_impact": "Moderate; depends on gain size and holding period.",
+            "strategy_name": "Investment Tax-Efficiency Planning",
+            "why_it_matters": "Capital gains and dividends can increase tax drag and may affect bracket thresholds and surtax exposure.",
+            "estimated_tax_impact": "Varies; can be meaningful when gain/loss timing and holding periods are actively managed.",
             "difficulty_level": "Medium",
-            "recommended_timing": "Before additional asset sales and at year-end.",
-            "advisor_note": "Use gain/loss netting and holding-period review to improve after-tax results."
+            "recommended_timing": "Before additional sales and again during year-end tax-loss harvesting reviews.",
+            "advisor_note": "Coordinate holding periods, gain/loss netting, and dividend awareness to improve after-tax outcomes."
+        })
+
+    credits_value = total_credits if total_credits is not None else estimated_credits
+    if credits_value is not None and credits_value > 0:
+        priorities.append({
+            "strategy_name": "Credit Preservation Review",
+            "why_it_matters": "Tax credits can materially reduce liability, and income changes may affect eligibility.",
+            "estimated_tax_impact": f"Preserve up to approximately ${credits_value:,.0f} in credit value when eligibility rules are maintained.",
+            "difficulty_level": "Medium",
+            "recommended_timing": "Before major income or filing-status changes and during year-end projections.",
+            "advisor_note": "Model planned income changes to avoid unintended phaseouts or eligibility loss."
+        })
+
+    if federal_withholding is not None and total_tax is not None and abs(federal_withholding - total_tax) <= 500:
+        priorities.append({
+            "strategy_name": "Payment Precision Monitoring",
+            "why_it_matters": "Payments are already close to projected liability; small updates can maintain accuracy.",
+            "estimated_tax_impact": "Limited direct tax reduction; primary benefit is smoother cash flow and reduced surprise balances.",
+            "difficulty_level": "Low",
+            "recommended_timing": "Check once per quarter and after large income changes.",
+            "advisor_note": "Keep estimates aligned with current projections while avoiding over-correction."
         })
 
     top_priorities = priorities[:3]
@@ -422,6 +459,22 @@ async def generate_full_valhalla_pdf_report(data: dict):
         effective_rate_display = _percent(effective_rate_num)
         marginal_rate_display = _percent(str(marginal_rate).replace("%", "")) if marginal_rate not in (None, "N/A") else "N/A"
         marginal_rate_decimal = (_to_number(str(marginal_rate).replace("%", "")) or 0) / 100
+        strategy_priorities = _build_strategy_priorities(data)
+        priority_lines = []
+        for priority in strategy_priorities:
+            estimated_impact = priority.get("estimated_tax_impact") or "Not determinable from current data."
+            priority_lines.append(
+                f"""{priority.get("priority_rank", "N/A")}. {priority.get("strategy_name", "Priority Action")}
+Why it matters: {priority.get("why_it_matters", "Review this area based on available return data.")}
+Estimated tax impact: {estimated_impact}
+Recommended timing: {priority.get("recommended_timing", "Coordinate timing with advisor and current-year projections.")}"""
+            )
+        priority_section_text = "\n\n".join(priority_lines) if priority_lines else (
+            "1. Data completion and projection refresh\n"
+            "Why it matters: Key fields are missing, so strategy ranking confidence is limited.\n"
+            "Estimated tax impact: Not determinable from current data.\n"
+            "Recommended timing: Immediately, after core tax inputs are confirmed."
+        )
 
         # 2. Force polished Valhalla structure
         full_report_text = f"""
@@ -499,13 +552,18 @@ This section evaluates standard vs itemized timing and bunching opportunities.
 Where business deductions apply, savings are discussed separately for income tax and potential self-employment tax impact.
 
 INVESTMENT AND CAPITAL GAIN STRATEGY
-Harvest long-term capital gains while remaining in the 0% capital gains bracket when possible, and manage gains carefully before entering the 15% capital gains bracket. Long-term capital gains generally use 0%, 15%, and 20% brackets, while short-term gains are taxed as ordinary income.
+Harvest long-term capital gains while remaining in the 0% capital gains bracket when possible, and manage gains carefully before entering the 15% capital gains bracket. Short-term gains are taxed as ordinary income.
 
 BUSINESS OR SCHEDULE 1 INCOME REVIEW
 Applicable when business or additional Schedule 1 income is present: review deduction quality, documentation, and estimated payment support.
 
 RENTAL STRATEGY REVIEW
 Applicable when rental income is present: review depreciation posture, passive-loss limits, and documentation discipline.
+
+TOP 3 PRIORITY ACTIONS
+This section ranks near-term planning actions using available client facts and conservative assumptions where data is incomplete.
+
+{priority_section_text}
 
 ACTION PLAN TIMELINE
 This section defines execution sequencing across immediate, mid-year, and year-end windows.
@@ -542,7 +600,7 @@ Focus first on the highest-value planning items supported by return data. Priori
             "pdf_message": pdf_message,
             "client_name": client_name,
             "tax_year": tax_year,
-            "strategy_priorities": _build_strategy_priorities(data),
+            "strategy_priorities": strategy_priorities,
             "missing_fields": combined_missing_fields,
             "debug_received_fields": sorted(list(data.keys())),
         }
