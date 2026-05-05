@@ -2167,7 +2167,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
                 "name": "Bracket Optimization",
                 "tax_cost": 0,
                 "roi": 0,
-                "summary": f"You have approximately ${room:,.0f} of room remaining in the 22% bracket before entering the 24% bracket. This creates an opportunity for Roth conversions or capital gain harvesting."
+                "summary": f"You have approximately ${room:,.0f} of room remaining in the 22% bracket before entering the 24% bracket. This creates an opportunity for Roth conversions and other ordinary income timing strategies. Long-term capital gain harvesting should be evaluated separately using the 0%, 15%, and 20% long-term capital gains thresholds, not the ordinary 12% bracket."
             })
 
     elif data.filing_status in ["married_filing_jointly", "mfj"]:
@@ -2244,7 +2244,7 @@ def generate_strategy_with_roi(data: StrategyROIInput):
 
     elif data.filing_status == "single" and taxable_income < 103350:
         priority_recommendation = (
-            "Primary recommendation: use remaining 22% bracket room strategically through Roth conversion planning, capital gain harvesting, or controlled income timing."
+            "Primary recommendation: use remaining 22% bracket room strategically through Roth conversion planning and controlled ordinary income timing. Long-term capital gain harvesting should be evaluated separately using the 0%, 15%, and 20% long-term capital gains thresholds, not ordinary bracket room."
         )
 
     else:
