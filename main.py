@@ -493,36 +493,10 @@ Recommended timing: {priority.get("recommended_timing", "Coordinate timing with 
 
 
         capital_gains_section_text = f"""{INVESTMENT_AND_CAPITAL_GAIN_STRATEGY_HEADER}
-Minimal capital gains activity is shown on the return.
+Long-term capital gains are taxed under a separate rate structure of 0%, 15%, or 20%, depending on taxable income and filing status.
 
-Planning opportunity:
-Long-term capital gains are taxed under a separate preferential rate structure of 0%, 15%, or 20%, depending on taxable income and filing status.
-
-Based on the taxable income shown in this return, any gain-harvesting strategy should be evaluated using the long-term capital gains thresholds, not ordinary income brackets.
-
-Strategy:
-- Review unrealized gains before year-end
-- Determine whether any gains can be realized within the 0% long-term capital gains range
-- If income exceeds the 0% range, evaluate whether realizing gains at the 15% rate still supports the overall portfolio and tax plan
-- Avoid triggering unnecessary NIIT, Medicare premium, or state-tax consequences
-
-Advisor note:
-This allows investment repositioning to be coordinated with the overall tax plan without incorrectly using ordinary bracket thresholds.
+Based on this return, gain harvesting should be evaluated using capital gains thresholds—not ordinary income tax brackets.
 """
-
-        forbidden_cap_gains_phrases = [
-            "12% bracket",
-            "22% bracket",
-            "24% bracket",
-            "ordinary bracket room",
-            "top of bracket",
-            "remaining bracket room",
-        ]
-        capital_gains_section_lower = capital_gains_section_text.lower()
-        for forbidden_phrase in forbidden_cap_gains_phrases:
-            if forbidden_phrase in capital_gains_section_lower:
-                capital_gains_section_text = capital_gains_section_text.replace(forbidden_phrase, "")
-                capital_gains_section_lower = capital_gains_section_text.lower()
 
         full_report_text = f"""
 Valhalla Tax Services
@@ -1970,7 +1944,7 @@ async def smart_strategy_report(data):
                 source_data.setdefault(field, value)
 
     extracted_values = source_data.get("extracted_fields")
-    if not isinstance(extracted_values, dict):
+    if extracted_values is None:
         extracted_values = {}
 
     confidence_lines = source_data.get("confidence_engine", {}).get("extracted_lines", {})
