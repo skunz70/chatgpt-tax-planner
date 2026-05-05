@@ -491,6 +491,39 @@ Recommended timing: {priority.get("recommended_timing", "Coordinate timing with 
         ACTION_PLAN_TIMELINE_HEADER = "==================================================\nACTION PLAN TIMELINE\n=================================================="
         FINAL_RECOMMENDATION_HEADER = "==================================================\nFINAL RECOMMENDATION\n=================================================="
 
+
+        capital_gains_section_text = f"""{INVESTMENT_AND_CAPITAL_GAIN_STRATEGY_HEADER}
+Minimal capital gains activity is shown on the return.
+
+Planning opportunity:
+Long-term capital gains are taxed under a separate preferential rate structure of 0%, 15%, or 20%, depending on taxable income and filing status.
+
+Based on the taxable income shown in this return, any gain-harvesting strategy should be evaluated using the long-term capital gains thresholds, not ordinary income brackets.
+
+Strategy:
+- Review unrealized gains before year-end
+- Determine whether any gains can be realized within the 0% long-term capital gains range
+- If income exceeds the 0% range, evaluate whether realizing gains at the 15% rate still supports the overall portfolio and tax plan
+- Avoid triggering unnecessary NIIT, Medicare premium, or state-tax consequences
+
+Advisor note:
+This allows investment repositioning to be coordinated with the overall tax plan without incorrectly using ordinary bracket thresholds.
+"""
+
+        forbidden_cap_gains_phrases = [
+            "12% bracket",
+            "22% bracket",
+            "24% bracket",
+            "ordinary bracket room",
+            "top of bracket",
+            "remaining bracket room",
+        ]
+        capital_gains_section_lower = capital_gains_section_text.lower()
+        for forbidden_phrase in forbidden_cap_gains_phrases:
+            if forbidden_phrase in capital_gains_section_lower:
+                capital_gains_section_text = capital_gains_section_text.replace(forbidden_phrase, "")
+                capital_gains_section_lower = capital_gains_section_text.lower()
+
         full_report_text = f"""
 Valhalla Tax Services
 Comprehensive Tax Planning Report
@@ -565,16 +598,7 @@ Retirement contributions are modeled as income-tax reduction opportunities and a
 This section evaluates standard vs itemized timing and bunching opportunities.
 Where business deductions apply, savings are discussed separately for income tax and potential self-employment tax impact.
 
-{INVESTMENT_AND_CAPITAL_GAIN_STRATEGY_HEADER}
-You are currently in a favorable position for long-term capital gain planning.
-
-Opportunity:
-
-Long-term capital gains are taxed under their own preferential rate system: 0%, 15%, or 20%.
-
-Based on the taxable income shown in this return, there may be room to realize long-term capital gains within the 0% capital gains range before additional gains move into the 15% capital gains bracket.
-
-This allows investments to be repositioned with minimal federal tax impact, but it should be coordinated with Social Security taxation, Medicare thresholds, and overall taxable income.
+{capital_gains_section_text}
 
 {BUSINESS_SCHEDULE_1_REVIEW_HEADER}
 Applicable when business or additional Schedule 1 income is present: review deduction quality, documentation, and estimated payment support.
