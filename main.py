@@ -552,7 +552,21 @@ This section evaluates standard vs itemized timing and bunching opportunities.
 Where business deductions apply, savings are discussed separately for income tax and potential self-employment tax impact.
 
 INVESTMENT AND CAPITAL GAIN STRATEGY
-Harvest long-term capital gains while remaining in the 0% capital gains bracket when possible, and manage gains carefully before entering the 15% capital gains bracket. Short-term gains are taxed as ordinary income.
+Capital Gain Strategy (Opportunity)
+
+You currently show no capital gains.
+
+Opportunity:
+Harvest long-term capital gains within the 0% capital gains bracket where available, and use the 15% bracket strategically when income exceeds the 0% threshold.
+
+Planning note:
+Long-term capital gains are generally taxed at preferential 0%, 15%, or 20% federal rates depending on taxable income and filing status. They are not taxed in a "12% capital gains bracket."
+
+Strategy:
+- Review unrealized gains before year-end
+- Determine how much gain can fit inside the 0% capital gains range
+- Use gain harvesting to rebalance investments tax-efficiently
+- Avoid creating unnecessary income that pushes Social Security taxation or Medicare thresholds higher
 
 BUSINESS OR SCHEDULE 1 INCOME REVIEW
 Applicable when business or additional Schedule 1 income is present: review deduction quality, documentation, and estimated payment support.
