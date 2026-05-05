@@ -476,15 +476,25 @@ Recommended timing: {priority.get("recommended_timing", "Coordinate timing with 
             "Recommended timing: Immediately, after core tax inputs are confirmed."
         )
 
-        total_tax_label = _money(total_tax)
-        if total_tax_label == "N/A":
-            total_tax_label = "not clearly identified"
+        # 2. Force polished Valhalla structure
+        EXECUTIVE_SUMMARY_HEADER = "==================================================\nEXECUTIVE SUMMARY\n=================================================="
+        CONFIRMED_TAX_DATA_SUMMARY_HEADER = "==================================================\nCONFIRMED TAX DATA SUMMARY\n=================================================="
+        CURRENT_TAX_POSITION_HEADER = "==================================================\nCURRENT TAX POSITION\n=================================================="
+        TAX_BRACKET_ANALYSIS_HEADER = "==================================================\nTAX BRACKET ANALYSIS\n=================================================="
+        STRATEGIC_TAX_PLAN_HEADER = "==================================================\nSTRATEGIC TAX PLAN\n=================================================="
+        WITHHOLDING_ANALYSIS_HEADER = "==================================================\nWITHHOLDING ANALYSIS\n=================================================="
+        RETIREMENT_CONTRIBUTION_OPTIMIZATION_HEADER = "==================================================\nRETIREMENT CONTRIBUTION OPTIMIZATION\n=================================================="
+        DEDUCTION_TIMING_STRATEGY_HEADER = "==================================================\nDEDUCTION TIMING STRATEGY\n=================================================="
+        INVESTMENT_AND_CAPITAL_GAIN_STRATEGY_HEADER = "==================================================\nINVESTMENT AND CAPITAL GAIN STRATEGY\n=================================================="
+        BUSINESS_SCHEDULE_1_REVIEW_HEADER = "==================================================\nBUSINESS / SCHEDULE 1 REVIEW\n=================================================="
+        ARIZONA_STATE_STRATEGY_HEADER = "==================================================\nARIZONA STATE STRATEGY\n=================================================="
+        ACTION_PLAN_TIMELINE_HEADER = "==================================================\nACTION PLAN TIMELINE\n=================================================="
+        FINAL_RECOMMENDATION_HEADER = "==================================================\nFINAL RECOMMENDATION\n=================================================="
 
-        est_withholding_gap = (_to_number(data.get("federal_withholding")) or 0) - (total_tax_num or 0)
-        projected_strategy_savings = (
-            (_to_number(data.get("retirement_contributions")) or 0) * marginal_rate_decimal
-            + max(0, (_to_number(balance_due) or 0) * 0.05)
-        )
+
+        capital_gains_section_text = f"""{INVESTMENT_AND_CAPITAL_GAIN_STRATEGY_HEADER}
+Long-term capital gains are taxed under separate preferential federal rates of 0%, 15%, and 20%, depending on taxable income and filing status. Any gain-harvesting strategy should be evaluated using long-term capital gains thresholds, not ordinary income tax brackets.
+"""
 
         full_report_text = f"""
 Valhalla Tax Services
@@ -493,107 +503,100 @@ Comprehensive Tax Planning Report
 Client: {client_name}
 Tax Year: {tax_year}
 
-Executive Summary
-Based on the data provided, your current profile shows AGI of {_money(agi)}, taxable income of {_money(taxable_income)}, and total federal tax of {total_tax_label}. The immediate planning objective is to lower avoidable federal tax, tighten payment accuracy, and coordinate Arizona moves without disrupting cash flow.
+{EXECUTIVE_SUMMARY_HEADER}
+This section provides a high-level overview of the client's tax profile and planning focus.
 
-Confirmed Tax Data Summary
-The following validated data points were used for this report.
+The client has adjusted gross income of {_money(agi)}, taxable income of {_money(taxable_income)}, and total federal tax of {_money(total_tax)}. The primary focus is to reduce avoidable tax drag, improve withholding accuracy, and coordinate federal and Arizona planning opportunities.
+
+{CONFIRMED_TAX_DATA_SUMMARY_HEADER}
+This section lists the validated tax inputs used to prepare this planning report.
 
 Filing Status: {filing_status}
 State: {data.get("state", "Arizona")}
 Adjusted Gross Income: {_money(agi)}
 Taxable Income: {_money(taxable_income)}
-Total Federal Tax: {total_tax_label}
+Total Federal Tax: {_money(total_tax)}
 Federal Withholding: {_money(data.get("federal_withholding", "N/A"))}
 Refund: {_money(refund)}
 Balance Due: {_money(balance_due)}
 Marginal Rate: {marginal_rate_display}
 Effective Rate: {effective_rate_display}
 
-Current Tax Position
-Your current effective federal tax burden is {effective_rate_display} based on available AGI and tax figures. Your marginal ordinary-income indicator is {marginal_rate_display}, which is the rate to use for business income, Roth conversion room, deductible contributions, and deduction timing decisions. Withholding less total tax currently implies a net payment position of {_money(est_withholding_gap)}.
+{CURRENT_TAX_POSITION_HEADER}
+This section explains the current federal tax posture and cash-flow implications.
 
-Tax Bracket Analysis
-Current effective rate calculation: Total Tax ÷ AGI = {total_tax_label} ÷ {_money(agi)} = {effective_rate_display}.
-For ordinary income planning, use your marginal rate of {marginal_rate_display}. For long-term capital gains, use only the preferential 0%, 15%, and 20% framework; ordinary brackets are not applied to long-term capital gains.
+With AGI of {_money(agi)} and taxable income of {_money(taxable_income)}, the current effective federal tax burden is {effective_rate_display}. The marginal rate indicator is {marginal_rate_display}. This supports estimated payment calibration and year-end optimization decisions.
 
-Strategic Tax Plan
+{TAX_BRACKET_ANALYSIS_HEADER}
+This section shows the core tax-rate math used to frame strategy decisions.
 
-1) Retirement Contribution Strategy
-Current exposure:
-Retirement contributions reported: {_money(data.get("retirement_contributions", "N/A"))}. Taxable income remains at {_money(taxable_income)} with marginal ordinary rate at {marginal_rate_display}.
-Strategy:
-Increase eligible pre-tax retirement contributions where cash flow allows.
-Tax impact:
-Estimated federal income-tax reduction per $1,000 additional contribution: {_money(1000 * marginal_rate_decimal)}.
-Recommendation:
-Prioritize this first because it is direct, controllable, and generally produces immediate federal tax benefit.
+Current effective rate calculation: Total Tax ÷ AGI = {_money(total_tax)} ÷ {_money(agi)} = {effective_rate_display}. This baseline helps compare the cost of additional income versus tax savings from deductions, deferrals, and credits.
 
-2) Withholding and Estimated Payment Strategy
-Current exposure:
-Federal withholding is {_money(data.get("federal_withholding", "N/A"))} against total federal tax of {total_tax_label}, with current net position {_money(est_withholding_gap)}.
-Strategy:
-Adjust W-4 and/or remaining estimated payments to close the projected gap before year-end.
-Tax impact:
-This does not reduce underlying tax directly, but can reduce underpayment risk and penalty exposure.
-Recommendation:
-Implement withholding calibration immediately so payment timing matches projected liability.
+{STRATEGIC_TAX_PLAN_HEADER}
+This section prioritizes practical tax strategies with concise calculations and implementation context.
 
-3) Deduction Timing and Schedule C Efficiency
-Current exposure:
-Standard deduction {_money(data.get("standard_deduction", "N/A"))}, itemized deductions {_money(data.get("itemized_deductions", "N/A"))}, mortgage interest {_money(data.get("mortgage_interest", "N/A"))}, charitable contributions {_money(data.get("charitable_contributions", "N/A"))}.
-Strategy:
-Time deductions into the highest-value year and separate income-tax vs self-employment-tax effects for business deductions.
-Tax impact:
-Income-tax savings estimate follows deduction x marginal rate; for Schedule C deductions, additional SE tax effect may approximate deduction x 15.3% where applicable.
-Recommendation:
-Use a pre-year-end deduction schedule to capture higher-value deductions in the target year.
+1. **Retirement Contribution Optimization**
+Reported retirement contributions are {_money(data.get("retirement_contributions", "N/A"))}. At a marginal rate of {marginal_rate_display}, each additional $1,000 pre-tax contribution may reduce federal income tax by approximately {_money(1000 * marginal_rate_decimal)}. Retirement contributions generally reduce income tax, not self-employment tax.
 
-4) Roth Conversion and Income Coordination
-Current exposure:
-Business income {_money(data.get("business_income", "N/A"))}, rental income {_money(data.get("rental_income", "N/A"))}, and taxable income {_money(taxable_income)} influence available bracket room.
-Strategy:
-Evaluate partial Roth conversion only within available ordinary bracket capacity while coordinating with business/rental income variability.
-Tax impact:
-Conversion increases current-year ordinary income but can improve long-term tax efficiency if executed within planned bracket limits.
-Recommendation:
-Run a targeted projection before executing any conversion amount.
+2. **Roth Conversion Strategy**
+Use current taxable income of {_money(taxable_income)} to evaluate bracket capacity for partial Roth conversions before year-end bracket compression.
 
-5) Capital Gains Strategy
-Current exposure:
-Reported capital gains: {_money(data.get("capital_gains", "N/A"))}.
-Strategy:
-Evaluate gain-harvesting or deferral using only long-term capital-gain rate thresholds.
-Tax impact:
-Long-term capital gains are evaluated only under 0%, 15%, and 20% rates based on taxable income and filing status.
-Recommendation:
-Coordinate sales timing with taxable-income projections so gains are realized in the most favorable long-term capital-gain band available.
+3. **Withholding Correction Strategy**
+Current withholding is {_money(data.get("federal_withholding", "N/A"))} against total tax of {_money(total_tax)}. Net position check: {_money((_to_number(data.get("federal_withholding")) or 0) - (total_tax_num or 0))}. If negative, increase W-4 withholding or estimated payments.
 
-Additional advisor priorities:
+4. **Deduction Timing Strategy**
+Standard deduction: {_money(data.get("standard_deduction", "N/A"))}; Itemized deductions: {_money(data.get("itemized_deductions", "N/A"))}; Mortgage interest: {_money(data.get("mortgage_interest", "N/A"))}; Charitable contributions: {_money(data.get("charitable_contributions", "N/A"))}. Timing deductions into one year can increase marginal deduction value. For Schedule C deductions, rough planning math can include income-tax savings (deduction x marginal rate) plus self-employment tax savings (deduction x 15.3%).
+
+5. **Income and Benefit Coordination**
+Business income: {_money(data.get("business_income", "N/A"))}; Rental income: {_money(data.get("rental_income", "N/A"))}; Capital gains: {_money(data.get("capital_gains", "N/A"))}. Coordinate timing with retirement contributions and withholding updates.
+
+6. **Estimated Tax and Cash Flow Planning**
+Refund reported: {_money(refund)}; Balance due: {_money(balance_due)}. Quarterly catch-up example: {_money((_to_number(balance_due) or 0) / 4)}.
+
+7. **Arizona State Strategy**
+State listed: {data.get("state", "Arizona")}. Align federal moves with Arizona treatment of deductions, retirement contributions, and payment schedules.
+
 {strategy_text}
 
-Arizona State Strategy
-Current exposure:
-State listed as {data.get("state", "Arizona")}; federal actions may change Arizona taxable posture and payment planning.
-Strategy:
-Synchronize retirement, deduction, and income-timing decisions with Arizona treatment and payment calendar.
-Tax impact:
-Can reduce state tax drag and prevent state payment mismatch when federal strategy changes taxable income.
-Recommendation:
-Implement Arizona updates in parallel with federal strategy changes, not after filing season.
+{WITHHOLDING_ANALYSIS_HEADER}
+This section evaluates payment alignment against projected federal tax.
+Withholding and paid-in tax entries are compared against total tax to flag overpayment or underpayment patterns early.
 
-Top 3 Priority Actions
+{RETIREMENT_CONTRIBUTION_OPTIMIZATION_HEADER}
+This section focuses on reducing taxable income through eligible pre-tax retirement contributions.
+Retirement contributions are modeled as income-tax reduction opportunities and are not treated as self-employment tax reductions.
+
+{DEDUCTION_TIMING_STRATEGY_HEADER}
+This section evaluates standard vs itemized timing and bunching opportunities.
+Where business deductions apply, savings are discussed separately for income tax and potential self-employment tax impact.
+
+{capital_gains_section_text}
+
+{BUSINESS_SCHEDULE_1_REVIEW_HEADER}
+Applicable when business or additional Schedule 1 income is present: review deduction quality, documentation, and estimated payment support.
+
+RENTAL STRATEGY REVIEW
+Applicable when rental income is present: review depreciation posture, passive-loss limits, and documentation discipline.
+
+{ARIZONA_STATE_STRATEGY_HEADER}
+State listed: {data.get("state", "Arizona")}. Align federal moves with Arizona treatment of deductions, retirement contributions, and payment schedules.
+
+TOP 3 PRIORITY ACTIONS
+This section ranks near-term planning actions using available client facts and conservative assumptions where data is incomplete.
 
 {priority_section_text}
 
-Action Plan Timeline
+{ACTION_PLAN_TIMELINE_HEADER}
+This section defines execution sequencing across immediate, mid-year, and year-end windows.
 
 Immediate (next 30 days): Validate missing fields, confirm withholding-to-liability alignment, and prioritize top projected after-tax actions.
 Mid-Year (next 3-6 months): Implement income-timing and deduction strategies while tracking estimated payments versus projected total tax.
 Year-End (Q4 execution): Finalize bracket actions, complete contribution-based strategies, and run a pre-filing projection.
 
-Final Recommendation
-Execute retirement contribution optimization, withholding correction, and deduction timing first, then layer in Roth and capital-gain execution after projection refresh. Based on currently available figures, a supportable planning target is approximately {_money(projected_strategy_savings)} in combined tax and penalty-friction improvement, subject to data completion and final projection validation.
+{FINAL_RECOMMENDATION_HEADER}
+This section summarizes the client-ready execution focus.
+
+Focus first on the highest-value planning items supported by return data. Prioritize strategies that reduce avoidable tax, improve long-term efficiency, and correct withholding issues before the next filing season.
 """
 
         full_report_text = (
