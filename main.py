@@ -493,9 +493,7 @@ Recommended timing: {priority.get("recommended_timing", "Coordinate timing with 
 
 
         capital_gains_section_text = f"""{INVESTMENT_AND_CAPITAL_GAIN_STRATEGY_HEADER}
-Long-term capital gains are taxed under a separate rate structure of 0%, 15%, or 20%, depending on taxable income and filing status.
-
-Based on this return, gain harvesting should be evaluated using capital gains thresholds—not ordinary income tax brackets.
+Long-term capital gains are taxed under separate preferential federal rates of 0%, 15%, and 20%, depending on taxable income and filing status. Any gain-harvesting strategy should be evaluated using long-term capital gains thresholds, not ordinary income tax brackets.
 """
 
         full_report_text = f"""
@@ -1947,7 +1945,11 @@ async def smart_strategy_report(data):
     if extracted_values is None:
         extracted_values = {}
 
-    confidence_lines = source_data.get("confidence_engine", {}).get("extracted_lines", {})
+    confidence_engine = source_data.get("confidence_engine")
+    if confidence_engine is None:
+        confidence_engine = {}
+
+    confidence_lines = confidence_engine.get("extracted_lines", {})
     if isinstance(confidence_lines, dict):
         for field, value in confidence_lines.items():
             extracted_values.setdefault(field, value)
