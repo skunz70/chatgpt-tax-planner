@@ -557,16 +557,18 @@ Capital Gain Strategy (Opportunity)
 You currently show no capital gains.
 
 Opportunity:
-Harvest long-term capital gains within the 0% capital gains bracket where available, and use the 15% bracket strategically when income exceeds the 0% threshold.
+You may be able to realize long-term capital gains within the 0% capital gains bracket, depending on your total taxable income and filing status.
+
+For married filing jointly taxpayers, the 0% capital gains threshold is significantly higher than your current taxable income, which creates room to harvest gains without triggering federal tax.
 
 Planning note:
-Long-term capital gains are generally taxed at preferential 0%, 15%, or 20% federal rates depending on taxable income and filing status. They are not taxed in a "12% capital gains bracket."
+Long-term capital gains are taxed at preferential rates of 0%, 15%, or 20% depending on taxable income. These are separate from ordinary income tax brackets such as 10%, 12%, or 22%.
 
 Strategy:
 - Review unrealized gains before year-end
-- Determine how much gain can fit inside the 0% capital gains range
-- Use gain harvesting to rebalance investments tax-efficiently
-- Avoid creating unnecessary income that pushes Social Security taxation or Medicare thresholds higher
+- Determine how much gain can be realized within the 0% capital gains range
+- Use gain harvesting to rebalance positions without creating unnecessary tax
+- Avoid increasing income to a level that impacts Social Security taxation or Medicare thresholds
 
 BUSINESS OR SCHEDULE 1 INCOME REVIEW
 Applicable when business or additional Schedule 1 income is present: review deduction quality, documentation, and estimated payment support.
