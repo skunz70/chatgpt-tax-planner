@@ -5,6 +5,11 @@ import matplotlib.pyplot as plt
 import tempfile
 import os
 import re
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import landscape, letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 def safe_text(value):
     if value is None:
@@ -148,3 +153,152 @@ def generate_smart_strategy_pdf(payload: dict) -> bytes:
     pdf.cell(0, 10, "Valhalla Tax Services | www.valhallataxservice.com | (623) 887-7921", ln=True, align="C")
 
     return pdf.output(dest="S").encode("latin1")
+
+
+def generate_valhalla_premium_tax_report(data: dict, output_path: str = "valhalla_premium_report.pdf"):
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "ValhallaTitle",
+        parent=styles["Title"],
+        fontName="Helvetica-Bold",
+        fontSize=24,
+        textColor=colors.HexColor("#0F1C2E"),
+        spaceAfter=12,
+    )
+    section_style = ParagraphStyle(
+        "ValhallaSection",
+        parent=styles["Heading2"],
+        fontName="Helvetica-Bold",
+        fontSize=14,
+        textColor=colors.HexColor("#1F4E78"),
+        spaceBefore=10,
+        spaceAfter=6,
+    )
+    body_style = ParagraphStyle(
+        "ValhallaBody",
+        parent=styles["BodyText"],
+        fontName="Helvetica",
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor("#1A1A1A"),
+    )
+
+    default_values = {
+        "client_name": "Nathan Deratany",
+        "tax_year": 2025,
+        "filing_status": "Head of Household",
+        "dependents": 2,
+        "agi": 24266,
+        "taxable_income": 0,
+        "total_tax": 3429,
+        "refund": 6731,
+        "schedule_c_gross_revenue": 216265,
+        "schedule_c_net_profit": 24266,
+        "contract_labor": 107920,
+        "depreciation": 16624,
+        "vehicle_deduction": 4628,
+        "qbi_deduction": 4510,
+    }
+    payload = {**default_values, **(data or {})}
+
+    doc = SimpleDocTemplate(
+        output_path,
+        pagesize=landscape(letter),
+        leftMargin=0.5 * inch,
+        rightMargin=0.5 * inch,
+        topMargin=0.5 * inch,
+        bottomMargin=0.5 * inch,
+    )
+
+    tax_eff_rate = (payload["total_tax"] / payload["agi"] * 100) if payload["agi"] else 0
+    strategy_savings = payload["depreciation"] + payload["vehicle_deduction"] + payload["qbi_deduction"]
+
+    story = [
+        Paragraph("Valhalla Premium Tax Strategy Report", title_style),
+        Paragraph(
+            f"Client: <b>{safe_text(payload['client_name'])}</b> | Tax Year: <b>{payload['tax_year']}</b>",
+            body_style,
+        ),
+        Spacer(1, 8),
+    ]
+
+    def section(title, bullet_points):
+        story.append(Paragraph(title, section_style))
+        for point in bullet_points:
+            story.append(Paragraph(f"• {safe_text(point)}", body_style))
+        story.append(Spacer(1, 6))
+
+    section("Executive Summary", [
+        f"Current filing status is {payload['filing_status']} with {payload['dependents']} dependents.",
+        f"AGI of ${payload['agi']:,.0f} and total tax of ${payload['total_tax']:,.0f} produced a refund of ${payload['refund']:,.0f}.",
+        "Primary opportunities are concentrated in business deductions, QBI optimization, and cash-flow timing.",
+    ])
+
+    table_data = [
+        ["Confirmed Tax Data", "Amount"],
+        ["Adjusted Gross Income", f"${payload['agi']:,.0f}"],
+        ["Taxable Income", f"${payload['taxable_income']:,.0f}"],
+        ["Total Tax", f"${payload['total_tax']:,.0f}"],
+        ["Refund", f"${payload['refund']:,.0f}"],
+    ]
+    table = Table(table_data, colWidths=[3.4 * inch, 2.0 * inch])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CFD8E3")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F6F8FB")]),
+    ]))
+    story.extend([Paragraph("Confirmed Tax Data", section_style), table, Spacer(1, 8)])
+
+    section("Federal Tax Analysis", [
+        f"Effective federal tax rate is approximately {tax_eff_rate:.1f}% based on AGI.",
+        "QBI deduction is currently captured and should be preserved through income smoothing.",
+        "Evaluate retirement contribution layering to protect future year tax brackets.",
+    ])
+
+    section("Arizona Tax Analysis", [
+        "Review conformity impacts between federal deductions and Arizona treatment.",
+        "Maintain complete support for business-use expenses to reduce audit exposure.",
+    ])
+
+    section("Schedule C Business Analysis", [
+        f"Gross revenue: ${payload['schedule_c_gross_revenue']:,.0f}; net profit: ${payload['schedule_c_net_profit']:,.0f}.",
+        f"Contract labor spend of ${payload['contract_labor']:,.0f} is material and should be documented by vendor.",
+        f"Depreciation (${payload['depreciation']:,.0f}) and vehicle deduction (${payload['vehicle_deduction']:,.0f}) are key levers.",
+    ])
+
+    section("Strategy Savings Summary", [
+        f"Tracked deduction value from depreciation, vehicle, and QBI totals ${strategy_savings:,.0f}.",
+        "Apply quarterly review cadence to convert year-end surprises into planned savings.",
+    ])
+
+    section("Top 3 Priority Actions", [
+        "Finalize accountable plan and expense substantiation package.",
+        "Implement monthly bookkeeping close to improve deduction capture.",
+        "Schedule mid-year projection to tune withholding and estimated payments.",
+    ])
+
+    section("Do This Now Checklist", [
+        "Collect receipts and mileage logs for all business-use vehicle activity.",
+        "Reconcile contractor payments to 1099 records and W-9 files.",
+        "Set calendar reminders for quarterly strategy reviews.",
+    ])
+
+    section("Multi-Year Strategy Roadmap", [
+        "Year 1: tighten documentation and stabilize baseline taxable income.",
+        "Year 2: expand retirement and entity-structure efficiency planning.",
+        "Year 3: optimize long-term depreciation, exit planning, and family tax integration.",
+    ])
+
+    section("Advisor Summary / Signature Block", [
+        "Prepared by: Valhalla Tax Strategy Team",
+        "Advisor Signature: ______________________    Date: ______________________",
+    ])
+
+    doc.build(story)
+    return output_path
+
+
+def demo_generate_valhalla_premium_tax_report(output_path: str = "valhalla_premium_report.pdf"):
+    return generate_valhalla_premium_tax_report(data={}, output_path=output_path)
