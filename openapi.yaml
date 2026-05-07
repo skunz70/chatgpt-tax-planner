@@ -1,8 +1,8 @@
 openapi: 3.0.1
 info:
-  title: Tax Planner Upload API
-  description: Upload a tax return PDF and generate a customized tax planning report.
-  version: "1.0.0"
+  title: Valhalla Tax Planner API
+  description: Upload tax data, preview dynamic strategy analysis, and generate premium Valhalla tax planning reports.
+  version: "1.1.0"
 servers:
   - url: https://chatgpt-tax-planner.onrender.com
 paths:
@@ -44,6 +44,43 @@ paths:
                     type: number
                   balance_due:
                     type: number
+
+  /preview_valhalla_premium_strategy:
+    post:
+      summary: Preview dynamic Valhalla premium strategy and ROI analysis
+      operationId: previewValhallaPremiumStrategy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValhallaPremiumReportInput'
+      responses:
+        '200':
+          description: Dynamic strategy and ROI preview
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /generate_valhalla_premium_docx:
+    post:
+      summary: Generate a premium Valhalla DOCX tax strategy report
+      operationId: generateValhallaPremiumDocx
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValhallaPremiumReportInput'
+      responses:
+        '200':
+          description: Premium Word report
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
 
   /generate_pdf:
     post:
@@ -120,3 +157,82 @@ paths:
             text/html:
               schema:
                 type: string
+
+components:
+  schemas:
+    ValhallaPremiumReportInput:
+      type: object
+      required:
+        - client_name
+        - tax_year
+        - filing_status
+        - agi
+        - taxable_income
+        - total_tax
+      properties:
+        client_name:
+          type: string
+          example: Test Client
+        tax_year:
+          type: integer
+          example: 2025
+        filing_status:
+          type: string
+          example: MFJ
+        agi:
+          type: number
+          example: 185000
+        taxable_income:
+          type: number
+          example: 142000
+        total_tax:
+          type: number
+          example: 24000
+        refund:
+          type: number
+          example: 1200
+        balance_due:
+          type: number
+          example: 0
+        federal_withholding:
+          type: number
+          example: 22800
+        dependents:
+          type: integer
+          example: 2
+        state:
+          type: string
+          example: AZ
+        schedule_c_gross_revenue:
+          type: number
+          example: 280000
+        schedule_c_net_profit:
+          type: number
+          example: 95000
+        contract_labor:
+          type: number
+          example: 107920
+        w2_income:
+          type: number
+          example: 90000
+        capital_gains:
+          type: number
+          example: 18000
+        dividend_income:
+          type: number
+          example: 3500
+        interest_income:
+          type: number
+          example: 1200
+        has_retirement_accounts:
+          type: boolean
+          example: true
+        age:
+          type: number
+          example: 64
+        aca_marketplace:
+          type: boolean
+          example: false
+        logo_path:
+          type: string
+          example: valhalla_logo.jpg
