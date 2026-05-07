@@ -6,11 +6,13 @@ from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 import os
+import tempfile
 
 BRAND_RED = "981E26"
 DARK_GRAY = "444444"
 LIGHT_RED = "F7E9EA"
 LIGHT_GRAY = "F2F2F2"
+GOLD = "FFF7DD"
 
 
 def _money(value):
@@ -18,6 +20,13 @@ def _money(value):
         return f"${float(value):,.0f}"
     except Exception:
         return "$0"
+
+
+def _num(value, default=0):
+    try:
+        return float(value)
+    except Exception:
+        return float(default)
 
 
 def _set_cell_shading(cell, fill):
@@ -46,13 +55,14 @@ def _set_cell_border(cell, color="CCCCCC", size="6"):
         element.set(qn("w:color"), color)
 
 
-def _format_cell(cell, bold=False, font_size=9.5, color="000000", fill=None):
+def _format_cell(cell, bold=False, font_size=9.2, color="000000", fill=None):
     if fill:
         _set_cell_shading(cell, fill)
     _set_cell_border(cell)
     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
     for paragraph in cell.paragraphs:
         paragraph.paragraph_format.space_after = Pt(0)
+        paragraph.paragraph_format.space_before = Pt(0)
         for run in paragraph.runs:
             run.bold = bold
             run.font.size = Pt(font_size)
@@ -60,7 +70,7 @@ def _format_cell(cell, bold=False, font_size=9.5, color="000000", fill=None):
             run.font.name = "Georgia"
 
 
-def _style_paragraph(paragraph, size=10, bold=False, color="000000", italic=False, before=0, after=6):
+def _style_paragraph(paragraph, size=9.5, bold=False, color="000000", italic=False, before=0, after=5):
     paragraph.paragraph_format.space_before = Pt(before)
     paragraph.paragraph_format.space_after = Pt(after)
     for run in paragraph.runs:
@@ -83,7 +93,7 @@ def _add_title_header(doc, data):
     r = p.add_run("VALHALLA TAX SERVICES\n")
     r.bold = True
     r.font.name = "Georgia"
-    r.font.size = Pt(18)
+    r.font.size = Pt(19)
     r.font.color.rgb = RGBColor.from_string(BRAND_RED)
     r2 = p.add_run("Comprehensive Tax Strategy Report")
     r2.bold = True
@@ -116,14 +126,13 @@ def _add_title_header(doc, data):
 
 def _add_section_heading(doc, text):
     p = doc.add_paragraph()
-    p.paragraph_format.space_before = Pt(12)
+    p.paragraph_format.space_before = Pt(11)
     p.paragraph_format.space_after = Pt(4)
     r = p.add_run(text.upper())
     r.bold = True
     r.font.name = "Georgia"
     r.font.size = Pt(13)
     r.font.color.rgb = RGBColor.from_string(BRAND_RED)
-
     border = OxmlElement("w:pBdr")
     bottom = OxmlElement("w:bottom")
     bottom.set(qn("w:val"), "single")
@@ -147,8 +156,30 @@ def _add_callout(doc, title, body, fill=LIGHT_RED):
     r.font.size = Pt(10.5)
     r.font.color.rgb = RGBColor.from_string(BRAND_RED)
     p2 = cell.add_paragraph(body)
-    _style_paragraph(p2, size=9.5, after=0)
+    _style_paragraph(p2, size=9.3, after=0)
     doc.add_paragraph()
+
+
+def _add_snapshot_box(doc, data):
+    _add_section_heading(doc, "Executive Snapshot")
+    rows = [
+        ["Metric", "Current Position", "Planning Opportunity"],
+        ["Federal Income Tax", "$0", "Primary focus is SE tax and structure"],
+        ["Total Tax", _money(data.get("total_tax", 3429)), "Reduce future tax drag as profit rises"],
+        ["Schedule C Net Profit", _money(data.get("schedule_c_net_profit", 24266)), "Build toward S-Corp / retirement trigger points"],
+        ["Refund", _money(data.get("refund", 6731)), "Do not rely on credits as profit increases"],
+        ["Top Planning Focus", "Schedule C / SE Tax", "Documentation, retirement, entity timing, vehicle planning"],
+    ]
+    table = doc.add_table(rows=len(rows), cols=3)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for r_idx, row in enumerate(rows):
+        for c_idx, val in enumerate(row):
+            cell = table.cell(r_idx, c_idx)
+            cell.text = val
+            if r_idx == 0:
+                _format_cell(cell, bold=True, color="FFFFFF", fill=BRAND_RED, font_size=9)
+            else:
+                _format_cell(cell, fill="FFFFFF", font_size=8.8)
 
 
 def _add_confirmed_tax_table(doc, data):
@@ -166,27 +197,27 @@ def _add_confirmed_tax_table(doc, data):
         table.cell(0, idx).text = label
         table.cell(1, idx).text = value
         _format_cell(table.cell(0, idx), bold=True, color="FFFFFF", fill=BRAND_RED)
-        _format_cell(table.cell(1, idx), bold=False, fill="FFFFFF")
+        _format_cell(table.cell(1, idx), fill="FFFFFF")
 
 
 def _add_business_table(doc, data):
-    gross = data.get("schedule_c_gross_revenue", 216265)
-    net = data.get("schedule_c_net_profit", 24266)
-    expenses = float(gross) - float(net)
+    gross = _num(data.get("schedule_c_gross_revenue", 216265))
+    net = _num(data.get("schedule_c_net_profit", 24266))
+    expenses = gross - net
+    margin = (net / gross * 100) if gross else 0
     rows = [
         ["Business Metric", "Amount", "Advisor Read", "Planning Priority"],
         ["Gross Revenue", _money(gross), "Strong activity level", "Build structure around growth"],
         ["Total Expenses", f"~{_money(expenses)}", "Very high expense ratio", "Confirm substantiation and business purpose"],
-        ["Net Profit", _money(net), "About 11% margin", "Improve profitability without losing tax control"],
+        ["Net Profit", _money(net), f"About {margin:.1f}% margin", "Improve profitability without losing tax control"],
+        ["Contract Labor", _money(data.get("contract_labor", 107920)), "Largest deduction category", "Review 1099/W-2 classification and documentation"],
     ]
     table = doc.add_table(rows=len(rows), cols=4)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    widths = [1.7, 1.2, 2.4, 3.0]
     for r_idx, row in enumerate(rows):
         for c_idx, val in enumerate(row):
             cell = table.cell(r_idx, c_idx)
             cell.text = val
-            cell.width = Inches(widths[c_idx])
             if r_idx == 0:
                 _format_cell(cell, bold=True, color="FFFFFF", fill=BRAND_RED)
             else:
@@ -211,7 +242,7 @@ def _add_strategy_table(doc):
             if r_idx == 0:
                 _format_cell(cell, bold=True, color="FFFFFF", fill=BRAND_RED)
             else:
-                _format_cell(cell, fill="FFFFFF")
+                _format_cell(cell, fill="FFFFFF", font_size=8.8)
 
 
 def _add_top_actions_table(doc):
@@ -228,9 +259,45 @@ def _add_top_actions_table(doc):
             cell = table.cell(r_idx, c_idx)
             cell.text = val
             if r_idx == 0:
-                _format_cell(cell, bold=True, color="FFFFFF", fill=BRAND_RED, font_size=8.5)
+                _format_cell(cell, bold=True, color="FFFFFF", fill=BRAND_RED, font_size=8.3)
             else:
-                _format_cell(cell, fill="FFFFFF", font_size=8.5)
+                _format_cell(cell, fill="FFFFFF", font_size=8.2)
+
+
+def _create_chart(path, title, labels, values):
+    try:
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(7.5, 2.8))
+        plt.bar(labels, values)
+        plt.title(title)
+        plt.tight_layout()
+        plt.savefig(path, dpi=160)
+        plt.close()
+        return True
+    except Exception:
+        return False
+
+
+def _add_charts(doc, data):
+    _add_section_heading(doc, "Planning Visuals")
+    gross = _num(data.get("schedule_c_gross_revenue", 216265))
+    net = _num(data.get("schedule_c_net_profit", 24266))
+    expenses = max(gross - net, 0)
+    chart_specs = [
+        ("Schedule C Revenue, Expenses, and Profit", ["Revenue", "Expenses", "Profit"], [gross, expenses, net]),
+        ("Estimated Strategy Savings Ranges", ["S-Corp", "Retirement", "Vehicle", "Child", "QBI"], [7500, 8000, 18000, 8500, 4500]),
+    ]
+    for title, labels, values in chart_specs:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+            chart_path = tmp.name
+        if _create_chart(chart_path, title, labels, values):
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.add_run().add_picture(chart_path, width=Inches(6.9))
+        try:
+            os.remove(chart_path)
+        except Exception:
+            pass
 
 
 def _add_footer_text(section):
@@ -238,6 +305,26 @@ def _add_footer_text(section):
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     footer.text = "Prepared by Scott Kunz, ChFC, TPCP, Enrolled Agent and Financial Advisor | Confidential client planning document"
     _style_paragraph(footer, size=8, color="777777")
+
+
+def _add_signature_block(doc):
+    _add_section_heading(doc, "Prepared By")
+    table = doc.add_table(rows=1, cols=2)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    left = table.cell(0, 0)
+    right = table.cell(0, 1)
+    left.text = "Scott Kunz, ChFC, TPCP\nEnrolled Agent and Financial Advisor\nValhalla Tax Services"
+    right.text = "7055 W Bell Rd, Suite B20, Glendale, AZ 85308\n(623) 887-7921\nskunz@valhallataxservice.com\nwww.valhallataxservice.com"
+    _format_cell(left, fill=LIGHT_RED, bold=True)
+    _format_cell(right, fill="FFFFFF")
+
+
+def _add_disclaimer(doc):
+    _add_section_heading(doc, "Important Planning Notes")
+    p = doc.add_paragraph(
+        "The savings estimates in this report are planning illustrations, not guaranteed outcomes. Actual results depend on final income, filing status, business-use percentages, payroll requirements, documentation, entity costs, state law, and implementation timing. Strategies involving children, contractors, retirement plans, vehicle deductions, and S-Corp elections should be implemented with proper documentation and professional review."
+    )
+    _style_paragraph(p, size=8.8, color="555555")
 
 
 def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premium_report.docx"):
@@ -258,11 +345,10 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
     styles["Normal"].font.size = Pt(9.5)
 
     _add_title_header(doc, data)
-    _add_callout(
-        doc,
-        "Advisor Summary",
-        "This plan identifies the current tax position, business deduction quality, tax savings opportunities, and the recommended implementation path. The current return shows no federal income tax exposure, but a clear self-employment tax burden and strong opportunity to improve structure as business profit scales.",
-    )
+    _add_callout(doc, "Advisor Summary", "This plan identifies the current tax position, business deduction quality, tax savings opportunities, and the recommended implementation path. The current return shows no federal income tax exposure, but a clear self-employment tax burden and strong opportunity to improve structure as business profit scales.")
+    _add_callout(doc, "Potential Future Annual Tax Savings Identified", "$15,000-$30,000+ depending on income growth, documentation quality, entity timing, retirement funding, vehicle strategy, and implementation discipline.", fill=GOLD)
+
+    _add_snapshot_box(doc, data)
 
     _add_section_heading(doc, "Confirmed Tax Position")
     _add_confirmed_tax_table(doc, data)
@@ -278,7 +364,8 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
         "The highest future tax savings come from S-Corp timing, retirement funding, child employment, and vehicle planning.",
     ]
     for item in summary_items:
-        doc.add_paragraph(item, style=None).style = doc.styles["Normal"]
+        p = doc.add_paragraph("- " + item)
+        _style_paragraph(p, size=9.5)
 
     _add_callout(doc, "Primary Planning Message", "The client is not currently paying federal income tax. The planning target is self-employment tax exposure, business structure, cash-flow control, and building tax-efficient wealth as Schedule C profit increases.")
 
@@ -296,7 +383,9 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
 
     _add_section_heading(doc, "Schedule C Business Analysis")
     _add_business_table(doc, data)
-    _add_callout(doc, "Schedule C Risk Point", "The contract labor amount is the largest compliance item. The recommendation is to document it properly, confirm independent contractor status, issue required Forms 1099, and evaluate whether any workers should be moved to payroll as the business scales.", fill="FFF7DD")
+    _add_callout(doc, "Schedule C Risk Point", "The contract labor amount is the largest compliance item. The recommendation is to document it properly, confirm independent contractor status, issue required Forms 1099, and evaluate whether any workers should be moved to payroll as the business scales.", fill=GOLD)
+
+    _add_charts(doc, data)
 
     _add_section_heading(doc, "Top 3 Priority Actions")
     _add_top_actions_table(doc)
@@ -334,11 +423,14 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
             roadmap.cell(r_idx, c_idx).text = val
             _format_cell(roadmap.cell(r_idx, c_idx), fill="FFFFFF")
 
-    _add_callout(doc, "Do This Now - Advisor Directive", "Start with documentation, contractor compliance, retirement plan setup, and profit tracking. Do not rush into an S-Corp until the profit level supports it. The strongest recommendation is to build the structure now so the client is ready when profit increases.", fill="FFF7DD")
+    _add_callout(doc, "Do This Now - Advisor Directive", "Start with documentation, contractor compliance, retirement plan setup, and profit tracking. Do not rush into an S-Corp until the profit level supports it. The strongest recommendation is to build the structure now so the client is ready when profit increases.", fill=GOLD)
 
     _add_section_heading(doc, "Final Advisor Recommendation")
     p = doc.add_paragraph("This client has a strong business revenue base and a favorable family-credit profile, but the current tax picture is not yet optimized. The correct planning path is to protect existing deductions, improve documentation, increase net profit intentionally, and then use entity structure, retirement funding, child employment, and vehicle strategy to control taxes. The highest-value planning message is simple: do not stay small to avoid tax. Build profit, then control tax through structure.")
     _style_paragraph(p, size=10)
+
+    _add_signature_block(doc)
+    _add_disclaimer(doc)
 
     doc.save(output_path)
     return output_path
@@ -356,6 +448,7 @@ def demo_generate_valhalla_docx():
         "refund": 6731,
         "schedule_c_gross_revenue": 216265,
         "schedule_c_net_profit": 24266,
+        "contract_labor": 107920,
         "logo_path": "valhalla_logo.jpg",
     }
     return generate_valhalla_docx_report(sample)
