@@ -13,6 +13,11 @@ try:
 except Exception:
     generate_dynamic_tax_strategy = None
 
+try:
+    from valhalla_roi_engine import generate_roi_analysis
+except Exception:
+    generate_roi_analysis = None
+
 BRAND_RED = "981E26"
 LIGHT_RED = "F7E9EA"
 GOLD = "FFF7DD"
@@ -182,6 +187,26 @@ def _add_snapshot_box(doc, data):
             _format_cell(cell, bold=(r_idx == 0), color=("FFFFFF" if r_idx == 0 else "000000"), fill=(BRAND_RED if r_idx == 0 else "FFFFFF"), font_size=8.8)
 
 
+def _add_tax_efficiency_score(doc, roi_output):
+    tax_efficiency = (roi_output or {}).get("tax_efficiency", {})
+    if not tax_efficiency:
+        return
+    _add_section_heading(doc, "Tax Opportunity Score")
+    current = tax_efficiency.get("current_score", "N/A")
+    optimized = tax_efficiency.get("optimized_score", "N/A")
+    rows = [
+        ["Current Tax Efficiency Score", "Potential Optimized Score", "Advisor Read"],
+        [f"{current}/100", f"{optimized}/100", tax_efficiency.get("advisor_summary", "Planning opportunities identified.")],
+    ]
+    table = doc.add_table(rows=2, cols=3)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for r_idx, row in enumerate(rows):
+        for c_idx, val in enumerate(row):
+            cell = table.cell(r_idx, c_idx)
+            cell.text = str(val)
+            _format_cell(cell, bold=(r_idx == 0), color=("FFFFFF" if r_idx == 0 else "000000"), fill=(BRAND_RED if r_idx == 0 else GOLD), font_size=9.0)
+
+
 def _add_confirmed_tax_table(doc, data):
     rows = [
         ("Filing Status", data.get("filing_status", "Head of Household")),
@@ -229,10 +254,23 @@ def _default_priority_actions(data):
     ]
 
 
+def _merge_roi_into_actions(priority_actions, roi_strategies):
+    actions = priority_actions or []
+    for roi in roi_strategies or []:
+        actions.append({
+            "priority": roi.get("priority", "Review"),
+            "title": roi.get("strategy", "ROI Strategy"),
+            "estimated_savings": _money(roi.get("estimated_savings", 0)),
+            "timeline": roi.get("timeline", "Review"),
+            "reason": roi.get("advisor_reasoning", "Quantified planning opportunity identified."),
+            "score": roi.get("score", ""),
+        })
+    actions.sort(key=lambda x: _num(x.get("score", 0)), reverse=True)
+    return actions[:7]
+
+
 def _add_top_actions_table(doc, actions):
-    actions = actions or []
-    if not actions:
-        actions = _default_priority_actions({})
+    actions = actions or _default_priority_actions({})
     rows = [["Rank", "Recommendation", "Estimated Impact", "Timing", "Why It Matters"]]
     for idx, action in enumerate(actions[:7], start=1):
         rows.append([
@@ -251,28 +289,27 @@ def _add_top_actions_table(doc, actions):
             _format_cell(cell, bold=(r_idx == 0), color=("FFFFFF" if r_idx == 0 else "000000"), fill=(BRAND_RED if r_idx == 0 else "FFFFFF"), font_size=8.0)
 
 
-def _add_strategy_table(doc, actions):
-    rows = [["Strategy", "Priority", "Estimated Impact", "Timing"]]
-    for action in (actions or [])[:7]:
+def _add_roi_scorecard(doc, roi_strategies):
+    _add_section_heading(doc, "ROI-Ranked Strategy Scorecard")
+    rows = [["Rank", "Strategy", "Estimated Savings", "Score", "Difficulty", "Timeline"]]
+    for idx, item in enumerate((roi_strategies or [])[:7], start=1):
         rows.append([
-            action.get("title", "Strategy"),
-            action.get("priority", "Review"),
-            action.get("estimated_savings", "TBD"),
-            action.get("timeline", "Review"),
+            str(idx),
+            item.get("strategy", "Strategy"),
+            _money(item.get("estimated_savings", 0)),
+            f"{item.get('score', 'N/A')}/100",
+            item.get("implementation_difficulty", "Review"),
+            item.get("timeline", "Review"),
         ])
     if len(rows) == 1:
-        rows.extend([
-            ["S-Corp", "Monitor", "$5,000-$7,500 annually", "Future"],
-            ["Retirement Plan", "High", "$4,000-$8,000 annually", "Current year"],
-            ["Vehicle Strategy", "Review", "$12,000-$18,000 year one", "If fact pattern supports it"],
-        ])
-    table = doc.add_table(rows=len(rows), cols=4)
+        rows.append(["1", "No quantified strategy available", "$0", "N/A", "Review", "Review"])
+    table = doc.add_table(rows=len(rows), cols=6)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     for r_idx, row in enumerate(rows):
         for c_idx, val in enumerate(row):
             cell = table.cell(r_idx, c_idx)
-            cell.text = val
-            _format_cell(cell, bold=(r_idx == 0), color=("FFFFFF" if r_idx == 0 else "000000"), fill=(BRAND_RED if r_idx == 0 else "FFFFFF"), font_size=8.5)
+            cell.text = str(val)
+            _format_cell(cell, bold=(r_idx == 0), color=("FFFFFF" if r_idx == 0 else "000000"), fill=(BRAND_RED if r_idx == 0 else "FFFFFF"), font_size=8.2)
 
 
 def _create_chart(path, title, labels, values):
@@ -290,16 +327,21 @@ def _create_chart(path, title, labels, values):
         return False
 
 
-def _add_charts_page(doc, data):
+def _add_charts_page(doc, data, roi_strategies=None):
     doc.add_page_break()
     _add_section_heading(doc, "Planning Visuals")
     gross = _num(data.get("schedule_c_gross_revenue", 216265))
     net = _num(data.get("schedule_c_net_profit", 24266))
     expenses = max(gross - net, 0)
-    chart_specs = [
-        ("Schedule C Revenue, Expenses, and Profit", ["Revenue", "Expenses", "Profit"], [gross, expenses, net]),
-        ("Estimated Strategy Savings Ranges", ["S-Corp", "Retirement", "Vehicle", "Child", "QBI"], [7500, 8000, 18000, 8500, 4500]),
-    ]
+    chart_specs = [("Schedule C Revenue, Expenses, and Profit", ["Revenue", "Expenses", "Profit"], [gross, expenses, net])]
+    if roi_strategies:
+        chart_specs.append((
+            "ROI-Ranked Estimated Savings",
+            [str(s.get("strategy", "Strategy"))[:12] for s in roi_strategies[:5]],
+            [_num(s.get("estimated_savings", 0)) for s in roi_strategies[:5]],
+        ))
+    else:
+        chart_specs.append(("Estimated Strategy Savings Ranges", ["S-Corp", "Retirement", "Vehicle", "Child", "QBI"], [7500, 8000, 18000, 8500, 4500]))
     for title, labels, values in chart_specs:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
             chart_path = tmp.name
@@ -320,11 +362,20 @@ def _add_dynamic_sections(doc, dynamic_sections):
         return
     _add_section_heading(doc, "Client-Specific Strategy Modules")
     for item in dynamic_sections:
-        title = item.get("section", "Strategy Module")
-        body = item.get("body", "")
-        p = doc.add_paragraph(title)
+        p = doc.add_paragraph(item.get("section", "Strategy Module"))
         _style_paragraph(p, size=10, bold=True, color=BRAND_RED, after=2)
-        p = doc.add_paragraph(body)
+        p = doc.add_paragraph(item.get("body", ""))
+        _style_paragraph(p, size=9.1)
+
+
+def _add_roi_commentary(doc, roi_strategies):
+    if not roi_strategies:
+        return
+    _add_section_heading(doc, "Advisor ROI Commentary")
+    for item in roi_strategies[:5]:
+        p = doc.add_paragraph(item.get("strategy", "Strategy"))
+        _style_paragraph(p, size=10, bold=True, color=BRAND_RED, after=2)
+        p = doc.add_paragraph(item.get("advisor_reasoning", ""))
         _style_paragraph(p, size=9.1)
 
 
@@ -358,10 +409,21 @@ def _build_strategy_output(data):
         return {"priority_actions": _default_priority_actions(data), "dynamic_sections": []}
 
 
+def _build_roi_output(data):
+    if generate_roi_analysis is None:
+        return {"tax_efficiency": {}, "roi_strategies": []}
+    try:
+        return generate_roi_analysis(data)
+    except Exception:
+        return {"tax_efficiency": {}, "roi_strategies": []}
+
+
 def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premium_report.docx"):
     data = data or {}
     strategy_output = _build_strategy_output(data)
-    priority_actions = strategy_output.get("priority_actions", [])
+    roi_output = _build_roi_output(data)
+    roi_strategies = roi_output.get("roi_strategies", [])
+    priority_actions = _merge_roi_into_actions(strategy_output.get("priority_actions", []), roi_strategies)
     dynamic_sections = strategy_output.get("dynamic_sections", [])
 
     doc = Document()
@@ -378,9 +440,10 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
     doc.styles["Normal"].font.size = Pt(9.3)
 
     _add_title_header(doc, data)
-    _add_callout(doc, "Advisor Summary", "This plan identifies the current tax position, business deduction quality, tax savings opportunities, and the recommended implementation path. The report now uses dynamic strategy logic to prioritize recommendations based on the client facts supplied.")
+    _add_callout(doc, "Advisor Summary", "This plan uses dynamic strategy logic and ROI scoring to prioritize the highest-value planning opportunities based on the client facts supplied.")
     _add_callout(doc, "Potential Future Annual Tax Savings Identified", "$15,000-$30,000+ depending on income growth, documentation quality, entity timing, retirement funding, vehicle strategy, and implementation discipline.", fill=GOLD)
     _add_snapshot_box(doc, data)
+    _add_tax_efficiency_score(doc, roi_output)
 
     _add_section_heading(doc, "Confirmed Tax Position")
     _add_confirmed_tax_table(doc, data)
@@ -388,17 +451,15 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
     _style_paragraph(p, size=8.3, color="555555", italic=True)
 
     _add_section_heading(doc, "Executive Summary")
-    summary_items = [
+    for item in [
         "The planning engine identifies which strategies are most relevant based on the supplied client fact pattern.",
-        "Priority actions are ranked based on estimated impact, timing, and implementation urgency.",
-        "The report is designed to move from tax preparation facts to proactive advisory recommendations.",
+        "Priority actions are ranked using estimated impact, timing, implementation difficulty, and ROI scoring.",
+        "The report is designed to convert tax preparation facts into proactive advisory recommendations.",
         "The highest-value planning opportunities are highlighted first so the client knows what to act on.",
-    ]
-    for item in summary_items:
+    ]:
         p = doc.add_paragraph("- " + item)
         _style_paragraph(p, size=9.2)
-
-    _add_callout(doc, "Primary Planning Message", "The objective is not merely to identify deductions. The objective is to prioritize the strategies that produce the highest planning value and convert them into a clear implementation path.")
+    _add_callout(doc, "Primary Planning Message", "The objective is to prioritize the strategies that produce the highest planning value and convert them into a clear implementation path.")
 
     _add_section_heading(doc, "Current Federal Tax Analysis")
     p = doc.add_paragraph("Tax Burden Analysis")
@@ -417,16 +478,15 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
         _add_business_table(doc, data)
         _add_callout(doc, "Schedule C Risk Point", "Business-owner planning should focus on documentation, entity timing, retirement plan integration, and self-employment tax management.", fill=GOLD)
 
-    _add_charts_page(doc, data)
+    _add_charts_page(doc, data, roi_strategies)
 
     _add_section_heading(doc, "Top Priority Actions")
     _add_top_actions_table(doc, priority_actions)
     doc.add_page_break()
 
-    _add_section_heading(doc, "Tax Savings Scorecard")
-    _add_strategy_table(doc, priority_actions)
-
+    _add_roi_scorecard(doc, roi_strategies)
     _add_dynamic_sections(doc, dynamic_sections)
+    _add_roi_commentary(doc, roi_strategies)
 
     _add_section_heading(doc, "Do This Now Checklist and Implementation Roadmap")
     roadmap = doc.add_table(rows=4, cols=3)
