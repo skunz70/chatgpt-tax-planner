@@ -1,0 +1,14 @@
+{
+  "client_name": "Test Client",
+  "tax_year": 2025,
+  "filing_status": "MFJ",
+  "agi": 185000,
+  "taxable_income": 142000,
+  "total_tax": 24000,
+  "refund": 1200,
+  "schedule_c_gross_revenue": 280000,
+  "schedule_c_net_profit": 95000,
+  "capital_gains": 18000,
+  "has_retirement_accounts": true,
+  "age": 64
+}
