@@ -8,6 +8,11 @@ from docx.oxml.ns import qn
 import os
 import tempfile
 
+try:
+    from valhalla_strategy_engine import generate_dynamic_tax_strategy
+except Exception:
+    generate_dynamic_tax_strategy = None
+
 BRAND_RED = "981E26"
 LIGHT_RED = "F7E9EA"
 GOLD = "FFF7DD"
@@ -162,11 +167,11 @@ def _add_snapshot_box(doc, data):
     _add_section_heading(doc, "Executive Snapshot")
     rows = [
         ["Metric", "Current Position", "Planning Opportunity"],
-        ["Federal Income Tax", "$0", "Primary focus is SE tax and structure"],
-        ["Total Tax", _money(data.get("total_tax", 3429)), "Reduce future tax drag as profit rises"],
-        ["Schedule C Net Profit", _money(data.get("schedule_c_net_profit", 24266)), "Build toward S-Corp / retirement trigger points"],
-        ["Refund", _money(data.get("refund", 6731)), "Do not rely on credits as profit increases"],
-        ["Top Planning Focus", "Schedule C / SE Tax", "Documentation, retirement, entity timing, vehicle planning"],
+        ["Federal Income Tax", "$0" if _num(data.get("taxable_income", 0)) == 0 else "Taxable exposure exists", "Focus planning on the highest-impact tax driver"],
+        ["Total Tax", _money(data.get("total_tax", 3429)), "Reduce future tax drag as income changes"],
+        ["Schedule C Net Profit", _money(data.get("schedule_c_net_profit", 24266)), "Build toward retirement/entity planning trigger points"],
+        ["Refund / Balance", _money(data.get("refund", 6731)), "Improve withholding and cash-flow predictability"],
+        ["Top Planning Focus", data.get("top_planning_focus", "Tax strategy prioritization"), "Use ranked recommendations and implementation timeline"],
     ]
     table = doc.add_table(rows=len(rows), cols=3)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -202,10 +207,10 @@ def _add_business_table(doc, data):
     margin = (net / gross * 100) if gross else 0
     rows = [
         ["Business Metric", "Amount", "Advisor Read", "Planning Priority"],
-        ["Gross Revenue", _money(gross), "Strong activity level", "Build structure around growth"],
-        ["Total Expenses", f"~{_money(expenses)}", "Very high expense ratio", "Confirm substantiation and business purpose"],
-        ["Net Profit", _money(net), f"About {margin:.1f}% margin", "Improve profitability without losing tax control"],
-        ["Contract Labor", _money(data.get("contract_labor", 107920)), "Largest deduction category", "Review 1099/W-2 classification and documentation"],
+        ["Gross Revenue", _money(gross), "Strong activity level" if gross else "Not provided", "Build structure around growth" if gross else "Review business inputs"],
+        ["Total Expenses", f"~{_money(expenses)}", "Very high expense ratio" if gross and expenses / gross > .70 else "Expense ratio appears moderate", "Confirm substantiation and business purpose"],
+        ["Net Profit", _money(net), f"About {margin:.1f}% margin" if gross else "Not provided", "Improve profitability without losing tax control"],
+        ["Contract Labor", _money(data.get("contract_labor", 0)), "Review if material", "Confirm 1099/W-2 classification and documentation"],
     ]
     table = doc.add_table(rows=len(rows), cols=4)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -216,13 +221,27 @@ def _add_business_table(doc, data):
             _format_cell(cell, bold=(r_idx == 0), color=("FFFFFF" if r_idx == 0 else "000000"), fill=(BRAND_RED if r_idx == 0 else "FFFFFF"), font_size=8.7)
 
 
-def _add_top_actions_table(doc):
-    rows = [
-        ["Rank", "Recommendation", "Estimated Impact", "Timing", "Why It Matters"],
-        ["1", "Clean up Schedule C structure and contractor compliance", "Risk reduction plus protects $100K+ deductions", "Now to 90 days", "Protects the largest deduction category and reduces audit exposure."],
-        ["2", "Open and fund a Solo 401(k) or SEP IRA", "Current year benefit may be limited; future benefit $4K-$8K+", "Now", "Creates a repeatable wealth-building deduction strategy as profit increases."],
-        ["3", "Build S-Corp trigger model for $60K-$80K profit level", "$5K-$7.5K annual future savings", "Monitor quarterly", "S-Corp should be timed to profit, not started too early."],
+def _default_priority_actions(data):
+    return [
+        {"title": "Clean up Schedule C structure and contractor compliance", "estimated_savings": "Risk reduction plus protects major deductions", "timeline": "Now to 90 days", "reason": "Protects the largest deduction categories and reduces audit exposure."},
+        {"title": "Open and fund a Solo 401(k) or SEP IRA", "estimated_savings": "Future benefit $4K-$8K+", "timeline": "Now", "reason": "Creates a repeatable wealth-building deduction strategy as profit increases."},
+        {"title": "Build S-Corp trigger model for $60K-$80K profit level", "estimated_savings": "$5K-$7.5K annual future savings", "timeline": "Monitor quarterly", "reason": "S-Corp should be timed to profit, not started too early."},
     ]
+
+
+def _add_top_actions_table(doc, actions):
+    actions = actions or []
+    if not actions:
+        actions = _default_priority_actions({})
+    rows = [["Rank", "Recommendation", "Estimated Impact", "Timing", "Why It Matters"]]
+    for idx, action in enumerate(actions[:7], start=1):
+        rows.append([
+            str(idx),
+            action.get("title", "Planning action"),
+            action.get("estimated_savings", "TBD"),
+            action.get("timeline", "Review"),
+            action.get("reason", "Client-specific planning opportunity."),
+        ])
     table = doc.add_table(rows=len(rows), cols=5)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     for r_idx, row in enumerate(rows):
@@ -232,15 +251,21 @@ def _add_top_actions_table(doc):
             _format_cell(cell, bold=(r_idx == 0), color=("FFFFFF" if r_idx == 0 else "000000"), fill=(BRAND_RED if r_idx == 0 else "FFFFFF"), font_size=8.0)
 
 
-def _add_strategy_table(doc):
-    rows = [
-        ["Strategy", "Current-Year Applicability", "Modeled Scenario", "Estimated Tax Impact"],
-        ["S-Corp", "Monitor only", "Profit increases to approx. $80K with reasonable salary planning", "$5,000-$7,500 annually"],
-        ["Retirement Plan", "Set up now; savings grows with profit", "Solo 401(k) or SEP IRA funding at higher profit", "$4,000-$8,000 annually"],
-        ["Child Employment", "Evaluate facts", "Reasonable wages for documented business work", "$6,000-$8,500 annually"],
-        ["Vehicle Strategy", "Compare methods", "Business vehicle with high business use and Section 179/bonus planning", "$12,000-$18,000 year one"],
-        ["QBI Optimization", "Already active", "Profit growth with 20% QBI deduction capacity", "$3,500-$4,500"],
-    ]
+def _add_strategy_table(doc, actions):
+    rows = [["Strategy", "Priority", "Estimated Impact", "Timing"]]
+    for action in (actions or [])[:7]:
+        rows.append([
+            action.get("title", "Strategy"),
+            action.get("priority", "Review"),
+            action.get("estimated_savings", "TBD"),
+            action.get("timeline", "Review"),
+        ])
+    if len(rows) == 1:
+        rows.extend([
+            ["S-Corp", "Monitor", "$5,000-$7,500 annually", "Future"],
+            ["Retirement Plan", "High", "$4,000-$8,000 annually", "Current year"],
+            ["Vehicle Strategy", "Review", "$12,000-$18,000 year one", "If fact pattern supports it"],
+        ])
     table = doc.add_table(rows=len(rows), cols=4)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     for r_idx, row in enumerate(rows):
@@ -290,6 +315,19 @@ def _add_charts_page(doc, data):
     doc.add_page_break()
 
 
+def _add_dynamic_sections(doc, dynamic_sections):
+    if not dynamic_sections:
+        return
+    _add_section_heading(doc, "Client-Specific Strategy Modules")
+    for item in dynamic_sections:
+        title = item.get("section", "Strategy Module")
+        body = item.get("body", "")
+        p = doc.add_paragraph(title)
+        _style_paragraph(p, size=10, bold=True, color=BRAND_RED, after=2)
+        p = doc.add_paragraph(body)
+        _style_paragraph(p, size=9.1)
+
+
 def _add_signature_block(doc):
     _add_section_heading(doc, "Prepared By")
     table = doc.add_table(rows=1, cols=2)
@@ -308,8 +346,24 @@ def _add_disclaimer(doc):
     _style_paragraph(p, size=8.5, color="555555")
 
 
+def _build_strategy_output(data):
+    if generate_dynamic_tax_strategy is None:
+        return {"priority_actions": _default_priority_actions(data), "dynamic_sections": []}
+    try:
+        result = generate_dynamic_tax_strategy(data)
+        if not result.get("priority_actions"):
+            result["priority_actions"] = _default_priority_actions(data)
+        return result
+    except Exception:
+        return {"priority_actions": _default_priority_actions(data), "dynamic_sections": []}
+
+
 def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premium_report.docx"):
     data = data or {}
+    strategy_output = _build_strategy_output(data)
+    priority_actions = strategy_output.get("priority_actions", [])
+    dynamic_sections = strategy_output.get("dynamic_sections", [])
+
     doc = Document()
     section = doc.sections[0]
     section.orientation = WD_ORIENT.LANDSCAPE
@@ -324,53 +378,65 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
     doc.styles["Normal"].font.size = Pt(9.3)
 
     _add_title_header(doc, data)
-    _add_callout(doc, "Advisor Summary", "This plan identifies the current tax position, business deduction quality, tax savings opportunities, and the recommended implementation path. The current return shows no federal income tax exposure, but a clear self-employment tax burden and strong opportunity to improve structure as business profit scales.")
+    _add_callout(doc, "Advisor Summary", "This plan identifies the current tax position, business deduction quality, tax savings opportunities, and the recommended implementation path. The report now uses dynamic strategy logic to prioritize recommendations based on the client facts supplied.")
     _add_callout(doc, "Potential Future Annual Tax Savings Identified", "$15,000-$30,000+ depending on income growth, documentation quality, entity timing, retirement funding, vehicle strategy, and implementation discipline.", fill=GOLD)
     _add_snapshot_box(doc, data)
+
     _add_section_heading(doc, "Confirmed Tax Position")
     _add_confirmed_tax_table(doc, data)
-    p = doc.add_paragraph("Source reviewed: 2025 filed income tax return, including Form 1040, Schedule C, Schedule SE, QBI schedules, and related supporting schedules. Amounts should be verified against final filed copies before implementation.")
+    p = doc.add_paragraph("Source reviewed: filed income tax return and supplied planning facts. Amounts should be verified against final filed copies before implementation.")
     _style_paragraph(p, size=8.3, color="555555", italic=True)
 
     _add_section_heading(doc, "Executive Summary")
-    for item in ["The return is currently driven by Schedule C income and refundable family credits.", "Federal taxable income is zero after the standard deduction.", "The primary tax cost is self-employment tax, not income tax.", "The business has strong revenue but a low reported profit margin.", "The highest future tax savings come from S-Corp timing, retirement funding, child employment, and vehicle planning."]:
+    summary_items = [
+        "The planning engine identifies which strategies are most relevant based on the supplied client fact pattern.",
+        "Priority actions are ranked based on estimated impact, timing, and implementation urgency.",
+        "The report is designed to move from tax preparation facts to proactive advisory recommendations.",
+        "The highest-value planning opportunities are highlighted first so the client knows what to act on.",
+    ]
+    for item in summary_items:
         p = doc.add_paragraph("- " + item)
         _style_paragraph(p, size=9.2)
-    _add_callout(doc, "Primary Planning Message", "The client is not currently paying federal income tax. The planning target is self-employment tax exposure, business structure, cash-flow control, and building tax-efficient wealth as Schedule C profit increases.")
+
+    _add_callout(doc, "Primary Planning Message", "The objective is not merely to identify deductions. The objective is to prioritize the strategies that produce the highest planning value and convert them into a clear implementation path.")
 
     _add_section_heading(doc, "Current Federal Tax Analysis")
     p = doc.add_paragraph("Tax Burden Analysis")
     _style_paragraph(p, size=9.8, bold=True)
-    for item in ["Federal income tax: $0 because taxable income is reduced to $0.", "Self-employment tax: $3,429, generated from Schedule C net earnings.", "Refund is driven primarily by refundable child credits, not withholding.", "This is a favorable current cash-flow result, but it can mask weak estimated tax discipline if profit rises."]:
+    for item in [
+        f"Adjusted gross income: {_money(data.get('agi', 0))}.",
+        f"Taxable income: {_money(data.get('taxable_income', 0))}.",
+        f"Total tax: {_money(data.get('total_tax', 0))}.",
+        "Planning focus should be directed toward the highest-impact tax driver rather than generic deductions.",
+    ]:
         p = doc.add_paragraph("- " + item)
         _style_paragraph(p, size=9.2)
 
-    _add_section_heading(doc, "Schedule C Business Analysis")
-    _add_business_table(doc, data)
-    _add_callout(doc, "Schedule C Risk Point", "The contract labor amount is the largest compliance item. The recommendation is to document it properly, confirm independent contractor status, issue required Forms 1099, and evaluate whether any workers should be moved to payroll as the business scales.", fill=GOLD)
+    if _num(data.get("schedule_c_net_profit", 0)) > 0 or _num(data.get("schedule_c_gross_revenue", 0)) > 0:
+        _add_section_heading(doc, "Schedule C Business Analysis")
+        _add_business_table(doc, data)
+        _add_callout(doc, "Schedule C Risk Point", "Business-owner planning should focus on documentation, entity timing, retirement plan integration, and self-employment tax management.", fill=GOLD)
 
     _add_charts_page(doc, data)
 
-    _add_section_heading(doc, "Top 3 Priority Actions")
-    _add_top_actions_table(doc)
+    _add_section_heading(doc, "Top Priority Actions")
+    _add_top_actions_table(doc, priority_actions)
     doc.add_page_break()
 
-    _add_section_heading(doc, "Strategy Impact By Category")
-    _add_strategy_table(doc)
+    _add_section_heading(doc, "Tax Savings Scorecard")
+    _add_strategy_table(doc, priority_actions)
 
-    _add_section_heading(doc, "Detailed Strategy Notes")
-    notes = [("S-Corporation Timing", "The S-Corp is a future-state strategy, not an automatic current-year recommendation. At $24,266 of profit, administrative costs, payroll, accounting, and reasonable compensation requirements may consume much of the benefit. The correct trigger is to monitor net profit quarterly and revisit the election when consistent annual profit approaches $60,000-$80,000."), ("Retirement Plan Funding", "The client should establish a self-employed retirement plan now so the structure is ready before income rises. Because current taxable income is already $0, immediate income tax savings may be limited. The long-term benefit is creating a repeatable deduction and wealth-building mechanism."), ("Child Employment Strategy", "If the children perform legitimate work for the business, reasonable wages can shift income from the parent business to the children. This requires timesheets, job descriptions, actual payment, and age-appropriate work."), ("Vehicle and Equipment Planning", "Current vehicle deductions appear modest relative to the size of the business. A future vehicle strategy should compare standard mileage, actual expense, depreciation, Section 179, bonus depreciation, business-use percentage, and cash-flow impact.")]
-    for title, body in notes:
-        p = doc.add_paragraph(title)
-        _style_paragraph(p, size=10, bold=True, color=BRAND_RED, after=2)
-        p = doc.add_paragraph(body)
-        _style_paragraph(p, size=9.1)
+    _add_dynamic_sections(doc, dynamic_sections)
 
     _add_section_heading(doc, "Do This Now Checklist and Implementation Roadmap")
     roadmap = doc.add_table(rows=4, cols=3)
     roadmap.alignment = WD_TABLE_ALIGNMENT.CENTER
     header = ["Timeline", "Action Items", "Purpose"]
-    rows = [["Next 30 Days", "Open Solo 401(k) or SEP IRA; confirm 1099 records; organize Schedule C documentation; set up separate tax savings account.", "Build the foundation without disrupting the current filing/reporting system."], ["Next 90 Days", "Review contractor classification; compare vehicle methods; create monthly profit dashboard; review children employment facts.", "Reduce compliance risk and identify high-impact strategies before year-end."], ["Next 12 Months", "Run S-Corp feasibility at each quarter-end; implement payroll if profit supports it; set annual retirement contribution target; schedule quarterly tax planning reviews.", "Convert the business from reactive tax prep to proactive tax planning."]]
+    rows = [
+        ["Next 30 Days", "Address the highest-ranked action items and gather supporting documentation.", "Create immediate momentum and reduce implementation risk."],
+        ["Next 90 Days", "Model larger strategies such as entity structure, retirement contributions, withholding, and investment tax planning.", "Convert recommendations into measurable planning decisions."],
+        ["Next 12 Months", "Review progress quarterly and update the strategy as income, deductions, and family facts change.", "Turn the report into a recurring advisory process."],
+    ]
     for i, val in enumerate(header):
         roadmap.cell(0, i).text = val
         _format_cell(roadmap.cell(0, i), bold=True, color="FFFFFF", fill=BRAND_RED)
@@ -378,10 +444,10 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
         for c_idx, val in enumerate(row):
             roadmap.cell(r_idx, c_idx).text = val
             _format_cell(roadmap.cell(r_idx, c_idx), fill="FFFFFF")
-    _add_callout(doc, "Do This Now - Advisor Directive", "Start with documentation, contractor compliance, retirement plan setup, and profit tracking. Do not rush into an S-Corp until the profit level supports it. The strongest recommendation is to build the structure now so the client is ready when profit increases.", fill=GOLD)
+    _add_callout(doc, "Do This Now - Advisor Directive", "Start with the highest-ranked recommendations. The purpose of this report is to convert tax data into an actionable implementation plan, not simply summarize the return.", fill=GOLD)
 
     _add_section_heading(doc, "Final Advisor Recommendation")
-    p = doc.add_paragraph("This client has a strong business revenue base and a favorable family-credit profile, but the current tax picture is not yet optimized. The correct planning path is to protect existing deductions, improve documentation, increase net profit intentionally, and then use entity structure, retirement funding, child employment, and vehicle strategy to control taxes. The highest-value planning message is simple: do not stay small to avoid tax. Build profit, then control tax through structure.")
+    p = doc.add_paragraph("The strongest planning value comes from prioritizing the right strategies in the right order. This report identifies the actions most likely to improve tax efficiency, reduce compliance risk, improve cash-flow predictability, and support long-term wealth building.")
     _style_paragraph(p, size=9.2)
     _add_signature_block(doc)
     _add_disclaimer(doc)
@@ -390,5 +456,21 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
 
 
 def demo_generate_valhalla_docx():
-    sample = {"client_name": "Nathan Deratany", "tax_year": 2025, "filing_status": "Head of Household", "dependents": 2, "agi": 24266, "taxable_income": 0, "total_tax": 3429, "refund": 6731, "schedule_c_gross_revenue": 216265, "schedule_c_net_profit": 24266, "contract_labor": 107920, "logo_path": "valhalla_logo.jpg"}
+    sample = {
+        "client_name": "Nathan Deratany",
+        "tax_year": 2025,
+        "filing_status": "Head of Household",
+        "dependents": 2,
+        "agi": 125000,
+        "taxable_income": 92000,
+        "total_tax": 14000,
+        "refund": 1200,
+        "schedule_c_gross_revenue": 216265,
+        "schedule_c_net_profit": 85000,
+        "contract_labor": 107920,
+        "capital_gains": 12000,
+        "has_retirement_accounts": True,
+        "age": 64,
+        "logo_path": "valhalla_logo.jpg",
+    }
     return generate_valhalla_docx_report(sample)
