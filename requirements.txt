@@ -14,3 +14,4 @@ python-jose[cryptography]
 pandas
 matplotlib
 reportlab==3.6.12
+python-docx
