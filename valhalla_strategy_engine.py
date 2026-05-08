@@ -22,81 +22,130 @@ class StrategyEngine:
         self.has_retirement = bool(self.data.get("has_retirement_accounts", False))
 
     def build_priority_actions(self) -> List[Dict]:
-        actions = []
+    actions = []
 
-        if self.schedule_c_profit > 0:
-            actions.append({
-                "priority": "High",
-                "title": "Schedule C Documentation Optimization",
-                "estimated_savings": "$3,000-$10,000 risk protection value",
-                "timeline": "Immediate",
-                "reason": "Protects existing deductions and reduces audit exposure.",
-            })
+    filing_status = self.data.get("filing_status", "MFJ")
+    federal_withholding = _num(self.data.get("federal_withholding", 0))
 
-        if self.schedule_c_profit >= 60000:
-            actions.append({
-                "priority": "High",
-                "title": "Evaluate S-Corporation Election",
-                "estimated_savings": "$5,000-$15,000 annually",
-                "timeline": "Within 90 days",
-                "reason": "Self-employment tax exposure becomes material at higher profitability levels.",
-            })
+    # ---- Federal bracket thresholds ----
 
-        if self.schedule_c_profit > 0 or self.w2_income > 0:
-            actions.append({
-                "priority": "High",
-                "title": "Maximize Retirement Contributions",
-                "estimated_savings": "$2,000-$12,000 annually",
-                "timeline": "Current tax year",
-                "reason": "Improves tax efficiency while accelerating long-term wealth accumulation.",
-            })
+    if filing_status == "MFJ":
+        top_22_bracket = 206700
+        top_24_bracket = 394600
+    else:
+        top_22_bracket = 103350
+        top_24_bracket = 197300
 
-        if self.capital_gains > 0:
-            actions.append({
-                "priority": "Medium",
-                "title": "Capital Gain Bracket Management",
-                "estimated_savings": "$1,500-$8,000",
-                "timeline": "Before year-end",
-                "reason": "Strategic harvesting may reduce future capital gains exposure.",
-            })
+    remaining_22_room = max(0, top_22_bracket - self.taxable_income)
 
-        if self.has_retirement and self.taxable_income < 250000:
-            actions.append({
-                "priority": "Medium",
-                "title": "Roth Conversion Window Analysis",
-                "estimated_savings": "Long-term tax reduction potential",
-                "timeline": "Current or future low-income years",
-                "reason": "Lower bracket years may create favorable Roth conversion opportunities.",
-            })
+    # ---- Schedule C documentation ----
 
-        if self.age >= 63:
-            actions.append({
-                "priority": "Medium",
-                "title": "IRMAA and Medicare Threshold Planning",
-                "estimated_savings": "$1,000-$6,000",
-                "timeline": "Multi-year planning",
-                "reason": "Managing MAGI may reduce future Medicare premium surcharges.",
-            })
+    if self.schedule_c_profit > 0:
+        actions.append({
+            "priority": "High",
+            "title": "Schedule C Documentation Optimization",
+            "estimated_savings": "$3,000-$10,000 risk protection value",
+            "timeline": "Immediate",
+            "reason": "Protects deductions, strengthens substantiation, and reduces audit exposure.",
+        })
 
-        if self.has_marketplace:
-            actions.append({
-                "priority": "High",
-                "title": "ACA Premium Credit Monitoring",
-                "estimated_savings": "$2,000-$15,000",
-                "timeline": "Quarterly",
-                "reason": "Income swings may create subsidy repayment exposure.",
-            })
+    # ---- S-Corp planning ----
 
-        if self.total_tax > 0 and self.taxable_income > 0:
-            actions.append({
-                "priority": "Medium",
-                "title": "Withholding and Estimated Tax Calibration",
-                "estimated_savings": "Penalty and cash-flow optimization",
-                "timeline": "Immediate",
-                "reason": "Improves predictability and reduces underpayment risk.",
-            })
+    if self.schedule_c_profit >= 80000:
 
-        return actions[:7]
+        estimated_se_tax_savings = round(self.schedule_c_profit * 0.08, 0)
+
+        actions.append({
+            "priority": "High",
+            "title": "S-Corporation Election Analysis",
+            "estimated_savings": f"${estimated_se_tax_savings:,.0f}",
+            "timeline": "Within 12 months",
+            "reason": "Current profitability may justify payroll optimization and self-employment tax reduction planning.",
+        })
+
+    # ---- Retirement optimization ----
+
+    if self.schedule_c_profit > 25000 or self.w2_income > 0:
+
+        estimated_retirement_savings = round(
+            (self.schedule_c_profit * 0.22),
+            0
+        )
+
+        actions.append({
+            "priority": "High",
+            "title": "Solo 401(k) / Retirement Contribution Optimization",
+            "estimated_savings": f"${estimated_retirement_savings:,.0f}",
+            "timeline": "Current tax year",
+            "reason": "Current earned income creates meaningful pre-tax retirement contribution opportunities.",
+        })
+
+    # ---- Roth conversion planning ----
+
+    if (
+        self.has_retirement
+        and remaining_22_room > 25000
+        and self.age >= 59
+    ):
+
+        roth_capacity = min(remaining_22_room, 50000)
+
+        actions.append({
+            "priority": "Medium",
+            "title": "Partial Roth Conversion Planning",
+            "estimated_savings": f"${round(roth_capacity * 0.15, 0):,.0f}",
+            "timeline": "Low-income or bracket-management years",
+            "reason": f"Approximately ${remaining_22_room:,.0f} remains before entering the next federal bracket.",
+        })
+
+    # ---- Capital gain strategy ----
+
+    if self.capital_gains > 0:
+
+        actions.append({
+            "priority": "Medium",
+            "title": "Capital Gain Bracket Management",
+            "estimated_savings": f"${round(self.capital_gains * 0.15, 0):,.0f}",
+            "timeline": "Before year-end",
+            "reason": "Future gain harvesting should be coordinated with ordinary income and bracket thresholds.",
+        })
+
+    # ---- IRMAA planning ----
+
+    if self.age >= 63 and self.agi > 200000:
+
+        actions.append({
+            "priority": "Medium",
+            "title": "IRMAA Threshold Planning",
+            "estimated_savings": "$2,500+",
+            "timeline": "Multi-year planning",
+            "reason": "Future Medicare premium surcharges may become material at current projected income levels.",
+        })
+
+    # ---- Withholding correction ----
+
+    if self.total_tax > federal_withholding:
+
+        projected_balance_due = round(
+            self.total_tax - federal_withholding,
+            0
+        )
+
+        actions.append({
+            "priority": "High",
+            "title": "Federal / Arizona Withholding Correction",
+            "estimated_savings": f"${projected_balance_due:,.0f}",
+            "timeline": "Immediate",
+            "reason": "Projected underwithholding should be corrected proactively to improve cash flow predictability and avoid penalties.",
+        })
+
+    actions = sorted(
+        actions,
+        key=lambda x: str(x.get("estimated_savings", "0")),
+        reverse=True
+    )
+
+    return actions[:7]
 
     def build_dynamic_sections(self) -> List[Dict]:
         sections = []
