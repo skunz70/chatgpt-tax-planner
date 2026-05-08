@@ -3,7 +3,8 @@ import io
 from fpdf import FPDF
 import tempfile
 import inspect
-
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, Response, UploadFile, File, Depends, HTTPException, Request, Body
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +22,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# ---- Serve generated DOCX/PDF reports ----
+os.makedirs("generated_reports", exist_ok=True)
 
+app.mount(
+    "/generated_reports",
+    StaticFiles(directory="generated_reports"),
+    name="generated_reports"
+)
 # ---- Serve plugin manifest ----
 import pathlib
 
