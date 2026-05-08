@@ -1,536 +1,185 @@
 from docx import Document
-from docx.shared import Pt, Inches, RGBColor
+from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.section import WD_ORIENT
-from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
-import os
-import tempfile
-
-try:
-    from valhalla_strategy_engine import generate_dynamic_tax_strategy
-except Exception:
-    generate_dynamic_tax_strategy = None
-
-try:
-    from valhalla_roi_engine import generate_roi_analysis
-except Exception:
-    generate_roi_analysis = None
-
-BRAND_RED = "981E26"
-LIGHT_RED = "F7E9EA"
-GOLD = "FFF7DD"
+from docx.enum.table import WD_TABLE_ALIGNMENT
 
 
-def _money(value):
+def money(value):
     try:
         return f"${float(value):,.0f}"
     except Exception:
         return "$0"
 
 
-def _num(value, default=0):
-    try:
-        return float(value)
-    except Exception:
-        return float(default)
+def add_red_header(paragraph, text):
+    run = paragraph.add_run(text)
+    run.bold = True
+    run.font.size = Pt(14)
+    run.font.color.rgb = RGBColor(150, 0, 0)
 
 
-def _set_cell_shading(cell, fill):
-    tc_pr = cell._tc.get_or_add_tcPr()
-    shd = OxmlElement("w:shd")
-    shd.set(qn("w:fill"), fill)
-    tc_pr.append(shd)
-
-
-def _set_cell_border(cell, color="CCCCCC", size="6"):
-    tc_pr = cell._tc.get_or_add_tcPr()
-    borders = tc_pr.first_child_found_in("w:tcBorders")
-    if borders is None:
-        borders = OxmlElement("w:tcBorders")
-        tc_pr.append(borders)
-    for edge in ("top", "left", "bottom", "right"):
-        element = borders.find(qn("w:" + edge))
-        if element is None:
-            element = OxmlElement("w:" + edge)
-            borders.append(element)
-        element.set(qn("w:val"), "single")
-        element.set(qn("w:sz"), size)
-        element.set(qn("w:space"), "0")
-        element.set(qn("w:color"), color)
-
-
-def _format_cell(cell, bold=False, font_size=8.8, color="000000", fill=None):
-    if fill:
-        _set_cell_shading(cell, fill)
-    _set_cell_border(cell)
-    cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
-    for paragraph in cell.paragraphs:
-        paragraph.paragraph_format.space_after = Pt(0)
-        paragraph.paragraph_format.space_before = Pt(0)
-        for run in paragraph.runs:
-            run.bold = bold
-            run.font.size = Pt(font_size)
-            run.font.color.rgb = RGBColor.from_string(color)
-            run.font.name = "Georgia"
-
-
-def _style_paragraph(paragraph, size=9.3, bold=False, color="000000", italic=False, before=0, after=4):
-    paragraph.paragraph_format.space_before = Pt(before)
-    paragraph.paragraph_format.space_after = Pt(after)
-    for run in paragraph.runs:
-        run.font.name = "Georgia"
-        run.font.size = Pt(size)
-        run.bold = bold
-        run.italic = italic
-        run.font.color.rgb = RGBColor.from_string(color)
-
-
-def _add_section_heading(doc, text):
-    p = doc.add_paragraph()
-    p.paragraph_format.space_before = Pt(10)
-    p.paragraph_format.space_after = Pt(4)
-    r = p.add_run(text.upper())
-    r.bold = True
-    r.font.name = "Georgia"
-    r.font.size = Pt(13)
-    r.font.color.rgb = RGBColor.from_string(BRAND_RED)
-    border = OxmlElement("w:pBdr")
-    bottom = OxmlElement("w:bottom")
-    bottom.set(qn("w:val"), "single")
-    bottom.set(qn("w:sz"), "10")
-    bottom.set(qn("w:space"), "1")
-    bottom.set(qn("w:color"), BRAND_RED)
-    border.append(bottom)
-    p._p.get_or_add_pPr().append(border)
-
-
-def _add_callout(doc, title, body, fill=LIGHT_RED):
-    table = doc.add_table(rows=1, cols=1)
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    cell = table.cell(0, 0)
-    _set_cell_shading(cell, fill)
-    _set_cell_border(cell, color="E5C4C7")
-    p = cell.paragraphs[0]
-    r = p.add_run(title)
-    r.bold = True
-    r.font.name = "Georgia"
-    r.font.size = Pt(10.2)
-    r.font.color.rgb = RGBColor.from_string(BRAND_RED)
-    p2 = cell.add_paragraph(body)
-    _style_paragraph(p2, size=9.0, after=0)
-    doc.add_paragraph()
-
-
-def _add_footer_text(section):
-    footer = section.footer.paragraphs[0]
-    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer.text = "Prepared by Scott Kunz, ChFC, TPCP, Enrolled Agent and Financial Advisor | Confidential client planning document"
-    _style_paragraph(footer, size=7.5, color="777777")
-
-
-def _add_title_header(doc, data):
-    header_table = doc.add_table(rows=1, cols=2)
-    header_table.autofit = False
-    header_table.columns[0].width = Inches(7.3)
-    header_table.columns[1].width = Inches(2.0)
-    left = header_table.cell(0, 0)
-    right = header_table.cell(0, 1)
-    p = left.paragraphs[0]
-    r = p.add_run("VALHALLA TAX SERVICES\n")
-    r.bold = True
-    r.font.name = "Georgia"
-    r.font.size = Pt(19)
-    r.font.color.rgb = RGBColor.from_string(BRAND_RED)
-    r2 = p.add_run("Comprehensive Tax Strategy Report")
-    r2.bold = True
-    r2.font.name = "Georgia"
-    r2.font.size = Pt(15)
-    logo_path = data.get("logo_path", "valhalla_logo.jpg")
-    rp = right.paragraphs[0]
-    rp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    if os.path.exists(logo_path):
-        try:
-            rp.add_run().add_picture(logo_path, width=Inches(1.35))
-        except Exception:
-            rp.add_run("VALHALLA")
-    else:
-        logo = rp.add_run("VALHALLA")
-        logo.bold = True
-        logo.font.color.rgb = RGBColor.from_string(BRAND_RED)
-    for cell in (left, right):
-        _set_cell_border(cell, color="FFFFFF", size="0")
-    meta = doc.add_paragraph()
-    meta.add_run(f"Client: {data.get('client_name', 'Client')}\n").bold = True
-    meta.add_run(f"Tax Year: {data.get('tax_year', '2025')}\n")
-    meta.add_run("Prepared by: Scott Kunz, ChFC, TPCP, Enrolled Agent and Financial Advisor")
-    _style_paragraph(meta, size=10.3, after=8)
-
-
-def _add_snapshot_box(doc, data):
-    _add_section_heading(doc, "Executive Snapshot")
-    rows = [
-        ["Metric", "Current Position", "Planning Opportunity"],
-        ["Federal Income Tax", "$0" if _num(data.get("taxable_income", 0)) == 0 else "Taxable exposure exists", "Focus planning on the highest-impact tax driver"],
-        ["Total Tax", _money(data.get("total_tax", 3429)), "Reduce future tax drag as income changes"],
-        ["Schedule C Net Profit", _money(data.get("schedule_c_net_profit", 24266)), "Build toward retirement/entity planning trigger points"],
-        ["Refund / Balance", _money(data.get("refund", 6731)), "Improve withholding and cash-flow predictability"],
-        ["Top Planning Focus", data.get("top_planning_focus", "Tax strategy prioritization"), "Use ranked recommendations and implementation timeline"],
-    ]
-    table = doc.add_table(rows=len(rows), cols=3)
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    for r_idx, row in enumerate(rows):
-        for c_idx, val in enumerate(row):
-            cell = table.cell(r_idx, c_idx)
-            cell.text = val
-            _format_cell(cell, bold=(r_idx == 0), color=("FFFFFF" if r_idx == 0 else "000000"), fill=(BRAND_RED if r_idx == 0 else "FFFFFF"), font_size=8.8)
-
-
-def _add_tax_efficiency_score(doc, roi_output):
-    tax_efficiency = (roi_output or {}).get("tax_efficiency", {})
-    if not tax_efficiency:
-        return
-    _add_section_heading(doc, "Tax Opportunity Score")
-    current = tax_efficiency.get("current_score", "N/A")
-    optimized = tax_efficiency.get("optimized_score", "N/A")
-    rows = [
-        ["Current Tax Efficiency Score", "Potential Optimized Score", "Advisor Read"],
-        [f"{current}/100", f"{optimized}/100", tax_efficiency.get("advisor_summary", "Planning opportunities identified.")],
-    ]
-    table = doc.add_table(rows=2, cols=3)
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    for r_idx, row in enumerate(rows):
-        for c_idx, val in enumerate(row):
-            cell = table.cell(r_idx, c_idx)
-            cell.text = str(val)
-            _format_cell(cell, bold=(r_idx == 0), color=("FFFFFF" if r_idx == 0 else "000000"), fill=(BRAND_RED if r_idx == 0 else GOLD), font_size=9.0)
-
-
-def _add_confirmed_tax_table(doc, data):
-    rows = [
-        ("Filing Status", data.get("filing_status", "Head of Household")),
-        ("Dependents", str(data.get("dependents", 2))),
-        ("AGI", _money(data.get("agi", 24266))),
-        ("Taxable Income", _money(data.get("taxable_income", 0))),
-        ("Total Tax", _money(data.get("total_tax", 3429))),
-        ("Refund", _money(data.get("refund", 6731))),
-    ]
-    table = doc.add_table(rows=2, cols=6)
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    for idx, (label, value) in enumerate(rows):
-        table.cell(0, idx).text = label
-        table.cell(1, idx).text = value
-        _format_cell(table.cell(0, idx), bold=True, color="FFFFFF", fill=BRAND_RED, font_size=8.5)
-        _format_cell(table.cell(1, idx), fill="FFFFFF", font_size=8.5)
-
-
-def _add_business_table(doc, data):
-    gross = _num(data.get("schedule_c_gross_revenue", 216265))
-    net = _num(data.get("schedule_c_net_profit", 24266))
-    expenses = gross - net
-    margin = (net / gross * 100) if gross else 0
-    rows = [
-        ["Business Metric", "Amount", "Advisor Read", "Planning Priority"],
-        ["Gross Revenue", _money(gross), "Strong activity level" if gross else "Not provided", "Build structure around growth" if gross else "Review business inputs"],
-        ["Total Expenses", f"~{_money(expenses)}", "Very high expense ratio" if gross and expenses / gross > .70 else "Expense ratio appears moderate", "Confirm substantiation and business purpose"],
-        ["Net Profit", _money(net), f"About {margin:.1f}% margin" if gross else "Not provided", "Improve profitability without losing tax control"],
-        ["Contract Labor", _money(data.get("contract_labor", 0)), "Review if material", "Confirm 1099/W-2 classification and documentation"],
-    ]
-    table = doc.add_table(rows=len(rows), cols=4)
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    for r_idx, row in enumerate(rows):
-        for c_idx, val in enumerate(row):
-            cell = table.cell(r_idx, c_idx)
-            cell.text = val
-            _format_cell(cell, bold=(r_idx == 0), color=("FFFFFF" if r_idx == 0 else "000000"), fill=(BRAND_RED if r_idx == 0 else "FFFFFF"), font_size=8.7)
-
-
-def _default_priority_actions(data):
-    return [
-        {"title": "Clean up Schedule C structure and contractor compliance", "estimated_savings": "Risk reduction plus protects major deductions", "timeline": "Now to 90 days", "reason": "Protects the largest deduction categories and reduces audit exposure."},
-        {"title": "Open and fund a Solo 401(k) or SEP IRA", "estimated_savings": "Future benefit $4K-$8K+", "timeline": "Now", "reason": "Creates a repeatable wealth-building deduction strategy as profit increases."},
-        {"title": "Build S-Corp trigger model for $60K-$80K profit level", "estimated_savings": "$5K-$7.5K annual future savings", "timeline": "Monitor quarterly", "reason": "S-Corp should be timed to profit, not started too early."},
-    ]
-
-
-def _merge_roi_into_actions(priority_actions, roi_strategies):
-    actions = priority_actions or []
-    for roi in roi_strategies or []:
-        actions.append({
-            "priority": roi.get("priority", "Review"),
-            "title": roi.get("strategy", "ROI Strategy"),
-            "estimated_savings": _money(roi.get("estimated_savings", 0)),
-            "timeline": roi.get("timeline", "Review"),
-            "reason": roi.get("advisor_reasoning", "Quantified planning opportunity identified."),
-            "score": roi.get("score", ""),
-        })
-    actions.sort(key=lambda x: _num(x.get("score", 0)), reverse=True)
-    return actions[:7]
-
-
-def _add_top_actions_table(doc, actions):
-    actions = actions or _default_priority_actions({})
-    rows = [["Rank", "Recommendation", "Estimated Impact", "Timing", "Why It Matters"]]
-    for idx, action in enumerate(actions[:7], start=1):
-        rows.append([
-            str(idx),
-            action.get("title", "Planning action"),
-            action.get("estimated_savings", "TBD"),
-            action.get("timeline", "Review"),
-            action.get("reason", "Client-specific planning opportunity."),
-        ])
-    table = doc.add_table(rows=len(rows), cols=5)
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    for r_idx, row in enumerate(rows):
-        for c_idx, val in enumerate(row):
-            cell = table.cell(r_idx, c_idx)
-            cell.text = val
-            _format_cell(cell, bold=(r_idx == 0), color=("FFFFFF" if r_idx == 0 else "000000"), fill=(BRAND_RED if r_idx == 0 else "FFFFFF"), font_size=8.0)
-
-
-def _add_roi_scorecard(doc, roi_strategies):
-    _add_section_heading(doc, "ROI-Ranked Strategy Scorecard")
-    rows = [["Rank", "Strategy", "Estimated Savings", "Score", "Difficulty", "Timeline"]]
-    for idx, item in enumerate((roi_strategies or [])[:7], start=1):
-        rows.append([
-            str(idx),
-            item.get("strategy", "Strategy"),
-            _money(item.get("estimated_savings", 0)),
-            f"{item.get('score', 'N/A')}/100",
-            item.get("implementation_difficulty", "Review"),
-            item.get("timeline", "Review"),
-        ])
-    if len(rows) == 1:
-        rows.append(["1", "No quantified strategy available", "$0", "N/A", "Review", "Review"])
-    table = doc.add_table(rows=len(rows), cols=6)
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    for r_idx, row in enumerate(rows):
-        for c_idx, val in enumerate(row):
-            cell = table.cell(r_idx, c_idx)
-            cell.text = str(val)
-            _format_cell(cell, bold=(r_idx == 0), color=("FFFFFF" if r_idx == 0 else "000000"), fill=(BRAND_RED if r_idx == 0 else "FFFFFF"), font_size=8.2)
-
-
-def _create_chart(path, title, labels, values):
-    try:
-        import matplotlib.pyplot as plt
-        plt.figure(figsize=(6.4, 2.15))
-        plt.bar(labels, values)
-        plt.title(title, fontsize=10)
-        plt.tick_params(axis="both", labelsize=8)
-        plt.tight_layout()
-        plt.savefig(path, dpi=150)
-        plt.close()
-        return True
-    except Exception:
-        return False
-
-
-def _add_charts_page(doc, data, roi_strategies=None):
-    doc.add_page_break()
-    _add_section_heading(doc, "Planning Visuals")
-    gross = _num(data.get("schedule_c_gross_revenue", 216265))
-    net = _num(data.get("schedule_c_net_profit", 24266))
-    expenses = max(gross - net, 0)
-    chart_specs = [("Schedule C Revenue, Expenses, and Profit", ["Revenue", "Expenses", "Profit"], [gross, expenses, net])]
-    if roi_strategies:
-        chart_specs.append((
-            "ROI-Ranked Estimated Savings",
-            [str(s.get("strategy", "Strategy"))[:12] for s in roi_strategies[:5]],
-            [_num(s.get("estimated_savings", 0)) for s in roi_strategies[:5]],
-        ))
-    else:
-        chart_specs.append(("Estimated Strategy Savings Ranges", ["S-Corp", "Retirement", "Vehicle", "Child", "QBI"], [7500, 8000, 18000, 8500, 4500]))
-    for title, labels, values in chart_specs:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-            chart_path = tmp.name
-        if _create_chart(chart_path, title, labels, values):
-            p = doc.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p.paragraph_format.space_after = Pt(8)
-            p.add_run().add_picture(chart_path, width=Inches(6.15))
-        try:
-            os.remove(chart_path)
-        except Exception:
-            pass
-    doc.add_page_break()
-
-
-def _add_dynamic_sections(doc, dynamic_sections):
-    if not dynamic_sections:
-        return
-    _add_section_heading(doc, "Client-Specific Strategy Modules")
-    for item in dynamic_sections:
-        p = doc.add_paragraph(item.get("section", "Strategy Module"))
-        _style_paragraph(p, size=10, bold=True, color=BRAND_RED, after=2)
-        p = doc.add_paragraph(item.get("body", ""))
-        _style_paragraph(p, size=9.1)
-
-
-def _add_roi_commentary(doc, roi_strategies):
-    if not roi_strategies:
-        return
-    _add_section_heading(doc, "Advisor ROI Commentary")
-    for item in roi_strategies[:5]:
-        p = doc.add_paragraph(item.get("strategy", "Strategy"))
-        _style_paragraph(p, size=10, bold=True, color=BRAND_RED, after=2)
-        p = doc.add_paragraph(item.get("advisor_reasoning", ""))
-        _style_paragraph(p, size=9.1)
-
-
-def _add_signature_block(doc):
-    _add_section_heading(doc, "Prepared By")
-    table = doc.add_table(rows=1, cols=2)
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    left = table.cell(0, 0)
-    right = table.cell(0, 1)
-    left.text = "Scott Kunz, ChFC, TPCP\nEnrolled Agent and Financial Advisor\nValhalla Tax Services"
-    right.text = "7055 W Bell Rd, Suite B20, Glendale, AZ 85308\n(623) 887-7921\nskunz@valhallataxservice.com\nwww.valhallataxservice.com"
-    _format_cell(left, fill=LIGHT_RED, bold=True)
-    _format_cell(right, fill="FFFFFF")
-
-
-def _add_disclaimer(doc):
-    _add_section_heading(doc, "Important Planning Notes")
-    p = doc.add_paragraph("The savings estimates in this report are planning illustrations, not guaranteed outcomes. Actual results depend on final income, filing status, business-use percentages, payroll requirements, documentation, entity costs, state law, and implementation timing. Strategies involving children, contractors, retirement plans, vehicle deductions, and S-Corp elections should be implemented with proper documentation and professional review.")
-    _style_paragraph(p, size=8.5, color="555555")
-
-
-def _build_strategy_output(data):
-    if generate_dynamic_tax_strategy is None:
-        return {"priority_actions": _default_priority_actions(data), "dynamic_sections": []}
-    try:
-        result = generate_dynamic_tax_strategy(data)
-        if not result.get("priority_actions"):
-            result["priority_actions"] = _default_priority_actions(data)
-        return result
-    except Exception:
-        return {"priority_actions": _default_priority_actions(data), "dynamic_sections": []}
-
-
-def _build_roi_output(data):
-    if generate_roi_analysis is None:
-        return {"tax_efficiency": {}, "roi_strategies": []}
-    try:
-        return generate_roi_analysis(data)
-    except Exception:
-        return {"tax_efficiency": {}, "roi_strategies": []}
-
-
-def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premium_report.docx"):
-    data = data or {}
-    strategy_output = _build_strategy_output(data)
-    roi_output = _build_roi_output(data)
-    roi_strategies = roi_output.get("roi_strategies", [])
-    priority_actions = _merge_roi_into_actions(strategy_output.get("priority_actions", []), roi_strategies)
-    dynamic_sections = strategy_output.get("dynamic_sections", [])
+def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_report.docx"):
+    from valhalla_strategy_engine import generate_dynamic_tax_strategy
 
     doc = Document()
-    section = doc.sections[0]
-    section.orientation = WD_ORIENT.LANDSCAPE
-    section.page_width = Inches(11)
-    section.page_height = Inches(8.5)
-    section.top_margin = Inches(0.45)
-    section.bottom_margin = Inches(0.6)
-    section.left_margin = Inches(0.55)
-    section.right_margin = Inches(0.55)
-    _add_footer_text(section)
-    doc.styles["Normal"].font.name = "Georgia"
-    doc.styles["Normal"].font.size = Pt(9.3)
 
-    _add_title_header(doc, data)
-    _add_callout(doc, "Advisor Summary", "This plan uses dynamic strategy logic and ROI scoring to prioritize the highest-value planning opportunities based on the client facts supplied.")
-    _add_callout(doc, "Potential Future Annual Tax Savings Identified", "$15,000-$30,000+ depending on income growth, documentation quality, entity timing, retirement funding, vehicle strategy, and implementation discipline.", fill=GOLD)
-    _add_snapshot_box(doc, data)
-    _add_tax_efficiency_score(doc, roi_output)
+    client_name = data.get("client_name", "Client")
+    tax_year = data.get("tax_year", "2025")
+    filing_status = data.get("filing_status", "MFJ")
+    agi = data.get("agi", 0)
+    taxable_income = data.get("taxable_income", 0)
+    total_tax = data.get("total_tax", 0)
+    federal_withholding = data.get("federal_withholding", 0)
+    schedule_c_gross = data.get("schedule_c_gross_revenue", 0)
+    schedule_c_profit = data.get("schedule_c_net_profit", 0)
+    contract_labor = data.get("contract_labor", 0)
+    capital_gains = data.get("capital_gains", 0)
+    state = data.get("state", "AZ")
 
-    _add_section_heading(doc, "Confirmed Tax Position")
-    _add_confirmed_tax_table(doc, data)
-    p = doc.add_paragraph("Source reviewed: filed income tax return and supplied planning facts. Amounts should be verified against final filed copies before implementation.")
-    _style_paragraph(p, size=8.3, color="555555", italic=True)
+    strategy_result = generate_dynamic_tax_strategy(data)
+    priority_actions = strategy_result.get("priority_actions", [])
+    dynamic_sections = strategy_result.get("dynamic_sections", [])
 
-    _add_section_heading(doc, "Executive Summary")
-    for item in [
-        "The planning engine identifies which strategies are most relevant based on the supplied client fact pattern.",
-        "Priority actions are ranked using estimated impact, timing, implementation difficulty, and ROI scoring.",
-        "The report is designed to convert tax preparation facts into proactive advisory recommendations.",
-        "The highest-value planning opportunities are highlighted first so the client knows what to act on.",
-    ]:
-        p = doc.add_paragraph("- " + item)
-        _style_paragraph(p, size=9.2)
-    _add_callout(doc, "Primary Planning Message", "The objective is to prioritize the strategies that produce the highest planning value and convert them into a clear implementation path.")
+    projected_balance = float(total_tax or 0) - float(federal_withholding or 0)
 
-    _add_section_heading(doc, "Current Federal Tax Analysis")
-    p = doc.add_paragraph("Tax Burden Analysis")
-    _style_paragraph(p, size=9.8, bold=True)
-    for item in [
-        f"Adjusted gross income: {_money(data.get('agi', 0))}.",
-        f"Taxable income: {_money(data.get('taxable_income', 0))}.",
-        f"Total tax: {_money(data.get('total_tax', 0))}.",
-        "Planning focus should be directed toward the highest-impact tax driver rather than generic deductions.",
-    ]:
-        p = doc.add_paragraph("- " + item)
-        _style_paragraph(p, size=9.2)
+    # ===== TITLE =====
+    title = doc.add_paragraph()
+    title_run = title.add_run("VALHALLA TAX SERVICES\nComprehensive Tax Strategy Report")
+    title_run.bold = True
+    title_run.font.size = Pt(18)
+    title.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
-    if _num(data.get("schedule_c_net_profit", 0)) > 0 or _num(data.get("schedule_c_gross_revenue", 0)) > 0:
-        _add_section_heading(doc, "Schedule C Business Analysis")
-        _add_business_table(doc, data)
-        _add_callout(doc, "Schedule C Risk Point", "Business-owner planning should focus on documentation, entity timing, retirement plan integration, and self-employment tax management.", fill=GOLD)
+    doc.add_paragraph(f"Client: {client_name}")
+    doc.add_paragraph(f"Tax Year: {tax_year}")
+    doc.add_paragraph("Prepared by: Scott Kunz, ChFC, TPCP, Enrolled Agent and Financial Advisor")
+    doc.add_paragraph("")
 
-    _add_charts_page(doc, data, roi_strategies)
+    # ===== EXECUTIVE SUMMARY =====
+    p = doc.add_paragraph()
+    add_red_header(p, "EXECUTIVE SUMMARY")
 
-    _add_section_heading(doc, "Top Priority Actions")
-    _add_top_actions_table(doc, priority_actions)
-    doc.add_page_break()
+    doc.add_paragraph(
+        f"This report analyzes the supplied tax facts for {client_name}. "
+        f"The client is filing {filing_status}, has AGI of {money(agi)}, taxable income of {money(taxable_income)}, "
+        f"and total federal tax of {money(total_tax)}. The planning focus is to identify strategies supported by the actual client data, "
+        f"not generic tax-planning ideas."
+    )
 
-    _add_roi_scorecard(doc, roi_strategies)
-    _add_dynamic_sections(doc, dynamic_sections)
-    _add_roi_commentary(doc, roi_strategies)
+    # ===== CONFIRMED TAX POSITION =====
+    p = doc.add_paragraph()
+    add_red_header(p, "CONFIRMED TAX POSITION")
 
-    _add_section_heading(doc, "Do This Now Checklist and Implementation Roadmap")
-    roadmap = doc.add_table(rows=4, cols=3)
-    roadmap.alignment = WD_TABLE_ALIGNMENT.CENTER
-    header = ["Timeline", "Action Items", "Purpose"]
-    rows = [
-        ["Next 30 Days", "Address the highest-ranked action items and gather supporting documentation.", "Create immediate momentum and reduce implementation risk."],
-        ["Next 90 Days", "Model larger strategies such as entity structure, retirement contributions, withholding, and investment tax planning.", "Convert recommendations into measurable planning decisions."],
-        ["Next 12 Months", "Review progress quarterly and update the strategy as income, deductions, and family facts change.", "Turn the report into a recurring advisory process."],
-    ]
-    for i, val in enumerate(header):
-        roadmap.cell(0, i).text = val
-        _format_cell(roadmap.cell(0, i), bold=True, color="FFFFFF", fill=BRAND_RED)
-    for r_idx, row in enumerate(rows, start=1):
-        for c_idx, val in enumerate(row):
-            roadmap.cell(r_idx, c_idx).text = val
-            _format_cell(roadmap.cell(r_idx, c_idx), fill="FFFFFF")
-    _add_callout(doc, "Do This Now - Advisor Directive", "Start with the highest-ranked recommendations. The purpose of this report is to convert tax data into an actionable implementation plan, not simply summarize the return.", fill=GOLD)
+    table = doc.add_table(rows=2, cols=5)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-    _add_section_heading(doc, "Final Advisor Recommendation")
-    p = doc.add_paragraph("The strongest planning value comes from prioritizing the right strategies in the right order. This report identifies the actions most likely to improve tax efficiency, reduce compliance risk, improve cash-flow predictability, and support long-term wealth building.")
-    _style_paragraph(p, size=9.2)
-    _add_signature_block(doc)
-    _add_disclaimer(doc)
+    headers = ["Filing Status", "AGI", "Taxable Income", "Total Tax", "Fed Withholding"]
+    values = [filing_status, money(agi), money(taxable_income), money(total_tax), money(federal_withholding)]
+
+    for i, h in enumerate(headers):
+        table.cell(0, i).text = h
+
+    for i, v in enumerate(values):
+        table.cell(1, i).text = str(v)
+
+    # ===== WITHHOLDING POSITION =====
+    p = doc.add_paragraph()
+    add_red_header(p, "WITHHOLDING / PAYMENT POSITION")
+
+    if projected_balance > 0:
+        doc.add_paragraph(
+            f"Based on supplied data, total federal tax exceeds federal withholding by approximately {money(projected_balance)}. "
+            f"This indicates a projected balance due unless additional payments, credits, or withholding exist outside the supplied facts."
+        )
+    else:
+        doc.add_paragraph(
+            f"Based on supplied data, federal withholding exceeds total federal tax by approximately {money(abs(projected_balance))}. "
+            f"This indicates a projected overpayment before considering other payments, credits, or adjustments."
+        )
+
+    # ===== SCHEDULE C =====
+    if float(schedule_c_gross or 0) > 0 or float(schedule_c_profit or 0) > 0:
+        p = doc.add_paragraph()
+        add_red_header(p, "SCHEDULE C BUSINESS ANALYSIS")
+
+        business_table = doc.add_table(rows=2, cols=4)
+        business_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+        headers = ["Gross Revenue", "Net Profit", "Contract Labor", "State"]
+        values = [money(schedule_c_gross), money(schedule_c_profit), money(contract_labor), state]
+
+        for i, h in enumerate(headers):
+            business_table.cell(0, i).text = h
+
+        for i, v in enumerate(values):
+            business_table.cell(1, i).text = str(v)
+
+        doc.add_paragraph(
+            f"The Schedule C activity shows gross revenue of {money(schedule_c_gross)} and net profit of {money(schedule_c_profit)}. "
+            f"Planning should focus on substantiation, contractor classification, retirement plan design, QBI support, and entity timing."
+        )
+
+    # ===== CAPITAL GAINS =====
+    if float(capital_gains or 0) > 0:
+        p = doc.add_paragraph()
+        add_red_header(p, "CAPITAL GAIN PLANNING")
+
+        doc.add_paragraph(
+            f"The supplied facts include capital gains of {money(capital_gains)}. "
+            f"Future gain harvesting, loss harvesting, and bracket management should be coordinated with ordinary income and taxable income levels."
+        )
+
+    # ===== PRIORITY ACTIONS =====
+    p = doc.add_paragraph()
+    add_red_header(p, "TOP PRIORITY ACTIONS")
+
+    if priority_actions:
+        table = doc.add_table(rows=1 + len(priority_actions), cols=4)
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+        table.cell(0, 0).text = "Priority"
+        table.cell(0, 1).text = "Recommendation"
+        table.cell(0, 2).text = "Estimated Impact"
+        table.cell(0, 3).text = "Timing"
+
+        for i, action in enumerate(priority_actions, start=1):
+            table.cell(i, 0).text = action.get("priority", "")
+            table.cell(i, 1).text = action.get("title", "")
+            table.cell(i, 2).text = str(action.get("estimated_savings", ""))
+            table.cell(i, 3).text = action.get("timeline", "")
+
+            doc.add_paragraph(
+                f"{i}. {action.get('title', '')}: {action.get('reason', '')}"
+            )
+    else:
+        doc.add_paragraph("No priority actions were generated from the supplied facts.")
+
+    # ===== DYNAMIC STRATEGY SECTIONS =====
+    if dynamic_sections:
+        p = doc.add_paragraph()
+        add_red_header(p, "CLIENT-SPECIFIC STRATEGY MODULES")
+
+        for section in dynamic_sections:
+            doc.add_paragraph(section.get("section", "Strategy"))
+            doc.add_paragraph(section.get("body", ""))
+
+    # ===== DO THIS NOW =====
+    p = doc.add_paragraph()
+    add_red_header(p, "DO THIS NOW CHECKLIST")
+
+    if priority_actions:
+        for action in priority_actions[:5]:
+            doc.add_paragraph(f"- {action.get('title', '')}: {action.get('timeline', '')}")
+    else:
+        doc.add_paragraph("- Review client data and rerun report with complete inputs.")
+
+    # ===== FINAL RECOMMENDATION =====
+    p = doc.add_paragraph()
+    add_red_header(p, "FINAL ADVISOR RECOMMENDATION")
+
+    doc.add_paragraph(
+        "The recommended next step is to begin with the highest-ranked planning items above, confirm all supporting documentation, "
+        "and model the actual tax impact before implementation. This report is intended to convert the supplied tax data into a practical advisory roadmap."
+    )
+
     doc.save(output_path)
     return output_path
-
-
-def demo_generate_valhalla_docx():
-    sample = {
-        "client_name": "Nathan Deratany",
-        "tax_year": 2025,
-        "filing_status": "Head of Household",
-        "dependents": 2,
-        "agi": 125000,
-        "taxable_income": 92000,
-        "total_tax": 14000,
-        "refund": 1200,
-        "schedule_c_gross_revenue": 216265,
-        "schedule_c_net_profit": 85000,
-        "contract_labor": 107920,
-        "capital_gains": 12000,
-        "has_retirement_accounts": True,
-        "age": 64,
-        "logo_path": "valhalla_logo.jpg",
-    }
-    return generate_valhalla_docx_report(sample)
