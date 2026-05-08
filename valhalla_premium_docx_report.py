@@ -4,11 +4,19 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 
 
-def money(value):
+def _num(value, default=0):
     try:
-        return f"${float(value):,.0f}"
+        if value is None or value == "":
+            return float(default)
+        if isinstance(value, str):
+            value = value.replace("$", "").replace(",", "").strip()
+        return float(value)
     except Exception:
-        return "$0"
+        return float(default)
+
+
+def money(value):
+    return f"${_num(value):,.0f}"
 
 
 def add_red_header(paragraph, text):
@@ -18,31 +26,53 @@ def add_red_header(paragraph, text):
     run.font.color.rgb = RGBColor(150, 0, 0)
 
 
+def add_table(doc, headers, rows):
+    table = doc.add_table(rows=1 + len(rows), cols=len(headers))
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+    for col, header in enumerate(headers):
+        table.cell(0, col).text = str(header)
+
+    for r, row in enumerate(rows, start=1):
+        for c, value in enumerate(row):
+            table.cell(r, c).text = str(value)
+
+    return table
+
+
 def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_report.docx"):
     from valhalla_strategy_engine import generate_dynamic_tax_strategy
+    from valhalla_roi_engine import generate_roi_analysis
+
+    data = data or {}
 
     doc = Document()
 
     client_name = data.get("client_name", "Client")
     tax_year = data.get("tax_year", "2025")
     filing_status = data.get("filing_status", "MFJ")
-    agi = data.get("agi", 0)
-    taxable_income = data.get("taxable_income", 0)
-    total_tax = data.get("total_tax", 0)
-    federal_withholding = data.get("federal_withholding", 0)
-    schedule_c_gross = data.get("schedule_c_gross_revenue", 0)
-    schedule_c_profit = data.get("schedule_c_net_profit", 0)
-    contract_labor = data.get("contract_labor", 0)
-    capital_gains = data.get("capital_gains", 0)
     state = data.get("state", "AZ")
 
+    agi = _num(data.get("agi", 0))
+    taxable_income = _num(data.get("taxable_income", 0))
+    total_tax = _num(data.get("total_tax", 0))
+    federal_withholding = _num(data.get("federal_withholding", 0))
+
+    schedule_c_gross = _num(data.get("schedule_c_gross_revenue", 0))
+    schedule_c_profit = _num(data.get("schedule_c_net_profit", 0))
+    contract_labor = _num(data.get("contract_labor", 0))
+    capital_gains = _num(data.get("capital_gains", 0))
+    age = _num(data.get("age", 0))
+
+    projected_balance = total_tax - federal_withholding
+
     strategy_result = generate_dynamic_tax_strategy(data)
+    roi_result = generate_roi_analysis(data)
+
     priority_actions = strategy_result.get("priority_actions", [])
     dynamic_sections = strategy_result.get("dynamic_sections", [])
+    roi_items = roi_result.get("roi_items", [])
 
-    projected_balance = float(total_tax or 0) - float(federal_withholding or 0)
-
-    # ===== TITLE =====
     title = doc.add_paragraph()
     title_run = title.add_run("VALHALLA TAX SERVICES\nComprehensive Tax Strategy Report")
     title_run.bold = True
@@ -54,132 +84,165 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
     doc.add_paragraph("Prepared by: Scott Kunz, ChFC, TPCP, Enrolled Agent and Financial Advisor")
     doc.add_paragraph("")
 
-    # ===== EXECUTIVE SUMMARY =====
     p = doc.add_paragraph()
     add_red_header(p, "EXECUTIVE SUMMARY")
 
     doc.add_paragraph(
-        f"This report analyzes the supplied tax facts for {client_name}. "
+        f"This report converts supplied tax facts into an advisor-level planning roadmap for {client_name}. "
         f"The client is filing {filing_status}, has AGI of {money(agi)}, taxable income of {money(taxable_income)}, "
-        f"and total federal tax of {money(total_tax)}. The planning focus is to identify strategies supported by the actual client data, "
-        f"not generic tax-planning ideas."
+        f"and total federal tax of {money(total_tax)}. Recommendations below are generated from the supplied data, "
+        f"including business profit, withholding, capital gains, retirement facts, age, and state."
     )
 
-    # ===== CONFIRMED TAX POSITION =====
     p = doc.add_paragraph()
     add_red_header(p, "CONFIRMED TAX POSITION")
 
-    table = doc.add_table(rows=2, cols=5)
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    add_table(
+        doc,
+        ["Filing Status", "State", "AGI", "Taxable Income", "Total Tax", "Federal Withholding"],
+        [[filing_status, state, money(agi), money(taxable_income), money(total_tax), money(federal_withholding)]],
+    )
 
-    headers = ["Filing Status", "AGI", "Taxable Income", "Total Tax", "Fed Withholding"]
-    values = [filing_status, money(agi), money(taxable_income), money(total_tax), money(federal_withholding)]
-
-    for i, h in enumerate(headers):
-        table.cell(0, i).text = h
-
-    for i, v in enumerate(values):
-        table.cell(1, i).text = str(v)
-
-    # ===== WITHHOLDING POSITION =====
     p = doc.add_paragraph()
     add_red_header(p, "WITHHOLDING / PAYMENT POSITION")
 
     if projected_balance > 0:
         doc.add_paragraph(
-            f"Based on supplied data, total federal tax exceeds federal withholding by approximately {money(projected_balance)}. "
-            f"This indicates a projected balance due unless additional payments, credits, or withholding exist outside the supplied facts."
+            f"Based only on supplied federal tax and withholding data, the client is underpaid by approximately "
+            f"{money(projected_balance)}. This should be reviewed immediately for withholding changes, estimated payments, "
+            f"or confirmation of additional payments not included in the supplied data."
         )
     else:
         doc.add_paragraph(
-            f"Based on supplied data, federal withholding exceeds total federal tax by approximately {money(abs(projected_balance))}. "
-            f"This indicates a projected overpayment before considering other payments, credits, or adjustments."
+            f"Based only on supplied federal tax and withholding data, the client appears overpaid by approximately "
+            f"{money(abs(projected_balance))}. Confirm whether other payments, credits, or refund offsets apply."
         )
 
-    # ===== SCHEDULE C =====
-    if float(schedule_c_gross or 0) > 0 or float(schedule_c_profit or 0) > 0:
+    if schedule_c_gross > 0 or schedule_c_profit > 0:
         p = doc.add_paragraph()
         add_red_header(p, "SCHEDULE C BUSINESS ANALYSIS")
 
-        business_table = doc.add_table(rows=2, cols=4)
-        business_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        expense_estimate = max(0, schedule_c_gross - schedule_c_profit)
+        profit_margin = (schedule_c_profit / schedule_c_gross * 100) if schedule_c_gross else 0
 
-        headers = ["Gross Revenue", "Net Profit", "Contract Labor", "State"]
-        values = [money(schedule_c_gross), money(schedule_c_profit), money(contract_labor), state]
-
-        for i, h in enumerate(headers):
-            business_table.cell(0, i).text = h
-
-        for i, v in enumerate(values):
-            business_table.cell(1, i).text = str(v)
-
-        doc.add_paragraph(
-            f"The Schedule C activity shows gross revenue of {money(schedule_c_gross)} and net profit of {money(schedule_c_profit)}. "
-            f"Planning should focus on substantiation, contractor classification, retirement plan design, QBI support, and entity timing."
+        add_table(
+            doc,
+            ["Gross Revenue", "Estimated Expenses", "Net Profit", "Profit Margin", "Contract Labor"],
+            [[money(schedule_c_gross), money(expense_estimate), money(schedule_c_profit), f"{profit_margin:.1f}%", money(contract_labor)]],
         )
 
-    # ===== CAPITAL GAINS =====
-    if float(capital_gains or 0) > 0:
+        doc.add_paragraph(
+            f"The Schedule C activity reports gross revenue of {money(schedule_c_gross)} and net profit of "
+            f"{money(schedule_c_profit)}, producing an estimated profit margin of {profit_margin:.1f}%. "
+            f"Planning should focus on substantiation, contractor classification, retirement plan design, QBI support, "
+            f"estimated tax planning, and entity timing."
+        )
+
+    if capital_gains > 0:
         p = doc.add_paragraph()
         add_red_header(p, "CAPITAL GAIN PLANNING")
 
         doc.add_paragraph(
-            f"The supplied facts include capital gains of {money(capital_gains)}. "
-            f"Future gain harvesting, loss harvesting, and bracket management should be coordinated with ordinary income and taxable income levels."
+            f"The supplied facts include capital gains of {money(capital_gains)}. Future planning should use the "
+            f"0% / 15% / 20% long-term capital gain framework and coordinate gain recognition with ordinary income, "
+            f"loss harvesting, and portfolio rebalancing."
         )
 
-    # ===== PRIORITY ACTIONS =====
     p = doc.add_paragraph()
     add_red_header(p, "TOP PRIORITY ACTIONS")
 
     if priority_actions:
-        table = doc.add_table(rows=1 + len(priority_actions), cols=4)
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        rows = []
+        for item in priority_actions:
+            rows.append([
+                item.get("priority", ""),
+                item.get("title", ""),
+                item.get("estimated_savings", ""),
+                item.get("timeline", ""),
+            ])
 
-        table.cell(0, 0).text = "Priority"
-        table.cell(0, 1).text = "Recommendation"
-        table.cell(0, 2).text = "Estimated Impact"
-        table.cell(0, 3).text = "Timing"
+        add_table(
+            doc,
+            ["Priority", "Recommendation", "Estimated Impact", "Timing"],
+            rows,
+        )
 
-        for i, action in enumerate(priority_actions, start=1):
-            table.cell(i, 0).text = action.get("priority", "")
-            table.cell(i, 1).text = action.get("title", "")
-            table.cell(i, 2).text = str(action.get("estimated_savings", ""))
-            table.cell(i, 3).text = action.get("timeline", "")
-
+        for index, item in enumerate(priority_actions, start=1):
             doc.add_paragraph(
-                f"{i}. {action.get('title', '')}: {action.get('reason', '')}"
+                f"{index}. {item.get('title', '')}: {item.get('reason', '')}"
             )
     else:
-        doc.add_paragraph("No priority actions were generated from the supplied facts.")
+        doc.add_paragraph("No priority strategies were generated from the supplied facts.")
 
-    # ===== DYNAMIC STRATEGY SECTIONS =====
+    p = doc.add_paragraph()
+    add_red_header(p, "ROI-RANKED STRATEGY SCORECARD")
+
+    if roi_items:
+        rows = []
+        for item in roi_items:
+            rows.append([
+                item.get("strategy", ""),
+                item.get("estimated_value", ""),
+                item.get("score", ""),
+                item.get("difficulty", ""),
+                item.get("timeline", ""),
+            ])
+
+        add_table(
+            doc,
+            ["Strategy", "Estimated Value", "Score", "Difficulty", "Timeline"],
+            rows,
+        )
+    else:
+        doc.add_paragraph("No ROI items were generated from the supplied facts.")
+
     if dynamic_sections:
         p = doc.add_paragraph()
         add_red_header(p, "CLIENT-SPECIFIC STRATEGY MODULES")
 
         for section in dynamic_sections:
-            doc.add_paragraph(section.get("section", "Strategy"))
+            heading = doc.add_paragraph()
+            heading_run = heading.add_run(section.get("section", "Strategy"))
+            heading_run.bold = True
+            heading_run.font.size = Pt(11)
+
             doc.add_paragraph(section.get("body", ""))
 
-    # ===== DO THIS NOW =====
     p = doc.add_paragraph()
-    add_red_header(p, "DO THIS NOW CHECKLIST")
+    add_red_header(p, "DO THIS NOW CHECKLIST AND IMPLEMENTATION ROADMAP")
 
     if priority_actions:
-        for action in priority_actions[:5]:
-            doc.add_paragraph(f"- {action.get('title', '')}: {action.get('timeline', '')}")
+        for item in priority_actions[:5]:
+            doc.add_paragraph(
+                f"- {item.get('title', '')}: {item.get('timeline', '')}. {item.get('reason', '')}"
+            )
     else:
-        doc.add_paragraph("- Review client data and rerun report with complete inputs.")
+        doc.add_paragraph("- Gather complete client tax facts and rerun the premium planning report.")
 
-    # ===== FINAL RECOMMENDATION =====
     p = doc.add_paragraph()
     add_red_header(p, "FINAL ADVISOR RECOMMENDATION")
 
-    doc.add_paragraph(
-        "The recommended next step is to begin with the highest-ranked planning items above, confirm all supporting documentation, "
-        "and model the actual tax impact before implementation. This report is intended to convert the supplied tax data into a practical advisory roadmap."
-    )
+    if priority_actions:
+        top = priority_actions[0]
+        doc.add_paragraph(
+            f"The first action item should be: {top.get('title', '')}. "
+            f"This ranks highest based on the supplied facts and estimated planning impact. "
+            f"Before implementation, confirm supporting documentation, final tax data, state impact, and cash-flow timing."
+        )
+    else:
+        doc.add_paragraph(
+            "The recommended next step is to confirm complete client tax data and rerun the strategy model."
+        )
+
+    doc.add_paragraph("")
+    doc.add_paragraph("PREPARED BY")
+    doc.add_paragraph("Scott Kunz, ChFC, TPCP")
+    doc.add_paragraph("Enrolled Agent and Financial Advisor")
+    doc.add_paragraph("Valhalla Tax Services")
+    doc.add_paragraph("7055 W Bell Rd, Suite B20, Glendale, AZ 85308")
+    doc.add_paragraph("(623) 887-7921")
+    doc.add_paragraph("skunz@valhallataxservice.com")
+    doc.add_paragraph("www.valhallataxservice.com")
 
     doc.save(output_path)
     return output_path
