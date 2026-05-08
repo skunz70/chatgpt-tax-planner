@@ -6,6 +6,7 @@ from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.section import WD_ORIENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_ROW_HEIGHT_RULE
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -108,11 +109,12 @@ def add_header_footer(section):
 
 def add_section_title(doc, title):
     p = doc.add_paragraph()
-    p.paragraph_format.space_before = Pt(7)
-    p.paragraph_format.space_after = Pt(4)
+    p.paragraph_format.space_before = Pt(14)
+    p.paragraph_format.space_after = Pt(7)
+    p.paragraph_format.keep_with_next = True
     run = p.add_run(title)
     run.bold = True
-    run.font.size = Pt(14)
+    run.font.size = Pt(16)
     run.font.color.rgb = RGBColor.from_string(VALHALLA_RED)
 
     border = OxmlElement("w:pBdr")
@@ -125,22 +127,22 @@ def add_section_title(doc, title):
     p._p.get_or_add_pPr().append(border)
 
 
-def add_box(doc, title, body, fill=LIGHT_RED):
+def add_box(doc, title, body, fill=LIGHT_RED, title_size=12, body_size=12):
     table = doc.add_table(rows=2, cols=1)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     set_table_column_widths(table, [Inches(9.9)])
 
     set_cell_shading(table.cell(0, 0), VALHALLA_RED)
-    set_cell_text(table.cell(0, 0), title, bold=True, color="FFFFFF", size=10)
+    set_cell_text(table.cell(0, 0), title, bold=True, color="FFFFFF", size=title_size)
 
     set_cell_shading(table.cell(1, 0), fill)
-    set_cell_text(table.cell(1, 0), body, size=10)
+    set_cell_text(table.cell(1, 0), body, size=body_size)
 
     spacer = doc.add_paragraph("")
-    spacer.paragraph_format.space_after = Pt(2)
+    spacer.paragraph_format.space_after = Pt(8)
 
 
-def add_table(doc, headers: List[str], rows: List[List[Any]], header_fill=VALHALLA_RED, col_widths=None, compact=False):
+def add_table(doc, headers: List[str], rows: List[List[Any]], header_fill=VALHALLA_RED, col_widths=None, compact=False, dominant=False):
     table = doc.add_table(rows=1 + len(rows), cols=len(headers))
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.style = "Table Grid"
@@ -149,17 +151,19 @@ def add_table(doc, headers: List[str], rows: List[List[Any]], header_fill=VALHAL
 
     for i, h in enumerate(headers):
         set_cell_shading(table.cell(0, i), header_fill)
-        set_cell_text(table.cell(0, i), h, bold=True, color="FFFFFF", size=9)
+        set_cell_text(table.cell(0, i), h, bold=True, color="FFFFFF", size=11 if dominant else 10)
     set_repeat_table_header(table.rows[0])
-    table.rows[0].height = Pt(20)
+    table.rows[0].height_rule = WD_ROW_HEIGHT_RULE.EXACTLY
+    table.rows[0].height = Pt(28 if dominant else 22)
 
     for r, row in enumerate(rows, start=1):
-        table.rows[r].height = Pt(22 if not compact else 20)
+        table.rows[r].height_rule = WD_ROW_HEIGHT_RULE.AT_LEAST
+        table.rows[r].height = Pt(32 if dominant else (24 if not compact else 22))
         for c, value in enumerate(row):
-            set_cell_text(table.cell(r, c), value, size=9 if compact else 10)
+            set_cell_text(table.cell(r, c), value, size=11 if dominant else (10 if compact else 11))
 
     spacer = doc.add_paragraph("")
-    spacer.paragraph_format.space_after = Pt(3)
+    spacer.paragraph_format.space_after = Pt(10)
     return table
 
 
@@ -295,12 +299,12 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
 
     styles = doc.styles
     styles["Normal"].font.name = "Times New Roman"
-    styles["Normal"].font.size = Pt(11)
+    styles["Normal"].font.size = Pt(12)
 
     # PAGE 1
     branding = doc.add_table(rows=1, cols=2)
     branding.alignment = WD_TABLE_ALIGNMENT.CENTER
-    set_table_column_widths(branding, [Inches(2.2), Inches(7.7)])
+    set_table_column_widths(branding, [Inches(2.4), Inches(7.5)])
 
     logo_cell = branding.cell(0, 0)
     logo_cell.text = ""
@@ -313,21 +317,21 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
     title_cell = branding.cell(0, 1)
     title_cell.text = ""
     title = title_cell.paragraphs[0]
-    title.paragraph_format.space_after = Pt(2)
+    title.paragraph_format.space_after = Pt(4)
     run = title.add_run("VALHALLA TAX SERVICES")
     run.bold = True
-    run.font.size = Pt(24)
+    run.font.size = Pt(28)
     run.font.color.rgb = RGBColor.from_string(VALHALLA_RED)
 
     subtitle = title_cell.add_paragraph("Comprehensive Tax Strategy Report")
-    subtitle.paragraph_format.space_after = Pt(4)
+    subtitle.paragraph_format.space_after = Pt(8)
     subtitle_run = subtitle.runs[0]
     subtitle_run.bold = True
-    subtitle_run.font.size = Pt(14)
+    subtitle_run.font.size = Pt(16)
     subtitle_run.font.color.rgb = RGBColor(60, 60, 60)
 
     meta = title_cell.add_paragraph()
-    meta.paragraph_format.space_after = Pt(4)
+    meta.paragraph_format.space_after = Pt(10)
     meta.add_run(f"Client: {client_name}   ").bold = True
     meta.add_run(f"Tax Year: {tax_year}   ").bold = True
     meta.add_run("Prepared by: Scott Kunz, ChFC, TPCP, Enrolled Agent")
@@ -340,6 +344,8 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
             "cash-flow control, threshold triggers, and compliance durability so implementation occurs in the right order."
         ),
         LIGHT_RED,
+        title_size=12,
+        body_size=12,
     )
 
     add_section_title(doc, "CONFIRMED TAX POSITION")
@@ -350,28 +356,26 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
         col_widths=[Inches(1.3), Inches(1.25), Inches(1.55), Inches(1.2), Inches(1.8), Inches(2.0)],
     )
 
-    p = doc.add_paragraph(
-        "Source reviewed: supplied tax return data and planning facts. Amounts should be verified against final filed copies before implementation."
-    )
-    p.paragraph_format.space_after = Pt(3)
+    p = doc.add_paragraph("Source reviewed: supplied tax return data and planning facts.")
+    p.paragraph_format.space_after = Pt(1)
+    p2 = doc.add_paragraph("Amounts should be verified against final filed copies before implementation.")
+    p2.paragraph_format.space_after = Pt(8)
 
     add_section_title(doc, "EXECUTIVE SUMMARY")
-    add_table(
-        doc,
-        ["Current Position", "Advisor Conclusion"],
-        [[
-            (
-                f"AGI is {money(agi)} and taxable income is {money(taxable_income)}. "
-                f"Total federal tax is {money(total_tax)} with federal withholding of {money(federal_withholding)}."
-            ),
-            (
-                "The advisor view is to stage decisions by threshold: protect compliance first, then optimize entity and retirement "
-                "structure once profit and liquidity levels justify complexity."
-            ),
-        ]],
-        col_widths=[Inches(4.8), Inches(5.1)],
-        compact=True,
+    exec_intro = doc.add_paragraph()
+    exec_intro.paragraph_format.space_after = Pt(6)
+    exec_intro.paragraph_format.line_spacing = 1.25
+    exec_intro.add_run(
+        f"AGI is {money(agi)} and taxable income is {money(taxable_income)}. "
+        f"Total federal tax is {money(total_tax)} with federal withholding of {money(federal_withholding)}."
     )
+    exec_conclusion = doc.add_paragraph()
+    exec_conclusion.paragraph_format.space_after = Pt(10)
+    exec_conclusion.paragraph_format.line_spacing = 1.3
+    exec_conclusion.add_run(
+        "The advisor view is to stage decisions by threshold: protect compliance first, then optimize entity and retirement "
+        "structure once profit and liquidity levels justify complexity."
+    ).bold = True
 
     if withholding_delta >= 0:
         primary_message = (
@@ -385,7 +389,7 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
             f"alignment: correct withholding and estimates now, then sequence structural strategies after cash-flow stabilization."
         )
 
-    add_box(doc, "Primary Planning Message", primary_message, LIGHT_GOLD)
+    add_box(doc, "Primary Planning Message", primary_message, LIGHT_GOLD, title_size=13, body_size=12)
 
     doc.add_page_break()
 
@@ -493,12 +497,24 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
             action.get("timeline", ""),
             action.get("reason", ""),
         ])
-    add_table(
+    top_actions_table = add_table(
         doc,
         ["Rank", "Recommendation", "Estimated Impact", "Timing", "Why It Matters"],
         rows,
-        col_widths=[Inches(0.55), Inches(2.7), Inches(2.0), Inches(1.2), Inches(3.45)],
-        compact=True,
+        col_widths=[Inches(0.65), Inches(3.0), Inches(2.1), Inches(1.35), Inches(2.75)],
+        compact=False,
+        dominant=True,
+    )
+    for row in top_actions_table.rows[1:]:
+        row.cells[0].paragraphs[0].runs[0].bold = True
+        row.cells[1].paragraphs[0].runs[0].bold = True
+    add_box(
+        doc,
+        "Execution Order",
+        "Implement in rank sequence. Do not advance to lower-ranked items until the prior action has evidence of completion.",
+        LIGHT_RED,
+        title_size=12,
+        body_size=11,
     )
 
     add_section_title(doc, "STRATEGY IMPACT BY CATEGORY")
