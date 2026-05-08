@@ -46,6 +46,9 @@ def set_cell_shading(cell, fill: str):
 def set_cell_text(cell, text, bold=False, color=None, size=9):
     cell.text = ""
     p = cell.paragraphs[0]
+    p.paragraph_format.space_before = Pt(1)
+    p.paragraph_format.space_after = Pt(1)
+    p.paragraph_format.line_spacing = 1.08
     run = p.add_run(str(text))
     run.bold = bold
     run.font.size = Pt(size)
@@ -61,7 +64,7 @@ def set_repeat_table_header(row):
     tr_pr.append(tbl_header)
 
 
-def set_cell_margins(cell, top=70, start=90, bottom=70, end=90):
+def set_cell_margins(cell, top=95, start=110, bottom=95, end=110):
     tc_pr = cell._tc.get_or_add_tcPr()
     tc_mar = tc_pr.find(qn("w:tcMar"))
     if tc_mar is None:
@@ -148,8 +151,10 @@ def add_table(doc, headers: List[str], rows: List[List[Any]], header_fill=VALHAL
         set_cell_shading(table.cell(0, i), header_fill)
         set_cell_text(table.cell(0, i), h, bold=True, color="FFFFFF", size=8)
     set_repeat_table_header(table.rows[0])
+    table.rows[0].height = Pt(18)
 
     for r, row in enumerate(rows, start=1):
+        table.rows[r].height = Pt(20 if not compact else 18)
         for c, value in enumerate(row):
             set_cell_text(table.cell(r, c), value, size=7 if compact else 8)
 
@@ -293,25 +298,46 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
     styles["Normal"].font.size = Pt(9)
 
     # PAGE 1
-    title = doc.add_paragraph()
-    title.paragraph_format.space_after = Pt(8)
-    run = title.add_run("VALHALLA TAX SERVICES\nComprehensive Tax Strategy Report")
+    branding = doc.add_table(rows=1, cols=2)
+    branding.alignment = WD_TABLE_ALIGNMENT.CENTER
+    set_table_column_widths(branding, [Inches(2.2), Inches(7.7)])
+
+    logo_cell = branding.cell(0, 0)
+    logo_cell.text = ""
+    logo_paths = ["valhalla_logo.png", "valhalla_logo.jpg", "Valhalla Logo Eagle-Tax Services.jpg"]
+    for logo_path in logo_paths:
+        if os.path.exists(logo_path):
+            logo_cell.paragraphs[0].add_run().add_picture(logo_path, width=Inches(1.85))
+            break
+
+    title_cell = branding.cell(0, 1)
+    title_cell.text = ""
+    title = title_cell.paragraphs[0]
+    title.paragraph_format.space_after = Pt(2)
+    run = title.add_run("VALHALLA TAX SERVICES")
     run.bold = True
-    run.font.size = Pt(20)
+    run.font.size = Pt(24)
     run.font.color.rgb = RGBColor.from_string(VALHALLA_RED)
 
-    meta = doc.add_paragraph()
-    meta.paragraph_format.space_after = Pt(10)
-    meta.add_run(f"Client: {client_name}\n")
-    meta.add_run(f"Tax Year: {tax_year}\n")
+    subtitle = title_cell.add_paragraph("Comprehensive Tax Strategy Report")
+    subtitle.paragraph_format.space_after = Pt(4)
+    subtitle_run = subtitle.runs[0]
+    subtitle_run.bold = True
+    subtitle_run.font.size = Pt(14)
+    subtitle_run.font.color.rgb = RGBColor(60, 60, 60)
+
+    meta = title_cell.add_paragraph()
+    meta.paragraph_format.space_after = Pt(8)
+    meta.add_run(f"Client: {client_name}   ").bold = True
+    meta.add_run(f"Tax Year: {tax_year}   ").bold = True
     meta.add_run("Prepared by: Scott Kunz, ChFC, TPCP, Enrolled Agent")
 
     add_box(
         doc,
         "Advisor Summary",
         (
-            "This plan identifies current tax position, deduction quality, planning opportunities, and the recommended "
-            "implementation path. The analysis is based on the supplied client facts and should be verified against final filed copies."
+            "This engagement translates today’s return data into a forward-looking decision framework. We prioritize sequencing, "
+            "cash-flow control, threshold triggers, and compliance durability so implementation occurs in the right order."
         ),
         LIGHT_RED,
     )
@@ -338,8 +364,8 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
                 f"Total federal tax is {money(total_tax)} with federal withholding of {money(federal_withholding)}."
             ),
             (
-                "The planning focus should be driven by the client’s actual tax position, bracket room, withholding posture, "
-                "business activity, retirement facts, and state cash-flow impact."
+                "The advisor view is to stage decisions by threshold: protect compliance first, then optimize entity and retirement "
+                "structure once profit and liquidity levels justify complexity."
             ),
         ]],
         col_widths=[Inches(4.8), Inches(5.1)],
@@ -349,13 +375,13 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
     if withholding_delta >= 0:
         primary_message = (
             f"The client is not currently showing an underpayment problem. Federal withholding exceeds federal tax by approximately "
-            f"{money(withholding_delta)}. The highest-value planning discussion is bracket management, retirement/Roth coordination, "
-            f"withholding optimization, and Arizona cash-flow review."
+            f"{money(withholding_delta)}. The highest-value next step is proactive bracket management: coordinate retirement "
+            f"contributions, evaluate Roth capacity, and tune withholding for cash-flow efficiency while preserving 'not yet' options."
         )
     else:
         primary_message = (
-            f"The client appears underpaid by approximately {money(abs(withholding_delta))}. The immediate planning target is "
-            f"withholding correction, estimated payment review, and cash-flow control."
+            f"The client appears underpaid by approximately {money(abs(withholding_delta))}. The immediate planning target is payment "
+            f"alignment: correct withholding and estimates now, then sequence structural strategies after cash-flow stabilization."
         )
 
     add_box(doc, "Primary Planning Message", primary_message, LIGHT_GOLD)
@@ -399,10 +425,10 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
             doc,
             ["Business Metric", "Amount", "Advisor Read", "Planning Priority"],
             [
-                ["Gross Revenue", money(schedule_c_gross), "Strong activity level" if schedule_c_gross > 100000 else "Developing activity level", "Build structure around growth"],
-                ["Total Expenses", f"~{money(estimated_expenses)}", "High expense ratio" if profit_margin < 20 else "Moderate expense ratio", "Confirm substantiation and business purpose"],
-                ["Net Profit", money(schedule_c_profit), f"About {profit_margin:.1f}% margin", "Improve profitability without losing tax control"],
-                ["Contract Labor", money(contract_labor), "Material compliance item" if contract_labor > 50000 else "Review if applicable", "Confirm 1099/W-2 classification and documentation"],
+                ["Gross Revenue", money(schedule_c_gross), "Strong activity level" if schedule_c_gross > 100000 else "Developing activity level", "Set future-state structure and reporting cadence"],
+                ["Total Expenses", f"~{money(estimated_expenses)}", "High expense ratio" if profit_margin < 20 else "Moderate expense ratio", "Strengthen substantiation controls before scaling deductions"],
+                ["Net Profit", money(schedule_c_profit), f"About {profit_margin:.1f}% margin", "Use margin trend to trigger entity and retirement decisions"],
+                ["Contract Labor", money(contract_labor), "Material compliance item" if contract_labor > 50000 else "Review if applicable", "Apply worker-classification decision framework before year-end filings"],
             ],
             col_widths=[Inches(1.5), Inches(1.4), Inches(2.6), Inches(4.4)],
             compact=True,
@@ -512,11 +538,11 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
     r = right.paragraphs[0].add_run("Estimated Planning Impact")
     r.bold = True
     impact_notes = [
-        "S-Corp election should be timed to profit level, reasonable compensation, payroll cost, and administrative burden.",
-        "Retirement funding becomes more powerful as taxable income and business profit rise.",
-        "Contractor compliance protects existing deductions and reduces audit exposure.",
+        "S-Corp conversion is a threshold decision: proceed only when recurring profit can support reasonable compensation, payroll friction, and admin cost while still producing net savings.",
+        "Retirement funding should be sequenced after quarterly profit visibility improves; contribution design should follow marginal bracket and liquidity targets, then Roth coordination.",
+        "Contractor compliance is a deduction-protection strategy: documentation and classification discipline preserve deductions already claimed and reduce reclassification risk.",
         "Capital gain planning should use the 0% / 15% / 20% long-term capital gain framework.",
-        "Withholding and estimated payment planning should match client cash-flow goals.",
+        "Withholding and estimated payments should be calibrated to a target outcome (small refund or small balance due) to improve monthly liquidity discipline.",
     ]
     for note in impact_notes:
         p = right.add_paragraph()
@@ -599,16 +625,16 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
         doc,
         "Do This Now - Advisor Directive",
         (
-            "Start with the highest-ranked recommendations. Confirm the underlying tax data, documentation, and client cash-flow goals before implementation. "
-            "The purpose of this report is to convert tax data into an actionable implementation plan, not simply summarize the return."
+            "Execute in sequence, not in parallel: validate data and documentation, stabilize withholding and cash flow, then implement "
+            "threshold-qualified strategies with measurable checkpoints."
         ),
         LIGHT_GOLD,
     )
 
     add_section_title(doc, "FINAL ADVISOR RECOMMENDATION")
     doc.add_paragraph(
-        "The strongest planning value comes from prioritizing the right strategies in the right order. This report identifies the actions most likely to improve "
-        "tax efficiency, reduce compliance risk, improve cash-flow predictability, and support long-term wealth building."
+        "Advisor recommendation: use a staged implementation model with quarterly decision gates. Keep 'not yet' strategies on standby "
+        "until profit, documentation, and liquidity thresholds are met; once triggered, execute quickly to capture current-year efficiency."
     )
 
     p = doc.add_paragraph()
