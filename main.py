@@ -122,6 +122,7 @@ from schedule_c import router as schedule_c_router
 from rental_analysis import router as rental_router
 from year_end_planning import router as year_end_router
 from csv_excel_keyword import router as csv_excel_router
+from valhalla_premium_router import router as valhalla_premium_router
 from multi_year_roth import router as multi_year_roth_router
 
 # Tax logic and PDF generation
@@ -192,6 +193,7 @@ app.include_router(schedule_c_router)
 app.include_router(rental_router)
 app.include_router(year_end_router)
 app.include_router(csv_excel_router)
+app.include_router(valhalla_premium_router)
 
 
 @app.post("/gpt-tax-router")
