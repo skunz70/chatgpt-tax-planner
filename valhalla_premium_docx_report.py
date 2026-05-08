@@ -1,248 +1,573 @@
+import os
+import tempfile
+from typing import Any, Dict, List
+
 from docx import Document
-from docx.shared import Pt, RGBColor
+from docx.shared import Pt, Inches, RGBColor
+from docx.enum.section import WD_ORIENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 
-def _num(value, default=0):
+VALHALLA_RED = "9D1B24"
+LIGHT_RED = "F3E6E8"
+LIGHT_GOLD = "F7EFD6"
+LIGHT_GRAY = "F2F2F2"
+
+
+def _num(value: Any, default: float = 0) -> float:
     try:
         if value is None or value == "":
             return float(default)
         if isinstance(value, str):
-            value = value.replace("$", "").replace(",", "").strip()
+            value = value.replace("$", "").replace(",", "").replace("%", "").strip()
         return float(value)
     except Exception:
         return float(default)
 
 
-def money(value):
+def money(value: Any) -> str:
     return f"${_num(value):,.0f}"
 
 
-def add_red_header(paragraph, text):
-    run = paragraph.add_run(text)
+def pct(value: Any) -> str:
+    return f"{_num(value):.1f}%"
+
+
+def set_cell_shading(cell, fill: str):
+    tc_pr = cell._tc.get_or_add_tcPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:fill"), fill)
+    tc_pr.append(shd)
+
+
+def set_cell_text(cell, text, bold=False, color=None, size=9):
+    cell.text = ""
+    p = cell.paragraphs[0]
+    run = p.add_run(str(text))
+    run.bold = bold
+    run.font.size = Pt(size)
+    if color:
+        run.font.color.rgb = RGBColor.from_string(color)
+    cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+
+
+def set_repeat_table_header(row):
+    tr_pr = row._tr.get_or_add_trPr()
+    tbl_header = OxmlElement("w:tblHeader")
+    tbl_header.set(qn("w:val"), "true")
+    tr_pr.append(tbl_header)
+
+
+def add_header_footer(section):
+    header = section.header
+    p = header.paragraphs[0]
+    p.text = "VALHALLA TAX SERVICES | Comprehensive Tax Strategy Report"
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    for run in p.runs:
+        run.font.size = Pt(8)
+        run.font.color.rgb = RGBColor(90, 90, 90)
+
+    footer = section.footer
+    p = footer.paragraphs[0]
+    p.text = "Prepared by Scott Kunz, ChFC, TPCP, Enrolled Agent and Financial Advisor | Confidential client planning document"
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    for run in p.runs:
+        run.font.size = Pt(8)
+        run.font.color.rgb = RGBColor(120, 120, 120)
+
+
+def add_section_title(doc, title):
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(4)
+    p.paragraph_format.space_after = Pt(3)
+    run = p.add_run(title)
     run.bold = True
     run.font.size = Pt(14)
-    run.font.color.rgb = RGBColor(150, 0, 0)
+    run.font.color.rgb = RGBColor.from_string(VALHALLA_RED)
+
+    border = OxmlElement("w:pBdr")
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "single")
+    bottom.set(qn("w:sz"), "8")
+    bottom.set(qn("w:space"), "1")
+    bottom.set(qn("w:color"), VALHALLA_RED)
+    border.append(bottom)
+    p._p.get_or_add_pPr().append(border)
 
 
-def add_table(doc, headers, rows):
+def add_box(doc, title, body, fill=LIGHT_RED):
+    table = doc.add_table(rows=2, cols=1)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = True
+
+    set_cell_shading(table.cell(0, 0), VALHALLA_RED)
+    set_cell_text(table.cell(0, 0), title, bold=True, color="FFFFFF", size=9)
+
+    set_cell_shading(table.cell(1, 0), fill)
+    set_cell_text(table.cell(1, 0), body, size=8)
+
+    doc.add_paragraph("")
+
+
+def add_table(doc, headers: List[str], rows: List[List[Any]], header_fill=VALHALLA_RED):
     table = doc.add_table(rows=1 + len(rows), cols=len(headers))
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.style = "Table Grid"
 
-    for col, header in enumerate(headers):
-        table.cell(0, col).text = str(header)
+    for i, h in enumerate(headers):
+        set_cell_shading(table.cell(0, i), header_fill)
+        set_cell_text(table.cell(0, i), h, bold=True, color="FFFFFF", size=8)
+    set_repeat_table_header(table.rows[0])
 
     for r, row in enumerate(rows, start=1):
         for c, value in enumerate(row):
-            table.cell(r, c).text = str(value)
+            set_cell_text(table.cell(r, c), value, size=8)
 
+    doc.add_paragraph("")
     return table
 
 
+def add_bullets(doc, items: List[str]):
+    for item in items:
+        p = doc.add_paragraph(style=None)
+        p.paragraph_format.left_indent = Inches(0.15)
+        p.paragraph_format.space_after = Pt(3)
+        run = p.add_run(f"- {item}")
+        run.font.size = Pt(9)
+
+
+def make_bar_chart(labels, values, title, ylabel, filename):
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(5.6, 2.7))
+    bars = ax.bar(labels, values)
+    ax.set_title(title, fontsize=10)
+    ax.set_ylabel(ylabel, fontsize=8)
+    ax.tick_params(axis="x", labelsize=8)
+    ax.tick_params(axis="y", labelsize=8)
+    ax.bar_label(bars, fmt="%.0f", fontsize=7)
+    fig.tight_layout()
+
+    path = os.path.join(tempfile.gettempdir(), filename)
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+    return path
+
+
+def safe_strategy_output(data: Dict) -> Dict:
+    try:
+        from valhalla_strategy_engine import generate_dynamic_tax_strategy
+        result = generate_dynamic_tax_strategy(data)
+        if isinstance(result, dict):
+            return result
+    except Exception:
+        pass
+    return {"priority_actions": [], "dynamic_sections": []}
+
+
+def safe_roi_output(data: Dict) -> Dict:
+    try:
+        from valhalla_roi_engine import generate_roi_analysis
+        result = generate_roi_analysis(data)
+        if isinstance(result, dict):
+            return result
+    except Exception:
+        pass
+    return {"roi_items": []}
+
+
+def normalize_priority_actions(data: Dict, priority_actions: List[Dict]) -> List[Dict]:
+    if priority_actions:
+        return priority_actions[:3]
+
+    schedule_c_profit = _num(data.get("schedule_c_net_profit", 0))
+    contract_labor = _num(data.get("contract_labor", 0))
+    has_retirement = bool(data.get("has_retirement_accounts", False))
+
+    fallback = []
+
+    if contract_labor > 0:
+        fallback.append({
+            "title": "Clean up Schedule C structure and contractor compliance",
+            "estimated_savings": f"Risk reduction plus protects {money(contract_labor)}+ deductions",
+            "timeline": "Now to 90 days",
+            "reason": "This protects the largest deduction category and reduces audit exposure.",
+        })
+
+    if has_retirement or schedule_c_profit > 0:
+        fallback.append({
+            "title": "Review retirement funding and Roth coordination",
+            "estimated_savings": "Bracket-management and long-term tax control",
+            "timeline": "Current year",
+            "reason": "Creates a repeatable tax and wealth-building strategy.",
+        })
+
+    fallback.append({
+        "title": "Run annual withholding and Arizona cash-flow review",
+        "estimated_savings": "Cash-flow and penalty protection",
+        "timeline": "Immediate",
+        "reason": "Confirms whether current withholding aligns with projected federal and state tax.",
+    })
+
+    return fallback[:3]
+
+
 def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_report.docx"):
-    from valhalla_strategy_engine import generate_dynamic_tax_strategy
-    from valhalla_roi_engine import generate_roi_analysis
-
     data = data or {}
-
-    doc = Document()
 
     client_name = data.get("client_name", "Client")
     tax_year = data.get("tax_year", "2025")
-    filing_status = data.get("filing_status", "MFJ")
+    filing_status = data.get("filing_status", "Unknown")
     state = data.get("state", "AZ")
 
     agi = _num(data.get("agi", 0))
     taxable_income = _num(data.get("taxable_income", 0))
     total_tax = _num(data.get("total_tax", 0))
     federal_withholding = _num(data.get("federal_withholding", 0))
+    refund = _num(data.get("refund", 0))
 
     schedule_c_gross = _num(data.get("schedule_c_gross_revenue", 0))
     schedule_c_profit = _num(data.get("schedule_c_net_profit", 0))
     contract_labor = _num(data.get("contract_labor", 0))
+    depreciation = _num(data.get("depreciation", data.get("depreciation_expense", 0)))
+    vehicle_expense = _num(data.get("vehicle_expense", data.get("car_truck_expense", 0)))
     capital_gains = _num(data.get("capital_gains", 0))
     age = _num(data.get("age", 0))
 
-    projected_balance = total_tax - federal_withholding
+    estimated_expenses = max(0, schedule_c_gross - schedule_c_profit)
+    profit_margin = (schedule_c_profit / schedule_c_gross * 100) if schedule_c_gross else 0
+    se_tax_estimate = round(schedule_c_profit * 0.9235 * 0.153, 0) if schedule_c_profit else 0
+    income_tax_estimate = max(0, total_tax - se_tax_estimate)
+    withholding_delta = federal_withholding - total_tax
 
-    strategy_result = generate_dynamic_tax_strategy(data)
-    roi_result = generate_roi_analysis(data)
-
-    priority_actions = strategy_result.get("priority_actions", [])
+    strategy_result = safe_strategy_output(data)
+    roi_result = safe_roi_output(data)
+    priority_actions = normalize_priority_actions(data, strategy_result.get("priority_actions", []))
     dynamic_sections = strategy_result.get("dynamic_sections", [])
     roi_items = roi_result.get("roi_items", [])
 
+    doc = Document()
+    section = doc.sections[0]
+    section.orientation = WD_ORIENT.LANDSCAPE
+    section.page_width = Inches(11)
+    section.page_height = Inches(8.5)
+    section.top_margin = Inches(0.35)
+    section.bottom_margin = Inches(0.35)
+    section.left_margin = Inches(0.45)
+    section.right_margin = Inches(0.45)
+    add_header_footer(section)
+
+    styles = doc.styles
+    styles["Normal"].font.name = "Times New Roman"
+    styles["Normal"].font.size = Pt(9)
+
+    # PAGE 1
     title = doc.add_paragraph()
-    title_run = title.add_run("VALHALLA TAX SERVICES\nComprehensive Tax Strategy Report")
-    title_run.bold = True
-    title_run.font.size = Pt(18)
-    title.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    run = title.add_run("VALHALLA TAX SERVICES\nComprehensive Tax Strategy Report")
+    run.bold = True
+    run.font.size = Pt(20)
+    run.font.color.rgb = RGBColor.from_string(VALHALLA_RED)
 
-    doc.add_paragraph(f"Client: {client_name}")
-    doc.add_paragraph(f"Tax Year: {tax_year}")
-    doc.add_paragraph("Prepared by: Scott Kunz, ChFC, TPCP, Enrolled Agent and Financial Advisor")
-    doc.add_paragraph("")
+    meta = doc.add_paragraph()
+    meta.add_run(f"Client: {client_name}\n")
+    meta.add_run(f"Tax Year: {tax_year}\n")
+    meta.add_run("Prepared by: Scott Kunz, ChFC, TPCP, Enrolled Agent")
 
-    p = doc.add_paragraph()
-    add_red_header(p, "EXECUTIVE SUMMARY")
-
-    doc.add_paragraph(
-        f"This report converts supplied tax facts into an advisor-level planning roadmap for {client_name}. "
-        f"The client is filing {filing_status}, has AGI of {money(agi)}, taxable income of {money(taxable_income)}, "
-        f"and total federal tax of {money(total_tax)}. Recommendations below are generated from the supplied data, "
-        f"including business profit, withholding, capital gains, retirement facts, age, and state."
+    add_box(
+        doc,
+        "Advisor Summary",
+        (
+            "This plan identifies current tax position, deduction quality, planning opportunities, and the recommended "
+            "implementation path. The analysis is based on the supplied client facts and should be verified against final filed copies."
+        ),
+        LIGHT_RED,
     )
 
-    p = doc.add_paragraph()
-    add_red_header(p, "CONFIRMED TAX POSITION")
+    add_section_title(doc, "CONFIRMED TAX POSITION")
+    add_table(
+        doc,
+        ["Filing Status", "AGI", "Taxable Income", "Total Tax", "Federal Withholding", "Refund / Overpayment"],
+        [[filing_status, money(agi), money(taxable_income), money(total_tax), money(federal_withholding), money(refund if refund else max(0, withholding_delta))]],
+    )
+
+    doc.add_paragraph(
+        "Source reviewed: supplied tax return data and planning facts. Amounts should be verified against final filed copies before implementation."
+    )
+
+    add_section_title(doc, "EXECUTIVE SUMMARY")
+    add_table(
+        doc,
+        ["Current Position", "Advisor Conclusion"],
+        [[
+            (
+                f"AGI is {money(agi)} and taxable income is {money(taxable_income)}. "
+                f"Total federal tax is {money(total_tax)} with federal withholding of {money(federal_withholding)}."
+            ),
+            (
+                "The planning focus should be driven by the client’s actual tax position, bracket room, withholding posture, "
+                "business activity, retirement facts, and state cash-flow impact."
+            ),
+        ]],
+    )
+
+    if withholding_delta >= 0:
+        primary_message = (
+            f"The client is not currently showing an underpayment problem. Federal withholding exceeds federal tax by approximately "
+            f"{money(withholding_delta)}. The highest-value planning discussion is bracket management, retirement/Roth coordination, "
+            f"withholding optimization, and Arizona cash-flow review."
+        )
+    else:
+        primary_message = (
+            f"The client appears underpaid by approximately {money(abs(withholding_delta))}. The immediate planning target is "
+            f"withholding correction, estimated payment review, and cash-flow control."
+        )
+
+    add_box(doc, "Primary Planning Message", primary_message, LIGHT_GOLD)
+
+    doc.add_page_break()
+
+    # PAGE 2
+    add_section_title(doc, "CURRENT FEDERAL TAX ANALYSIS")
+
+    chart1 = make_bar_chart(
+        ["Federal\nIncome Tax", "Self-\nEmployment Tax"],
+        [income_tax_estimate, se_tax_estimate],
+        "Current Tax Burden: Income Tax vs SE Tax",
+        "Current tax ($)",
+        "valhalla_tax_burden.png",
+    )
+
+    analysis_table = doc.add_table(rows=1, cols=2)
+    analysis_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    left = analysis_table.cell(0, 0)
+    right = analysis_table.cell(0, 1)
+
+    left.text = ""
+    left.paragraphs[0].add_run("Tax Burden Analysis").bold = True
+    bullets = [
+        f"Federal income tax estimate: {money(income_tax_estimate)} based on supplied total tax and SE tax estimate.",
+        f"Self-employment tax estimate: {money(se_tax_estimate)} if Schedule C profit is present.",
+        f"Federal withholding position: {'overpaid' if withholding_delta >= 0 else 'underpaid'} by approximately {money(abs(withholding_delta))}.",
+        "This result should be reconciled with credits, estimated payments, and final return data before implementation.",
+    ]
+    for b in bullets:
+        p = left.add_paragraph()
+        p.add_run(f"- {b}").font.size = Pt(9)
+
+    right.paragraphs[0].add_run().add_picture(chart1, width=Inches(4.4))
+
+    if schedule_c_gross > 0 or schedule_c_profit > 0:
+        add_section_title(doc, "SCHEDULE C BUSINESS ANALYSIS")
+        add_table(
+            doc,
+            ["Business Metric", "Amount", "Advisor Read", "Planning Priority"],
+            [
+                ["Gross Revenue", money(schedule_c_gross), "Strong activity level" if schedule_c_gross > 100000 else "Developing activity level", "Build structure around growth"],
+                ["Total Expenses", f"~{money(estimated_expenses)}", "High expense ratio" if profit_margin < 20 else "Moderate expense ratio", "Confirm substantiation and business purpose"],
+                ["Net Profit", money(schedule_c_profit), f"About {profit_margin:.1f}% margin", "Improve profitability without losing tax control"],
+                ["Contract Labor", money(contract_labor), "Material compliance item" if contract_labor > 50000 else "Review if applicable", "Confirm 1099/W-2 classification and documentation"],
+            ],
+        )
+
+    doc.add_page_break()
+
+    # PAGE 3
+    if schedule_c_gross > 0 or schedule_c_profit > 0:
+        chart2 = make_bar_chart(
+            ["Gross\nRevenue", "Expenses", "Net\nProfit"],
+            [schedule_c_gross, estimated_expenses, schedule_c_profit],
+            "Schedule C Revenue, Expenses, and Profit",
+            "Dollars",
+            "valhalla_schedule_c.png",
+        )
+
+        two_col = doc.add_table(rows=1, cols=2)
+        two_col.alignment = WD_TABLE_ALIGNMENT.CENTER
+        two_col.cell(0, 0).paragraphs[0].add_run().add_picture(chart2, width=Inches(4.6))
+
+        right = two_col.cell(0, 1)
+        right.text = ""
+        r = right.paragraphs[0].add_run("Major Deduction Categories Reviewed")
+        r.bold = True
+        deduction_items = []
+        if contract_labor:
+            deduction_items.append(f"Contract labor: {money(contract_labor)} - large enough to require worker classification review and 1099 compliance support.")
+        if depreciation:
+            deduction_items.append(f"Depreciation and equipment: {money(depreciation)} - indicates asset investment and possible future Section 179 planning opportunities.")
+        if vehicle_expense:
+            deduction_items.append(f"Vehicle expense: {money(vehicle_expense)} - compare standard mileage vs actual expense planning.")
+        deduction_items.append("Supplies, office, utilities, insurance, and other deductions should be supported by clean records.")
+
+        for item in deduction_items:
+            p = right.add_paragraph()
+            p.add_run(f"- {item}").font.size = Pt(9)
+
+        if contract_labor > 0:
+            add_box(
+                doc,
+                "Schedule C Risk Point",
+                (
+                    "The contract labor amount is the largest compliance item. The planning recommendation is not to eliminate the deduction. "
+                    "The recommendation is to document it properly, confirm independent contractor status, issue required Forms 1099, and evaluate "
+                    "whether any workers should be moved to payroll as the business scales."
+                ),
+                LIGHT_GOLD,
+            )
+
+    add_section_title(doc, "TOP 3 PRIORITY ACTIONS")
+    rows = []
+    for idx, action in enumerate(priority_actions[:3], start=1):
+        rows.append([
+            idx,
+            action.get("title", ""),
+            action.get("estimated_savings", ""),
+            action.get("timeline", ""),
+            action.get("reason", ""),
+        ])
+    add_table(doc, ["Rank", "Recommendation", "Estimated Impact", "Timing", "Why It Matters"], rows)
+
+    add_section_title(doc, "STRATEGY IMPACT BY CATEGORY")
+
+    doc.add_page_break()
+
+    # PAGE 4
+    impact_labels = []
+    impact_values = []
+
+    for item in roi_items[:5]:
+        impact_labels.append(str(item.get("strategy", "Strategy"))[:14])
+        impact_values.append(_num(str(item.get("estimated_value", "0")).replace("$", "").replace(",", "").split("-")[-1], 0))
+
+    if not impact_labels:
+        impact_labels = ["S-Corp\nFuture", "Retirement", "Contractor\nCompliance", "Capital\nGain", "Withholding"]
+        impact_values = [
+            7500 if schedule_c_profit >= 60000 else 0,
+            max(0, schedule_c_profit * 0.20),
+            10000 if contract_labor > 50000 else 0,
+            capital_gains * 0.15,
+            abs(withholding_delta),
+        ]
+
+    chart3 = make_bar_chart(
+        impact_labels,
+        impact_values,
+        "Estimated Strategy Impact by Category",
+        "Estimated tax impact ($)",
+        "valhalla_strategy_impact.png",
+    )
+
+    two_col = doc.add_table(rows=1, cols=2)
+    two_col.alignment = WD_TABLE_ALIGNMENT.CENTER
+    two_col.cell(0, 0).paragraphs[0].add_run().add_picture(chart3, width=Inches(4.7))
+
+    right = two_col.cell(0, 1)
+    right.text = ""
+    r = right.paragraphs[0].add_run("Estimated Planning Impact")
+    r.bold = True
+    impact_notes = [
+        "S-Corp election should be timed to profit level, reasonable compensation, payroll cost, and administrative burden.",
+        "Retirement funding becomes more powerful as taxable income and business profit rise.",
+        "Contractor compliance protects existing deductions and reduces audit exposure.",
+        "Capital gain planning should use the 0% / 15% / 20% long-term capital gain framework.",
+        "Withholding and estimated payment planning should match client cash-flow goals.",
+    ]
+    for note in impact_notes:
+        p = right.add_paragraph()
+        p.add_run(f"- {note}").font.size = Pt(9)
+
+    strategy_rows = []
+    for action in priority_actions:
+        strategy_rows.append([
+            action.get("title", ""),
+            "Applicable based on supplied facts",
+            action.get("reason", ""),
+            action.get("estimated_savings", ""),
+        ])
 
     add_table(
         doc,
-        ["Filing Status", "State", "AGI", "Taxable Income", "Total Tax", "Federal Withholding"],
-        [[filing_status, state, money(agi), money(taxable_income), money(total_tax), money(federal_withholding)]],
+        ["Strategy", "Current-Year Applicability", "Modeled Scenario", "Estimated Tax Impact"],
+        strategy_rows,
+    )
+
+    doc.add_page_break()
+
+    # PAGE 5
+    add_section_title(doc, "DETAILED STRATEGY NOTES")
+
+    if dynamic_sections:
+        for section_data in dynamic_sections:
+            p = doc.add_paragraph()
+            run = p.add_run(section_data.get("section", "Strategy"))
+            run.bold = True
+            run.font.size = Pt(11)
+            doc.add_paragraph(section_data.get("body", ""))
+    else:
+        notes = [
+            ("Retirement Plan Funding", "Retirement planning should be coordinated with taxable income, cash flow, and long-term bracket management."),
+            ("Withholding Optimization", "Withholding should be adjusted only after confirming final payments, credits, refund targets, and Arizona tax impact."),
+            ("Arizona Planning", "Arizona planning should be coordinated with federal taxable income, state withholding, estimated payments, and retirement strategy."),
+        ]
+        for title_text, body in notes:
+            p = doc.add_paragraph()
+            run = p.add_run(title_text)
+            run.bold = True
+            run.font.size = Pt(11)
+            doc.add_paragraph(body)
+
+    doc.add_page_break()
+
+    # PAGE 6
+    add_section_title(doc, "DO THIS NOW CHECKLIST AND IMPLEMENTATION ROADMAP")
+
+    roadmap_rows = [
+        [
+            "Next 30 Days",
+            "Confirm source data, withholding, retirement facts, Schedule C documentation, and Arizona payment position.",
+            "Build the foundation before implementing advanced strategies.",
+        ],
+        [
+            "Next 90 Days",
+            "Model retirement funding, Roth conversion capacity, contractor compliance, capital gain timing, and cash-flow changes.",
+            "Convert recommendations into measurable planning decisions.",
+        ],
+        [
+            "Next 12 Months",
+            "Review progress quarterly, update income projections, and adjust the strategy as income, deductions, and family facts change.",
+            "Turn the report into a recurring advisory process.",
+        ],
+    ]
+
+    add_table(doc, ["Timeline", "Action Items", "Purpose"], roadmap_rows)
+
+    add_box(
+        doc,
+        "Do This Now - Advisor Directive",
+        (
+            "Start with the highest-ranked recommendations. Confirm the underlying tax data, documentation, and client cash-flow goals before implementation. "
+            "The purpose of this report is to convert tax data into an actionable implementation plan, not simply summarize the return."
+        ),
+        LIGHT_GOLD,
+    )
+
+    add_section_title(doc, "FINAL ADVISOR RECOMMENDATION")
+    doc.add_paragraph(
+        "The strongest planning value comes from prioritizing the right strategies in the right order. This report identifies the actions most likely to improve "
+        "tax efficiency, reduce compliance risk, improve cash-flow predictability, and support long-term wealth building."
     )
 
     p = doc.add_paragraph()
-    add_red_header(p, "WITHHOLDING / PAYMENT POSITION")
+    p.add_run("IMPORTANT PLANNING NOTES").bold = True
+    doc.add_paragraph(
+        "The savings estimates in this report are planning illustrations, not guaranteed outcomes. Actual savings depend on final income, filing status, business-use "
+        "percentages, payroll requirements, documentation, state law, entity costs, and implementation timing. Strategies involving children, contractors, retirement plans, "
+        "vehicle deductions, and S-Corp elections should be implemented with proper documentation and professional review."
+    )
 
-    if projected_balance > 0:
-        doc.add_paragraph(
-            f"Based only on supplied federal tax and withholding data, the client is underpaid by approximately "
-            f"{money(projected_balance)}. This should be reviewed immediately for withholding changes, estimated payments, "
-            f"or confirmation of additional payments not included in the supplied data."
-        )
-    else:
-        doc.add_paragraph(
-            f"Based only on supplied federal tax and withholding data, the client appears overpaid by approximately "
-            f"{money(abs(projected_balance))}. Confirm whether other payments, credits, or refund offsets apply."
-        )
-
-    if schedule_c_gross > 0 or schedule_c_profit > 0:
-        p = doc.add_paragraph()
-        add_red_header(p, "SCHEDULE C BUSINESS ANALYSIS")
-
-        expense_estimate = max(0, schedule_c_gross - schedule_c_profit)
-        profit_margin = (schedule_c_profit / schedule_c_gross * 100) if schedule_c_gross else 0
-
-        add_table(
-            doc,
-            ["Gross Revenue", "Estimated Expenses", "Net Profit", "Profit Margin", "Contract Labor"],
-            [[money(schedule_c_gross), money(expense_estimate), money(schedule_c_profit), f"{profit_margin:.1f}%", money(contract_labor)]],
-        )
-
-        doc.add_paragraph(
-            f"The Schedule C activity reports gross revenue of {money(schedule_c_gross)} and net profit of "
-            f"{money(schedule_c_profit)}, producing an estimated profit margin of {profit_margin:.1f}%. "
-            f"Planning should focus on substantiation, contractor classification, retirement plan design, QBI support, "
-            f"estimated tax planning, and entity timing."
-        )
-
-    if capital_gains > 0:
-        p = doc.add_paragraph()
-        add_red_header(p, "CAPITAL GAIN PLANNING")
-
-        doc.add_paragraph(
-            f"The supplied facts include capital gains of {money(capital_gains)}. Future planning should use the "
-            f"0% / 15% / 20% long-term capital gain framework and coordinate gain recognition with ordinary income, "
-            f"loss harvesting, and portfolio rebalancing."
-        )
-
-    p = doc.add_paragraph()
-    add_red_header(p, "TOP PRIORITY ACTIONS")
-
-    if priority_actions:
-        rows = []
-        for item in priority_actions:
-            rows.append([
-                item.get("priority", ""),
-                item.get("title", ""),
-                item.get("estimated_savings", ""),
-                item.get("timeline", ""),
-            ])
-
-        add_table(
-            doc,
-            ["Priority", "Recommendation", "Estimated Impact", "Timing"],
-            rows,
-        )
-
-        for index, item in enumerate(priority_actions, start=1):
-            doc.add_paragraph(
-                f"{index}. {item.get('title', '')}: {item.get('reason', '')}"
-            )
-    else:
-        doc.add_paragraph("No priority strategies were generated from the supplied facts.")
-
-    p = doc.add_paragraph()
-    add_red_header(p, "ROI-RANKED STRATEGY SCORECARD")
-
-    if roi_items:
-        rows = []
-        for item in roi_items:
-            rows.append([
-                item.get("strategy", ""),
-                item.get("estimated_value", ""),
-                item.get("score", ""),
-                item.get("difficulty", ""),
-                item.get("timeline", ""),
-            ])
-
-        add_table(
-            doc,
-            ["Strategy", "Estimated Value", "Score", "Difficulty", "Timeline"],
-            rows,
-        )
-    else:
-        doc.add_paragraph("No ROI items were generated from the supplied facts.")
-
-    if dynamic_sections:
-        p = doc.add_paragraph()
-        add_red_header(p, "CLIENT-SPECIFIC STRATEGY MODULES")
-
-        for section in dynamic_sections:
-            heading = doc.add_paragraph()
-            heading_run = heading.add_run(section.get("section", "Strategy"))
-            heading_run.bold = True
-            heading_run.font.size = Pt(11)
-
-            doc.add_paragraph(section.get("body", ""))
-
-    p = doc.add_paragraph()
-    add_red_header(p, "DO THIS NOW CHECKLIST AND IMPLEMENTATION ROADMAP")
-
-    if priority_actions:
-        for item in priority_actions[:5]:
-            doc.add_paragraph(
-                f"- {item.get('title', '')}: {item.get('timeline', '')}. {item.get('reason', '')}"
-            )
-    else:
-        doc.add_paragraph("- Gather complete client tax facts and rerun the premium planning report.")
-
-    p = doc.add_paragraph()
-    add_red_header(p, "FINAL ADVISOR RECOMMENDATION")
-
-    if priority_actions:
-        top = priority_actions[0]
-        doc.add_paragraph(
-            f"The first action item should be: {top.get('title', '')}. "
-            f"This ranks highest based on the supplied facts and estimated planning impact. "
-            f"Before implementation, confirm supporting documentation, final tax data, state impact, and cash-flow timing."
-        )
-    else:
-        doc.add_paragraph(
-            "The recommended next step is to confirm complete client tax data and rerun the strategy model."
-        )
-
-    doc.add_paragraph("")
-    doc.add_paragraph("PREPARED BY")
-    doc.add_paragraph("Scott Kunz, ChFC, TPCP")
-    doc.add_paragraph("Enrolled Agent and Financial Advisor")
-    doc.add_paragraph("Valhalla Tax Services")
-    doc.add_paragraph("7055 W Bell Rd, Suite B20, Glendale, AZ 85308")
-    doc.add_paragraph("(623) 887-7921")
-    doc.add_paragraph("skunz@valhallataxservice.com")
-    doc.add_paragraph("www.valhallataxservice.com")
+    doc.add_paragraph("Prepared by Scott Kunz, ChFC, TPCP, Enrolled Agent and Financial Advisor | Valhalla Tax Services")
 
     doc.save(output_path)
     return output_path
