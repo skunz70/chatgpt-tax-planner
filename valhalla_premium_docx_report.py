@@ -252,6 +252,142 @@ def normalize_priority_actions(data: Dict, priority_actions: List[Dict]) -> List
     return fallback[:3]
 
 
+def build_ranked_priority_actions(data: Dict, priority_actions: List[Dict], roi_items: List[Dict]) -> List[Dict]:
+    schedule_c_profit = _num(data.get("schedule_c_net_profit", 0))
+    contract_labor = _num(data.get("contract_labor", 0))
+    total_tax = _num(data.get("total_tax", 0))
+    federal_withholding = _num(data.get("federal_withholding", 0))
+    capital_gains = _num(data.get("capital_gains", 0))
+    has_retirement = bool(data.get("has_retirement_accounts", False))
+
+    def _first_text(match_terms: List[str], key: str, fallback: str) -> str:
+        terms = [t.lower() for t in match_terms]
+        for item in priority_actions:
+            hay = " ".join(
+                [
+                    str(item.get("title", "")),
+                    str(item.get("reason", "")),
+                    str(item.get("timeline", "")),
+                    str(item.get("estimated_savings", "")),
+                ]
+            ).lower()
+            if any(term in hay for term in terms):
+                value = str(item.get(key, "")).strip()
+                if value:
+                    return value
+        return fallback
+
+    roi_text = "Applicable based on supplied facts"
+    if roi_items:
+        roi_text = "; ".join([str(r.get("strategy", "")).strip() for r in roi_items[:2] if str(r.get("strategy", "")).strip()]) or roi_text
+
+    candidates = []
+
+    if contract_labor > 0:
+        candidates.append({
+            "score": 130 if contract_labor >= 50000 else 110,
+            "recommendation": _first_text(
+                ["contract labor", "contractor", "schedule c"],
+                "title",
+                "Strengthen contractor and Schedule C documentation controls",
+            ),
+            "estimated_impact": _first_text(
+                ["contract labor", "contractor", "schedule c"],
+                "estimated_savings",
+                f"Protects deductions tied to {money(contract_labor)} of contract labor",
+            ),
+            "timing": _first_text(
+                ["contract labor", "contractor", "schedule c"],
+                "timeline",
+                "Now through year-end",
+            ),
+            "advisor_rationale": _first_text(
+                ["contract labor", "contractor", "schedule c"],
+                "reason",
+                "Material contractor deductions require documentation, classification, and filing discipline.",
+            ),
+        })
+
+    if schedule_c_profit >= 60000:
+        candidates.append({
+            "score": 120,
+            "recommendation": _first_text(["s-corp", "entity"], "title", "Run S-Corp threshold and reasonable-compensation analysis"),
+            "estimated_impact": _first_text(["s-corp", "entity"], "estimated_savings", "Potential SE tax and payroll-structure optimization"),
+            "timing": _first_text(["s-corp", "entity"], "timeline", "Model now; implement for next tax year if justified"),
+            "advisor_rationale": _first_text(["s-corp", "entity"], "reason", "Recurring Schedule C profit at or above $60,000 can justify S-Corp evaluation."),
+        })
+
+    if schedule_c_profit > 0 and has_retirement:
+        candidates.append({
+            "score": 100,
+            "recommendation": _first_text(["retirement", "solo 401", "sep"], "title", "Optimize Solo 401(k) / SEP retirement contribution strategy"),
+            "estimated_impact": _first_text(["retirement", "solo 401", "sep"], "estimated_savings", "Current-year deduction plus long-term bracket management"),
+            "timing": _first_text(["retirement", "solo 401", "sep"], "timeline", "Current year contribution window"),
+            "advisor_rationale": _first_text(["retirement", "solo 401", "sep"], "reason", "Positive business profit and existing retirement accounts support coordinated contribution planning."),
+        })
+
+    if total_tax > federal_withholding:
+        underpaid = total_tax - federal_withholding
+        candidates.append({
+            "score": 115,
+            "recommendation": _first_text(["withholding", "estimated payment"], "title", "Correct withholding and estimated tax payment alignment"),
+            "estimated_impact": _first_text(["withholding", "estimated payment"], "estimated_savings", f"Addresses projected underpayment of about {money(underpaid)}"),
+            "timing": _first_text(["withholding", "estimated payment"], "timeline", "Immediate"),
+            "advisor_rationale": _first_text(["withholding", "estimated payment"], "reason", "When total tax exceeds withholding, payment alignment becomes a top-priority cash-flow action."),
+        })
+
+    if capital_gains > 0:
+        candidates.append({
+            "score": 90,
+            "recommendation": _first_text(["capital gain", "gain"], "title", "Plan capital gain timing and bracket exposure"),
+            "estimated_impact": _first_text(["capital gain", "gain"], "estimated_savings", f"Manages tax impact on {money(capital_gains)} of capital gains"),
+            "timing": _first_text(["capital gain", "gain"], "timeline", "Before year-end realization decisions"),
+            "advisor_rationale": _first_text(["capital gain", "gain"], "reason", "Capital gains planning can improve after-tax outcomes through timing and rate management."),
+        })
+
+    if len(candidates) < 3:
+        fallback = normalize_priority_actions(data, priority_actions)
+        for item in fallback:
+            candidates.append({
+                "score": 50,
+                "recommendation": str(item.get("title", "Priority action")).strip() or "Priority action",
+                "estimated_impact": str(item.get("estimated_savings", roi_text)).strip() or roi_text,
+                "timing": str(item.get("timeline", "Current year")).strip() or "Current year",
+                "advisor_rationale": str(item.get("reason", "Applies based on supplied tax facts.")).strip() or "Applies based on supplied tax facts.",
+            })
+
+    seen = set()
+    unique_ranked = []
+    for item in sorted(candidates, key=lambda x: x["score"], reverse=True):
+        key = item["recommendation"].strip().lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_ranked.append(item)
+        if len(unique_ranked) == 3:
+            break
+
+    while len(unique_ranked) < 3:
+        unique_ranked.append({
+            "score": 10,
+            "recommendation": "Complete annual tax projection and implementation checkpoint",
+            "estimated_impact": roi_text,
+            "timing": "Within 30 days",
+            "advisor_rationale": "Keeps execution sequence on track and confirms facts before lower-priority actions.",
+        })
+
+    return [
+        {
+            "rank": f"Rank {idx}",
+            "recommendation": row["recommendation"],
+            "estimated_impact": row["estimated_impact"],
+            "timing": row["timing"],
+            "advisor_rationale": row["advisor_rationale"],
+        }
+        for idx, row in enumerate(unique_ranked, start=1)
+    ]
+
+
 def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_report.docx"):
     data = data or {}
 
@@ -492,25 +628,27 @@ def generate_valhalla_docx_report(data: dict, output_path="valhalla_premium_repo
             )
 
     add_section_title(doc, "TOP 3 PRIORITY ACTIONS")
-    rows = []
-    for idx, action in enumerate(priority_actions[:3], start=1):
-        rows.append([
-            idx,
-            action.get("title", ""),
-            action.get("estimated_savings", ""),
-            action.get("timeline", ""),
-            action.get("reason", ""),
-        ])
+    ranked_rows = build_ranked_priority_actions(data, priority_actions, roi_items)
+    rows = [
+        [
+            row.get("rank", ""),
+            row.get("recommendation", ""),
+            row.get("estimated_impact", ""),
+            row.get("timing", ""),
+            row.get("advisor_rationale", ""),
+        ]
+        for row in ranked_rows
+    ]
     top_actions_table = add_table(
         doc,
-        ["Priority", "Top 3 Priority Actions", "Estimated Impact", "Timing", "Advisor Rationale"],
+        ["Rank", "Recommendation", "Estimated Impact", "Timing", "Why It Matters"],
         rows,
         col_widths=[Inches(0.95), Inches(3.6), Inches(2.0), Inches(1.35), Inches(1.95)],
         compact=False,
         dominant=True,
     )
     for i, row in enumerate(top_actions_table.rows[1:], start=1):
-        row.cells[0].paragraphs[0].runs[0].text = f"#{i}"
+        row.cells[0].paragraphs[0].runs[0].text = f"Rank {i}"
         set_cell_shading(row.cells[0], "EFE0E2")
         set_cell_shading(row.cells[1], "FAF5F6")
         if i % 2 == 0:
