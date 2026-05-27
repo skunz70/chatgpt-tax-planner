@@ -148,3 +148,169 @@ def generate_smart_strategy_pdf(payload: dict) -> bytes:
     pdf.cell(0, 10, "Valhalla Tax Services | www.valhallataxservice.com | (623) 887-7921", ln=True, align="C")
 
     return pdf.output(dest="S").encode("latin1")
+
+def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
+    pdf = TaxReportPDF(orientation="P", unit="mm", format="Letter")
+    pdf.logo_path = logo_path
+    pdf.title = "Valhalla Tax Services - Client Tax Strategy Report"
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # PAGE 1
+    pdf.add_page()
+
+    executive_dashboard = f"""
+Client: {data.get('client_name', '')}
+Tax Year: {data.get('tax_year', '')}
+Filing Status: {data.get('filing_status', '')}
+
+Tax Efficiency Score: {data.get('tax_efficiency_score', '')}
+Tax Opportunity Index: {data.get('tax_opportunity_index', '')}
+Current Federal Bracket: {data.get('current_federal_bracket', '')}
+Refund or Balance Position: {data.get('refund_or_balance_position', '')}
+
+Top 3 Priority Actions:
+1. {data.get('priority_1', '')}
+2. {data.get('priority_2', '')}
+3. {data.get('priority_3', '')}
+"""
+
+    pdf.add_section("Executive Dashboard", executive_dashboard)
+
+    # PAGE 2
+    pdf.add_page()
+
+    advisor_summary = f"""
+Current Situation:
+{data.get('current_situation', '')}
+
+What We Found:
+{data.get('what_we_found', '')}
+
+Primary Planning Message:
+{data.get('primary_planning_message', '')}
+
+Advisor Conclusion:
+{data.get('advisor_conclusion', '')}
+"""
+
+    pdf.add_section("Advisor Summary", advisor_summary)
+
+    # PAGE 3
+    pdf.add_page()
+
+    executive_summary = f"""
+Confirmed Tax Position:
+{data.get('confirmed_tax_position', '')}
+
+Current Position Analysis:
+{data.get('current_position_analysis', '')}
+
+Advisor Conclusions:
+{data.get('advisor_conclusions', '')}
+
+Key Recommendations:
+{data.get('key_recommendations', '')}
+"""
+
+    pdf.add_section("Executive Summary", executive_summary)
+
+    # PAGE 4
+    pdf.add_page()
+
+    federal_analysis = f"""
+W-2 Income: ${data.get('w2_income', 0):,.0f}
+Schedule C Income/Loss: ${data.get('schedule_c_net_profit', 0):,.0f}
+Adjusted Gross Income: ${data.get('agi', 0):,.0f}
+Taxable Income: ${data.get('taxable_income', 0):,.0f}
+Total Federal Tax: ${data.get('total_tax', 0):,.0f}
+Federal Withholding: ${data.get('federal_withholding', 0):,.0f}
+Refund: ${data.get('refund', 0):,.0f}
+Balance Due: ${data.get('balance_due', 0):,.0f}
+
+Advisor Commentary:
+{data.get('federal_advisor_commentary', '')}
+"""
+
+    pdf.add_section("Federal Tax Analysis", federal_analysis)
+
+    # PAGE 5
+    pdf.add_page()
+
+    business_analysis = f"""
+Gross Receipts: ${data.get('schedule_c_gross_revenue', 0):,.0f}
+Net Profit/Loss: ${data.get('schedule_c_net_profit', 0):,.0f}
+
+Mileage Review:
+{data.get('mileage_review', '')}
+
+Documentation Review:
+{data.get('documentation_review', '')}
+
+Risk Assessment:
+{data.get('risk_assessment', '')}
+"""
+
+    pdf.add_section("Business Analysis", business_analysis)
+
+    # PAGE 6
+    pdf.add_page()
+
+    roth_strategy = f"""
+Roth Opportunity Analysis:
+{data.get('roth_opportunity_analysis', '')}
+
+1-Year Plan:
+{data.get('roth_1_year_plan', '')}
+
+3-Year Plan:
+{data.get('roth_3_year_plan', '')}
+
+5-Year Plan:
+{data.get('roth_5_year_plan', '')}
+"""
+
+    pdf.add_section("Retirement and Roth Strategy", roth_strategy)
+
+    # PAGE 7
+    pdf.add_page()
+
+    action_plan = f"""
+Next 30 Days:
+{data.get('next_30_days', '')}
+
+Next 90 Days:
+{data.get('next_90_days', '')}
+
+Before Year-End:
+{data.get('before_year_end', '')}
+
+Annual Review:
+{data.get('annual_review', '')}
+"""
+
+    pdf.add_section("Action Plan Timeline", action_plan)
+
+    # PAGE 8
+    pdf.add_page()
+
+    final_recommendation = f"""
+Highest Priority Actions:
+{data.get('highest_priority_actions', '')}
+
+Monitor Annually:
+{data.get('monitor_annually', '')}
+
+Long-Term Tax Savings Potential:
+{data.get('long_term_tax_savings_potential', '')}
+
+Recommended Follow-Up Date:
+{data.get('recommended_follow_up_date', '')}
+
+Advisor Signature:
+Valhalla Tax Services LLP
+"""
+
+    pdf.add_section("Final Advisor Recommendation", final_recommendation)
+
+    return pdf.output(dest="S").encode("latin1")
+
