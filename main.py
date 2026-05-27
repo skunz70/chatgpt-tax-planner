@@ -53,7 +53,10 @@ from year_end_planning import year_end_plan
 from withdrawal_optimizer import router as withdrawal_optimizer_router
 from auto_tax_plan import router as auto_tax_plan_router
 from parse_1040 import parse1040
-from report_generator import generate_tax_plan_pdf
+from report_generator import (
+    generate_tax_plan_pdf,
+    generate_valhalla_report_v2_pdf
+)
 
 
 
