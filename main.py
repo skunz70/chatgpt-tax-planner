@@ -126,7 +126,11 @@ from multi_year_roth import router as multi_year_roth_router
 
 # Tax logic and PDF generation
 from arizona_tax import calculate_arizona_tax
-from report_generator import generate_tax_plan_pdf, generate_smart_strategy_pdf
+from report_generator import (
+    generate_tax_plan_pdf,
+    generate_smart_strategy_pdf,
+    generate_valhalla_report_v2_pdf
+)
 
 
 from pydantic import BaseModel
