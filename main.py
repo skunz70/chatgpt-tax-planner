@@ -745,10 +745,15 @@ from report_generator import generate_tax_plan_pdf
 @app.post("/generate_pdf")
 def generate_pdf(payload: dict):
     try:
-       pdf_bytes = generate_valhalla_report_v2_pdf(
-           data=payload
-)
-        return Response(content=pdf_bytes, media_type="application/pdf")
+        pdf_bytes = generate_valhalla_report_v2_pdf(
+            data=payload
+        )
+
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf"
+        )
+
     except Exception as e:
         return {"error": f"PDF generation failed: {str(e)}"}
 
