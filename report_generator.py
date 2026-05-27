@@ -49,34 +49,34 @@ class TaxReportPDF(FPDF):
 
     def add_section(self, title, content):
 
-    # Space before section
-    self.ln(6)
+        # Space before section
+        self.ln(6)
 
-    # Section Header Background
-    self.set_fill_color(30, 30, 30)
+        # Section Header Background
+        self.set_fill_color(30, 30, 30)
 
-    # Section Title
-    self.set_text_color(255, 255, 255)
-    self.set_font("Helvetica", "B", 14)
+        # Section Title
+        self.set_text_color(255, 255, 255)
+        self.set_font("Helvetica", "B", 14)
 
-    self.cell(
+        self.cell(
         0,
         10,
         safe_text(title),
         ln=True,
         fill=True
-    )
+        )
 
-    # Reset text color
-    self.set_text_color(0, 0, 0)
+        # Reset text color
+        self.set_text_color(0, 0, 0)
 
-    # Section Body
-    self.set_font("Helvetica", "", 11)
+        # Section Body
+        self.set_font("Helvetica", "", 11)
 
-    # Light spacing
-    self.ln(3)
+        # Light spacing
+        self.ln(3)
 
-    for line in str(content).split("\n"):
+        for line in str(content).split("\n"):
 
         if line.strip() == "":
             self.ln(2)
@@ -88,8 +88,8 @@ class TaxReportPDF(FPDF):
             safe_text(line)
         )
 
-    # Space after section
-    self.ln(4)
+        # Space after section
+        self.ln(4)
 
     def add_chart_image(self, img_path):
         self.ln(10)
