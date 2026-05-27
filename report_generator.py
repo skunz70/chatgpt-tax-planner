@@ -62,7 +62,7 @@ class TaxReportPDF(FPDF):
 
         for line in str(content).split("\n"):
 
-        self.multi_cell(0, 7, safe_text(line))
+            self.multi_cell(0, 7, safe_text(line))
 
         self.ln(5)
 
