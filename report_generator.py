@@ -192,7 +192,34 @@ def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
 
     # PAGE 1
     pdf.add_page()
+    
+    pdf.add_kpi_card(
+        "AGI",
+        f"${data.get('agi',0):,.0f}",
+        15,
+        45
+    )
 
+    pdf.add_kpi_card(
+        "Federal Tax",
+        f"${data.get('total_tax',0):,.0f}",
+        75,
+        45
+    )
+
+    pdf.add_kpi_card(
+        "Refund",
+        f"${data.get('refund',0):,.0f}",
+        135,
+        45
+    )
+
+    pdf.add_kpi_card(
+        "Tax Score",
+        data.get('tax_efficiency_score', "N/A"),
+        195,
+        45
+    )
     executive_dashboard = f"""
 Client: {data.get('client_name', '')}
 Tax Year: {data.get('tax_year', '')}
