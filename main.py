@@ -1399,8 +1399,7 @@ async def quick_entry_plan(data: dict):
     }
 
     # Step 4 – Generate PDF
-    pdf_bytes = generate_tax_plan_pdf(pdf_payload)
-
+    pdf_bytes = generate_valhalla_report_v2_pdf(pdf_payload)
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
 # === Smart Strategy PDF Report Handler ===
 async def smart_strategy_report(data):
