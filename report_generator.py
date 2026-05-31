@@ -224,7 +224,7 @@ def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
     pdf.set_text_color(255, 0, 0)
     pdf.cell(0, 20, "KPI TEST ACTIVE", ln=True)
 
-    executive_dashboard = f"""
+   
     executive_dashboard = f"""
 Client: {data.get('client_name', '')}
 Tax Year: {data.get('tax_year', '')}
