@@ -71,29 +71,29 @@ class TaxReportPDF(FPDF):
         self.image(img_path, x=30, w=220)
         self.ln(5)
 
-def add_kpi_card(self, title, value, x, y, w=55, h=28):
-
-    # Card background
-    self.set_fill_color(245, 245, 245)
-
-    # Border
-    self.set_draw_color(180, 180, 180)
-
-    self.rect(x, y, w, h, style="DF")
-
-    # KPI Title
-    self.set_xy(x, y + 4)
-    self.set_font("Helvetica", "B", 9)
-    self.set_text_color(80, 80, 80)
-
-    self.cell(w, 5, safe_text(title), align="C")
-
-    # KPI Value
-    self.set_xy(x, y + 12)
-    self.set_font("Helvetica", "B", 16)
-    self.set_text_color(0, 0, 0)
-
-    self.cell(w, 8, safe_text(str(value)), align="C")
+    def add_kpi_card(self, title, value, x, y, w=55, h=28):
+    
+        # Card background
+        self.set_fill_color(245, 245, 245)
+    
+        # Border
+        self.set_draw_color(180, 180, 180)
+    
+        self.rect(x, y, w, h, style="DF")
+    
+        # KPI Title
+        self.set_xy(x, y + 4)
+        self.set_font("Helvetica", "B", 9)
+        self.set_text_color(80, 80, 80)
+    
+        self.cell(w, 5, safe_text(title), align="C")
+    
+        # KPI Value
+        self.set_xy(x, y + 12)
+        self.set_font("Helvetica", "B", 16)
+        self.set_text_color(0, 0, 0)
+    
+        self.cell(w, 8, safe_text(str(value)), align="C")
 
 def generate_bar_chart(title, labels, values, filename):
     plt.figure(figsize=(9, 4.5))
