@@ -744,13 +744,11 @@ from report_generator import generate_tax_plan_pdf
 
 @app.post("/generate_valhalla_premium_docx")
 def generate_valhalla_premium_docx(payload: dict):
-    try:
-        pdf_bytes = generate_valhalla_report_v2_pdf(data=payload)
-
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf"
-        )
+    return {
+        "status": "success",
+        "message": "route reached",
+        "client_name": payload.get("client_name")
+    }
 
     except Exception as e:
         return {"status": "error", "detail": str(e)}
