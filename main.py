@@ -750,8 +750,7 @@ def generate_valhalla_premium_docx(payload: dict):
         "client_name": payload.get("client_name")
     }
 
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
+    
         
 @app.post("/parse_bank_statement", summary="Extract data from a bank statement PDF")
 async def parse_bank_statement(file: UploadFile = File(...)):
