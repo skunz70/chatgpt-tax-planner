@@ -222,7 +222,7 @@ def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
     )
     pdf.set_font("Helvetica", "B", 20)
     pdf.set_text_color(255, 0, 0)
-    pdf.cell(0, 20, "KPI TEST ACTIVE", ln=True)
+    pdf.cell(0, 20, "*** THIS IS REPORT V2 ***", ln=True)
 
    
     executive_dashboard = f"""
