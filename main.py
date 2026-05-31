@@ -742,12 +742,10 @@ class PDFReport(FPDF):
 from fastapi.responses import Response
 from report_generator import generate_tax_plan_pdf
 
-@app.post("/generate_pdf")
-def generate_pdf(payload: dict):
+@app.post("/generate_valhalla_premium_docx")
+def generate_valhalla_premium_docx(payload: dict):
     try:
-        pdf_bytes = generate_valhalla_report_v2_pdf(
-            data=payload
-        )
+        pdf_bytes = generate_valhalla_report_v2_pdf(data=payload)
 
         return Response(
             content=pdf_bytes,
@@ -755,8 +753,8 @@ def generate_pdf(payload: dict):
         )
 
     except Exception as e:
-        return {"error": f"PDF generation failed: {str(e)}"}
-
+        return {"status": "error", "detail": str(e)}
+        
 @app.post("/parse_bank_statement", summary="Extract data from a bank statement PDF")
 async def parse_bank_statement(file: UploadFile = File(...)):
     reader = PdfReader(file.file)
