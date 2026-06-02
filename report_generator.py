@@ -195,10 +195,7 @@ def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
 
     pdf.add_page()
 
-    try:
-        pdf.image("valhalla_gold_logo.png.png", x=55, y=15, w=105)
-    except:
-        pass
+    
 
     pdf.set_y(35)
     pdf.set_y(35)
