@@ -195,7 +195,8 @@ def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
 
     pdf.add_page()
 
-    
+    pdf.set_font("Helvetica", "B", 20)
+    pdf.cell(0, 20, "LOGO POSITION TEST", ln=True, align="C")
 
     pdf.set_y(35)
     pdf.set_y(35)
