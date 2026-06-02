@@ -187,7 +187,7 @@ def generate_smart_strategy_pdf(payload: dict) -> bytes:
 def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
 
     pdf = TaxReportPDF(...)
-    pdf.logo_path = logo_path
+    pdf.logo_path = None
     pdf.title = ...
     pdf.set_auto_page_break(...)
 
