@@ -192,7 +192,10 @@ def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
 
         # COVER PAGE
     pdf.add_page()
-
+    try:
+        pdf.image("valhalla_logo.png", x=55, y=15, w=105)
+    except:
+        pass    
     pdf.set_y(35)
     pdf.set_font("Helvetica", "B", 22)
     pdf.set_text_color(0, 0, 0)
