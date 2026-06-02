@@ -190,7 +190,44 @@ def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
     pdf.title = "Valhalla Tax Services - Client Tax Strategy Report"
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    # PAGE 1
+        # COVER PAGE
+    pdf.add_page()
+
+    pdf.set_y(35)
+    pdf.set_font("Helvetica", "B", 22)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 12, "VALHALLA TAX SERVICES", ln=True, align="C")
+
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 10, "Comprehensive Tax Strategy Plan", ln=True, align="C")
+
+    pdf.ln(18)
+
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 10, f"Client: {safe_text(data.get('client_name', 'Client'))}", ln=True, align="C")
+    pdf.cell(0, 10, f"Tax Year: {safe_text(data.get('tax_year', ''))}", ln=True, align="C")
+
+    pdf.ln(20)
+
+    pdf.set_font("Helvetica", "", 12)
+    pdf.multi_cell(
+        0,
+        8,
+        safe_text(
+            "Prepared by Scott Kunz, ChFC, TPCP, Enrolled Agent and Financial Advisor"
+        ),
+        align="C"
+    )
+
+    pdf.ln(35)
+
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.cell(0, 8, "Confidential Client Planning Document", ln=True, align="C")
+
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 8, "Prepared by Valhalla Tax Services", ln=True, align="C")
+
+    # PAGE 1 - EXECUTIVE DASHBOARD
     pdf.add_page()
     
     pdf.add_kpi_card(
