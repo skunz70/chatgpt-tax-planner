@@ -749,13 +749,19 @@ def generate_valhalla_premium_docx(payload: dict):
             data=payload
         )
 
-return Response(
-    content=pdf_bytes,
-    media_type="application/pdf",
-    headers={
-        "Content-Disposition": 'attachment; filename="Valhalla_Report.pdf"'
-    }
-)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": 'attachment; filename="Valhalla_Report.pdf"'
+            }
+        )
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "detail": str(e)
+        }
 
     
         
