@@ -185,17 +185,22 @@ def generate_smart_strategy_pdf(payload: dict) -> bytes:
     return pdf.output(dest="S").encode("latin1")
 
 def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
-    pdf = TaxReportPDF(orientation="P", unit="mm", format="Letter")
-    pdf.logo_path = logo_path
-    pdf.title = "Valhalla Tax Services - Client Tax Strategy Report"
-    pdf.set_auto_page_break(auto=True, margin=15)
 
-        # COVER PAGE
+    pdf = TaxReportPDF(...)
+    pdf.logo_path = logo_path
+    pdf.title = ...
+    pdf.set_auto_page_break(...)
+
+    # COVER PAGE
+
     pdf.add_page()
-     try:
+
+    try:
         pdf.image("valhalla_gold_logo.png.png", x=55, y=15, w=105)
     except:
         pass
+
+    pdf.set_y(35)
     pdf.set_y(35)
     pdf.set_font("Helvetica", "B", 22)
     pdf.set_text_color(0, 0, 0)
