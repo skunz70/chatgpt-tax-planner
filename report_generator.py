@@ -145,9 +145,9 @@ def generate_smart_strategy_pdf(payload: dict) -> bytes:
     pdf.add_page()
 
     # Logo
-    try:
+    
         pdf.image("valhalla_gold_logo.png.png", x=45, y=15, w=125)
-    except:
+   
         pass  # Fails silently if logo missing
 
     # Title
