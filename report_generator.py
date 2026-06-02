@@ -186,10 +186,10 @@ def generate_smart_strategy_pdf(payload: dict) -> bytes:
 
 def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
 
-    pdf = TaxReportPDF(...)
+    pdf = TaxReportPDF(orientation="P", unit="mm", format="Letter")
     pdf.logo_path = None
-    pdf.title = ...
-    pdf.set_auto_page_break(...)
+    pdf.title = "Valhalla Tax Services - Client Tax Strategy Report"
+    pdf.set_auto_page_break(auto=True, margin=15)
 
     # COVER PAGE
 
