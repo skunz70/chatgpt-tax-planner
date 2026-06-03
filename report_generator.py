@@ -197,8 +197,7 @@ def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
 
     pdf.image("valhalla_gold_logo.png.png", x=70, y=15, w=75)
     pdf.set_font("Helvetica", "B", 20)
-    pdf.cell(0, 20, "AFTER IMAGE", ln=True, align="C")
-
+    
     pdf.set_y(95)
     
     pdf.set_font("Helvetica", "B", 22)
