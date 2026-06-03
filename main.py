@@ -745,8 +745,7 @@ from report_generator import generate_tax_plan_pdf
 @app.post("/generate_valhalla_premium_docx")
 def generate_valhalla_premium_docx(payload: dict):
     try:
-    import tempfile
-    import os
+        
 
     pdf_bytes = generate_valhalla_report_v2_pdf(
         data=payload
