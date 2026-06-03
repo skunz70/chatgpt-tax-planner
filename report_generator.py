@@ -195,12 +195,12 @@ def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
 
     pdf.add_page()
 
-    pdf.image("valhalla_gold_logo.png.png", x=55, y=15, w=105)
+    pdf.image("valhalla_gold_logo.png.png", x=70, y=15, w=75)
     pdf.set_font("Helvetica", "B", 20)
     pdf.cell(0, 20, "AFTER IMAGE", ln=True, align="C")
 
-    pdf.set_y(35)
-    pdf.set_y(35)
+    pdf.set_y(95)
+    
     pdf.set_font("Helvetica", "B", 22)
     pdf.set_text_color(0, 0, 0)
     pdf.cell(0, 12, "VALHALLA TAX SERVICES", ln=True, align="C")
