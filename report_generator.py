@@ -204,9 +204,9 @@ def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
     
     pdf.set_y(95)
 
-    pdf.set_fill_color(35, 35, 35)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 22)
+    pdf.set_text_color(120, 0, 20)
+
+    pdf.set_font("Helvetica", "B", 24)
 
     pdf.cell(
     0,
@@ -214,11 +214,13 @@ def generate_valhalla_report_v2_pdf(data: dict, logo_path=None) -> bytes:
     "VALHALLA TAX SERVICES",
     ln=True,
     align="C",
-    fill=True
+    fill=False
 )
 
     pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 10, "Comprehensive Tax Strategy Plan", ln=True, align="C")
+    pdf.set_text_color(80, 80, 80)
+    pdf.set_font("Helvetica", "", 16)
+    pdf.cell(0, 12, "Comprehensive Tax Strategy Plan", ln=True, align="C")
 
     pdf.ln(18)
 
