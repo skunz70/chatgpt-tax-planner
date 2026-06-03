@@ -50,7 +50,7 @@ paths:
       summary: Generate a premium Valhalla DOCX tax strategy report
       operationId: generateValhallaPremiumDocx
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -143,79 +143,94 @@ components:
   schemas:
     ValhallaPremiumReportInput:
       type: object
-      required:
-        - client_name
-        - tax_year
-        - filing_status
-        - agi
-        - taxable_income
-        - total_tax
       properties:
         client_name:
           type: string
+          default: Test Client
           example: Test Client
         tax_year:
           type: integer
+          default: 2025
           example: 2025
         filing_status:
           type: string
+          default: MFJ
           example: MFJ
         agi:
           type: number
+          default: 185000
           example: 185000
         taxable_income:
           type: number
+          default: 142000
           example: 142000
         total_tax:
           type: number
+          default: 24000
           example: 24000
         refund:
           type: number
+          default: 1200
           example: 1200
         balance_due:
           type: number
+          default: 0
           example: 0
         federal_withholding:
           type: number
+          default: 22800
           example: 22800
         dependents:
           type: integer
+          default: 2
           example: 2
         state:
           type: string
+          default: AZ
           example: AZ
         schedule_c_gross_revenue:
           type: number
+          default: 280000
           example: 280000
         schedule_c_net_profit:
           type: number
+          default: 95000
           example: 95000
         contract_labor:
           type: number
+          default: 107920
           example: 107920
         w2_income:
           type: number
+          default: 90000
           example: 90000
         capital_gains:
           type: number
+          default: 18000
           example: 18000
         dividend_income:
           type: number
+          default: 3500
           example: 3500
         interest_income:
           type: number
+          default: 1200
           example: 1200
         has_retirement_accounts:
           type: boolean
+          default: false
           example: true
         age:
           type: number
+          default: 64
           example: 64
         aca_marketplace:
           type: boolean
+          default: false
           example: false
         logo_path:
           type: string
+          default: valhalla_logo.jpg
           example: valhalla_logo.jpg
 
     ValhallaPremiumDocxResponse:
