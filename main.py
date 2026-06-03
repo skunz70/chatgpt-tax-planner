@@ -741,7 +741,32 @@ class PDFReport(FPDF):
 
 from fastapi.responses import Response
 from report_generator import generate_tax_plan_pdf
+@app.post("/generate_pdf")
+def generate_pdf(payload: dict):
 
+    try:
+        pdf_bytes = generate_tax_plan_pdf(payload)
+
+        temp_dir = tempfile.gettempdir()
+
+        filename = "Tax_Plan_Report.pdf"
+
+        file_path = os.path.join(temp_dir, filename)
+
+        with open(file_path, "wb") as f:
+            f.write(pdf_bytes)
+
+        return FileResponse(
+            file_path,
+            media_type="application/pdf",
+            filename=filename
+        )
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "detail": str(e)
+        }
 @app.post("/generate_valhalla_premium_docx")
 def generate_valhalla_premium_docx(payload: dict):
 
