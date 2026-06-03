@@ -771,10 +771,10 @@ def generate_valhalla_premium_docx(payload: dict):
             "detail": str(e)
         }
 
-except Exception as e:
-    return {
-        "status": "error",
-        "detail": str(e)
+    except Exception as e:
+        return {
+            "status": "error",
+            "detail": str(e)
     }
 
     
