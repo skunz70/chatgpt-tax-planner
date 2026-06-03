@@ -31,10 +31,10 @@ def safe_text(value):
 class TaxReportPDF(FPDF):
     def header(self):
         if self.page_no() == 1:
-        return
+            return
 
         if hasattr(self, 'logo_path') and self.logo_path:
-        self.image(self.logo_path, x=245, y=5, w=45)
+            self.image(self.logo_path, x=245, y=5, w=45)
 
         self.set_font("Helvetica", "B", 14)
         self.cell(0, 10, self.title, ln=True, align="L")
