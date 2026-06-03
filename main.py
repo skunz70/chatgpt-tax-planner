@@ -742,25 +742,25 @@ class PDFReport(FPDF):
 from fastapi.responses import Response
 from report_generator import generate_tax_plan_pdf
 @app.post("/generate_pdf")
-def generate_pdf(payload: dict):
-
+async def generate_pdf(payload: dict):
     try:
-        pdf_bytes = generate_tax_plan_pdf(payload)
+        result = await recommend(payload)
 
-        temp_dir = tempfile.gettempdir()
-
-        filename = "Tax_Plan_Report.pdf"
-
-        file_path = os.path.join(temp_dir, filename)
-
-        with open(file_path, "wb") as f:
-            f.write(pdf_bytes)
-
-        return FileResponse(
-            file_path,
-            media_type="application/pdf",
-            filename=filename
-        )
+        return {
+            "status": "success",
+            "report_stage": "planning_preview",
+            "message": "Tax plan generated successfully. Review or revise this plan before generating the final client-ready report.",
+            "input_summary": {
+                "filing_status": payload.get("filing_status"),
+                "agi": payload.get("agi"),
+                "taxable_income": payload.get("taxable_income"),
+                "total_tax": payload.get("total_tax"),
+                "business_income": payload.get("business_income"),
+                "capital_gains": payload.get("capital_gains")
+            },
+            "planning_result": result,
+            "next_step": "After review, call generateValhallaPremiumDocx to generate the final client-ready PDF report."
+        }
 
     except Exception as e:
         return {
