@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Body
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Body, Response
 from fastapi.responses import JSONResponse, FileResponse
 from pathlib import Path
 import os
@@ -12,6 +12,14 @@ router = APIRouter()
 
 DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 REPORT_DIR = Path("generated_reports")
+
+
+@router.get("/openapi_final_docx.yaml", include_in_schema=False)
+def serve_final_docx_openapi():
+    spec_path = Path(__file__).parent / "openapi_final_docx.yaml"
+    if not spec_path.is_file():
+        return Response("Final DOCX OpenAPI spec not found", media_type="text/plain", status_code=404)
+    return Response(spec_path.read_text(encoding="utf-8"), media_type="application/x-yaml")
 
 
 @router.post("/auto_tax_plan")
