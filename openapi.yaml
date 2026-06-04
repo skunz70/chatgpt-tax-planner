@@ -47,7 +47,8 @@ paths:
 
   /generate_valhalla_premium_docx:
     post:
-      summary: Generate a premium Valhalla DOCX tax strategy report
+      summary: Generate the final approved Valhalla Premium DOCX report
+      description: Call this operation when the user has approved the tax plan and asks for the final Valhalla Premium DOCX report. If no client data is supplied during an action test, call this operation with an empty JSON object {} and the backend will use default test values. The response is always JSON and contains a download_url for the generated DOCX file.
       operationId: generateValhallaPremiumDocx
       requestBody:
         required: false
@@ -143,6 +144,7 @@ components:
   schemas:
     ValhallaPremiumReportInput:
       type: object
+      description: Optional final-report inputs. For action testing, this may be omitted or sent as {}. In the real workflow, pass the client facts and reviewed planning data from generateTaxPlan.
       properties:
         client_name:
           type: string
