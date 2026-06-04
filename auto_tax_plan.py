@@ -124,8 +124,8 @@ def _json_docx_response(
 
 @router.post(
     "/generate_valhalla_premium_docx",
-    operation_id="generateValhallaPremiumDocx",
-    summary="Generate a premium Valhalla DOCX tax strategy report",
+    operation_id="generateFinalReport",
+    summary="Generate the final downloadable client DOCX report",
 )
 def generate_valhalla_premium_docx(
     request: Request,
