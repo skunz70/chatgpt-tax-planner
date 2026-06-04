@@ -47,9 +47,9 @@ paths:
 
   /generate_valhalla_premium_docx:
     post:
-      summary: Final client-ready downloadable Valhalla Premium DOCX report only
-      description: This is the final report action. Call generateValhallaPremiumDocx immediately when the user approves the planning analysis or asks for the final client-ready report, downloadable DOCX report, final Valhalla Premium report, or final report file. Do not call generateTaxPlan or /generate_pdf for final report generation. Do not ask the user for missing Form 1040 line items before calling this action. Send whatever taxpayer facts, planning summary, and recommendations are already available in the conversation. Omit unknown fields. The backend will safely use defaults for missing optional values and still generate a DOCX. If no client data is supplied during an action test, call this operation with an empty JSON object {}. The response is always JSON and contains a download_url for the generated DOCX file.
-      operationId: generateValhallaPremiumDocx
+      summary: Generate the final downloadable client DOCX report
+      description: This is the final report action. Call generateFinalReport immediately when the user approves the planning analysis or asks for the final report, client-ready report, downloadable report, DOCX report, final Valhalla Premium report, or report file. Do not call generateTaxPlan or /generate_pdf for final report generation. Do not ask the user for missing Form 1040 line items before calling this action. Send whatever taxpayer facts, planning summary, and recommendations are already available in the conversation. Omit unknown fields. The backend will safely use defaults for missing optional values and still generate a DOCX. If no client data is supplied during an action test, call this operation with an empty JSON object {}. The response is always JSON and contains a download_url for the generated DOCX file.
+      operationId: generateFinalReport
       requestBody:
         required: false
         content:
@@ -67,7 +67,7 @@ paths:
   /generate_pdf:
     post:
       summary: Planning preview and strategy analysis only, not the final report
-      description: Use generateTaxPlan only for the initial planning preview, strategy analysis, and tax planning workflow. This operation is not the final client-ready report and must not be called after the user approves the plan or asks for the final DOCX/downloadable Valhalla Premium report. For final report generation, call generateValhallaPremiumDocx instead.
+      description: Use generateTaxPlan only for the initial planning preview, strategy analysis, and tax planning workflow. This operation is not the final client-ready report and must not be called after the user approves the plan or asks for the final DOCX/downloadable Valhalla Premium report. For final report generation, call generateFinalReport instead.
       operationId: generateTaxPlan
       requestBody:
         required: true
