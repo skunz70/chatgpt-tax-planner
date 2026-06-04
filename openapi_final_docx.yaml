@@ -1,0 +1,152 @@
+openapi: 3.0.1
+info:
+  title: Valhalla Final DOCX Report API
+  description: Dedicated action schema for generating only the final client-ready Valhalla Premium DOCX report after the planning preview has been reviewed and approved.
+  version: "1.0.0"
+servers:
+  - url: https://chatgpt-tax-planner.onrender.com
+paths:
+  /generate_valhalla_premium_docx:
+    post:
+      summary: Generate final client-ready Valhalla Premium DOCX report
+      description: This is the only action in this schema. Call generateValhallaPremiumDocx when the user approves the planning analysis or asks for the final client-ready report, downloadable DOCX report, final Valhalla Premium report, final report file, or document generation. Do not use this action for the initial tax planning preview. The response is always JSON and contains download_url for the generated DOCX file. If no values are available during an action test, call with an empty JSON object {}.
+      operationId: generateValhallaPremiumDocx
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValhallaPremiumReportInput'
+      responses:
+        '200':
+          description: JSON result containing the generated DOCX filename and download URL.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValhallaPremiumDocxResponse'
+components:
+  schemas:
+    ValhallaPremiumReportInput:
+      type: object
+      description: Optional final-report inputs. In the real workflow, pass the taxpayer facts and reviewed planning data already available in the conversation. For testing, this may be omitted or sent as {}.
+      properties:
+        client_name:
+          type: string
+          default: Test Client
+          example: Test Client
+        tax_year:
+          type: integer
+          default: 2025
+          example: 2025
+        filing_status:
+          type: string
+          default: MFJ
+          example: MFJ
+        agi:
+          type: number
+          default: 185000
+          example: 185000
+        taxable_income:
+          type: number
+          default: 142000
+          example: 142000
+        total_tax:
+          type: number
+          default: 24000
+          example: 24000
+        refund:
+          type: number
+          default: 1200
+          example: 1200
+        balance_due:
+          type: number
+          default: 0
+          example: 0
+        federal_withholding:
+          type: number
+          default: 22800
+          example: 22800
+        dependents:
+          type: integer
+          default: 2
+          example: 2
+        state:
+          type: string
+          default: AZ
+          example: AZ
+        schedule_c_gross_revenue:
+          type: number
+          default: 280000
+          example: 280000
+        schedule_c_net_profit:
+          type: number
+          default: 95000
+          example: 95000
+        contract_labor:
+          type: number
+          default: 107920
+          example: 107920
+        w2_income:
+          type: number
+          default: 90000
+          example: 90000
+        capital_gains:
+          type: number
+          default: 18000
+          example: 18000
+        dividend_income:
+          type: number
+          default: 3500
+          example: 3500
+        interest_income:
+          type: number
+          default: 1200
+          example: 1200
+        has_retirement_accounts:
+          type: boolean
+          default: false
+          example: true
+        age:
+          type: number
+          default: 64
+          example: 64
+        aca_marketplace:
+          type: boolean
+          default: false
+          example: false
+        logo_path:
+          type: string
+          default: valhalla_logo.jpg
+          example: valhalla_logo.jpg
+    ValhallaPremiumDocxResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - message
+        - filename
+        - content_type
+        - download_url
+        - download_path
+      properties:
+        status:
+          type: string
+          enum:
+            - success
+            - error
+          example: success
+        message:
+          type: string
+          example: Valhalla Premium DOCX report generated successfully.
+        filename:
+          type: string
+          example: valhalla_premium_Test_Client_2025.docx
+        content_type:
+          type: string
+          example: application/vnd.openxmlformats-officedocument.wordprocessingml.document
+        download_url:
+          type: string
+          example: https://chatgpt-tax-planner.onrender.com/generated_reports/valhalla_premium_Test_Client_2025.docx
+        download_path:
+          type: string
+          example: /generated_reports/valhalla_premium_Test_Client_2025.docx
