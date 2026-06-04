@@ -45,32 +45,59 @@ async def auto_tax_plan(file: UploadFile = File(...)):
     return JSONResponse(content=strat)
 
 
+def _first_present(data: dict, *keys, default=None):
+    for key in keys:
+        value = data.get(key)
+        if value is not None and value != "":
+            return value
+    return default
+
+
 def _normalize_valhalla_payload(payload: dict) -> dict:
     data = payload or {}
-    return {
+    normalized = {
         "client_name": data.get("client_name", "Test Client"),
         "tax_year": data.get("tax_year", 2025),
         "filing_status": data.get("filing_status", "MFJ"),
         "agi": data.get("agi", 185000),
         "taxable_income": data.get("taxable_income", 142000),
         "total_tax": data.get("total_tax", 24000),
-        "refund": data.get("refund", 1200),
-        "balance_due": data.get("balance_due", 0),
-        "federal_withholding": data.get("federal_withholding", 22800),
+        "refund": _first_present(data, "refund", "refund_amount", default=1200),
+        "balance_due": _first_present(data, "balance_due", "amount_owed", default=0),
+        "federal_withholding": _first_present(data, "federal_withholding", "withholding", "total_withholding", default=22800),
         "dependents": data.get("dependents", 2),
         "state": data.get("state", "AZ"),
-        "schedule_c_gross_revenue": data.get("schedule_c_gross_revenue", 280000),
-        "schedule_c_net_profit": data.get("schedule_c_net_profit", 95000),
+        "schedule_c_gross_revenue": _first_present(data, "schedule_c_gross_revenue", "business_gross_revenue", default=280000),
+        "schedule_c_net_profit": _first_present(data, "schedule_c_net_profit", "business_income", "business_net_profit", default=95000),
         "contract_labor": data.get("contract_labor", 107920),
-        "w2_income": data.get("w2_income", 90000),
-        "capital_gains": data.get("capital_gains", 18000),
-        "dividend_income": data.get("dividend_income", 3500),
-        "interest_income": data.get("interest_income", 1200),
+        "w2_income": _first_present(data, "w2_income", "wages", default=90000),
+        "capital_gains": _first_present(data, "capital_gains", "capital_gain", default=18000),
+        "dividend_income": _first_present(data, "dividend_income", "dividends", default=3500),
+        "interest_income": _first_present(data, "interest_income", "interest", default=1200),
         "has_retirement_accounts": data.get("has_retirement_accounts", False),
         "age": data.get("age", 64),
         "aca_marketplace": data.get("aca_marketplace", False),
         "logo_path": data.get("logo_path", "valhalla_logo.jpg"),
     }
+
+    # Preserve optional plan narrative fields when the GPT has already produced
+    # a reviewed strategy in chat. Missing values never block DOCX generation.
+    passthrough_keys = (
+        "advisor_summary",
+        "top_planning_focus",
+        "planning_summary",
+        "final_recommendation",
+        "tax_efficiency_score",
+        "priority_actions",
+        "strategies",
+        "dynamic_sections",
+        "roi_strategies",
+    )
+    for key in passthrough_keys:
+        if key in data and data[key] not in (None, ""):
+            normalized[key] = data[key]
+
+    return normalized
 
 
 def _json_docx_response(
