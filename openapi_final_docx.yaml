@@ -1,7 +1,7 @@
-openapi: 3.0.1
+openapi: 3.1.0
 info:
   title: Valhalla Final DOCX Report API
-  description: Dedicated action schema for generating only the final client-ready Valhalla Premium DOCX report after the planning preview has been reviewed and approved.
+  description: Dedicated schema for generating the final client-ready Valhalla Premium DOCX report.
   version: "1.0.0"
 servers:
   - url: https://chatgpt-tax-planner.onrender.com
@@ -9,7 +9,7 @@ paths:
   /generate_valhalla_premium_docx:
     post:
       summary: Generate the final downloadable client DOCX report
-      description: This is the final report action. Call generateFinalReport immediately when the user approves the planning analysis or asks for the final report, client-ready report, downloadable report, DOCX report, final Valhalla Premium report, or report file. Do not use this action for the initial tax planning preview. Do not ask the user for missing Form 1040 line items before calling this action. Send whatever taxpayer facts, planning summary, and recommendations are already available in the conversation. Omit unknown fields. The backend will safely use defaults for missing optional values and still generate a DOCX. If no values are available during an action test, call with an empty JSON object {}. The response is always JSON and contains download_url for the generated DOCX file.
+      description: Final DOCX action. Call after plan approval or report request. Use available taxpayer and plan data, omit unknown fields, and return the download_url.
       operationId: generateFinalReport
       requestBody:
         required: false
@@ -19,7 +19,7 @@ paths:
               $ref: '#/components/schemas/ValhallaPremiumReportInput'
       responses:
         '200':
-          description: JSON result containing the generated DOCX filename and download URL.
+          description: JSON result with generated DOCX filename and download URL.
           content:
             application/json:
               schema:
@@ -28,7 +28,7 @@ components:
   schemas:
     ValhallaPremiumReportInput:
       type: object
-      description: Optional final-report inputs. This schema has no required fields. For final report generation, do not wait for every Form 1040 line item. Pass the taxpayer facts, planning summary, and recommendations already available in the reviewed plan. Omit unknown fields; the backend fills missing optional values and generates the DOCX anyway.
+      description: Optional inputs. Pass available taxpayer facts and reviewed plan data. Omit unknown fields.
       properties:
         client_name:
           type: string
@@ -116,39 +116,39 @@ components:
           example: false
         advisor_summary:
           type: string
-          description: Optional summary from the reviewed plan to include in the DOCX.
+          description: Optional plan summary.
         top_planning_focus:
           type: string
-          description: Optional primary planning focus from the reviewed plan.
+          description: Optional primary planning focus.
         planning_summary:
           type: string
-          description: Optional plain-text planning summary from generateTaxPlan or chat review.
+          description: Optional planning summary.
         final_recommendation:
           type: string
-          description: Optional final advisor recommendation from the reviewed plan.
+          description: Optional final recommendation.
         tax_efficiency_score:
           type: number
-          description: Optional tax efficiency score from the reviewed plan.
+          description: Optional tax efficiency score.
         priority_actions:
           type: array
-          description: Optional ranked action items from the reviewed plan.
+          description: Optional ranked actions.
           items:
             type: object
             additionalProperties: true
         strategies:
           type: array
-          description: Optional strategy names or recommendations from the reviewed plan.
+          description: Optional strategy names.
           items:
             type: string
         dynamic_sections:
           type: array
-          description: Optional report sections from the reviewed plan.
+          description: Optional report sections.
           items:
             type: object
             additionalProperties: true
         roi_strategies:
           type: array
-          description: Optional ROI-ranked strategies from the reviewed plan.
+          description: Optional ROI strategies.
           items:
             type: object
             additionalProperties: true
