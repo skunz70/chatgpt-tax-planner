@@ -47,8 +47,8 @@ paths:
 
   /generate_valhalla_premium_docx:
     post:
-      summary: Generate the final approved Valhalla Premium DOCX report
-      description: Call this operation when the user has approved the tax plan and asks for the final Valhalla Premium DOCX report. If no client data is supplied during an action test, call this operation with an empty JSON object {} and the backend will use default test values. The response is always JSON and contains a download_url for the generated DOCX file.
+      summary: Final client-ready downloadable Valhalla Premium DOCX report only
+      description: This is the final report action. Call generateValhallaPremiumDocx when the user approves the planning analysis or asks for the final client-ready report, downloadable DOCX report, final Valhalla Premium report, or final report file. Do not call generateTaxPlan or /generate_pdf for final report generation. If no client data is supplied during an action test, call this operation with an empty JSON object {} and the backend will use default test values. The response is always JSON and contains a download_url for the generated DOCX file.
       operationId: generateValhallaPremiumDocx
       requestBody:
         required: false
@@ -66,7 +66,8 @@ paths:
 
   /generate_pdf:
     post:
-      summary: Generate a customized tax plan report
+      summary: Planning preview and strategy analysis only, not the final report
+      description: Use generateTaxPlan only for the initial planning preview, strategy analysis, and tax planning workflow. This operation is not the final client-ready report and must not be called after the user approves the plan or asks for the final DOCX/downloadable Valhalla Premium report. For final report generation, call generateValhallaPremiumDocx instead.
       operationId: generateTaxPlan
       requestBody:
         required: true
@@ -89,7 +90,7 @@ paths:
                     type: string
       responses:
         '200':
-          description: A PDF report of tax strategies
+          description: Planning preview or strategy response. Not a final client-ready DOCX report.
           content:
             application/pdf:
               schema:
