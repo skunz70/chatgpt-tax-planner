@@ -7,6 +7,7 @@ import inspect
 from fastapi import FastAPI, Response, UploadFile, File, Depends, HTTPException, Request, Body
 from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -44,6 +45,11 @@ def serve_openapi_spec():
     if not spec_path.is_file():
         return Response("OpenAPI spec not found", media_type="text/plain", status_code=404)
     return Response(spec_path.read_text(encoding="utf-8"), media_type="application/x-yaml")
+
+
+GENERATED_REPORTS_DIR = pathlib.Path(__file__).parent.joinpath("generated_reports")
+GENERATED_REPORTS_DIR.mkdir(exist_ok=True)
+app.mount("/generated_reports", StaticFiles(directory=str(GENERATED_REPORTS_DIR)), name="generated_reports")
 
 
 
@@ -768,39 +774,42 @@ async def generate_pdf(payload: dict):
             "detail": str(e)
         }
 @app.post("/generate_valhalla_premium_docx")
-def generate_valhalla_premium_docx(payload: dict):
+def generate_valhalla_premium_docx(request: Request, payload: dict | None = Body(default=None)):
 
     try:
-        pdf_bytes = generate_valhalla_report_v2_pdf(
-            data=payload
-        )
+        from valhalla_premium_docx_report import generate_valhalla_docx_report
 
-        temp_dir = tempfile.gettempdir()
+        data = payload or {}
+        client_name = str(data.get("client_name") or "Test Client")
+        tax_year = str(data.get("tax_year") or "2025")
+        safe_client_name = re.sub(r"[^A-Za-z0-9_-]+", "_", client_name).strip("_") or "Client"
+        safe_tax_year = re.sub(r"[^0-9A-Za-z_-]+", "_", tax_year).strip("_") or "2025"
+        filename = f"valhalla_premium_{safe_client_name}_{safe_tax_year}.docx"
+        file_path = GENERATED_REPORTS_DIR.joinpath(filename)
 
-        filename = "Valhalla_Report.pdf"
+        generate_valhalla_docx_report(data, output_path=str(file_path))
 
-        file_path = os.path.join(temp_dir, filename)
+        download_path = f"/generated_reports/{filename}"
+        download_url = str(request.base_url).rstrip("/") + download_path
 
-        with open(file_path, "wb") as f:
-            f.write(pdf_bytes)
-
-        return FileResponse(
-            file_path,
-            media_type="application/pdf",
-            filename=filename
-        )
-
-    except Exception as e:
         return {
-            "status": "error",
-            "detail": str(e)
+            "status": "success",
+            "message": "Valhalla Premium DOCX report generated successfully.",
+            "filename": filename,
+            "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "download_url": download_url,
+            "download_path": download_path
         }
 
     except Exception as e:
         return {
             "status": "error",
-            "detail": str(e)
-    }
+            "message": f"Valhalla Premium DOCX report generation failed: {str(e)}",
+            "filename": "",
+            "content_type": "",
+            "download_url": "",
+            "download_path": ""
+        }
 
     
         

@@ -294,6 +294,8 @@ def _add_roi_scorecard(doc, roi_strategies):
 
 def _create_chart(path, title, labels, values):
     try:
+        import matplotlib
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         plt.figure(figsize=(6.4, 2.15))
         plt.bar(labels, values)
