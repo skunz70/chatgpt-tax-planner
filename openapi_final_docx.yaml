@@ -8,9 +8,9 @@ servers:
 paths:
   /generate_valhalla_premium_docx:
     post:
-      summary: Generate final client-ready Valhalla Premium DOCX report
-      description: This is the final report action. Call generateValhallaPremiumDocx immediately when the user approves the planning analysis or asks for the final client-ready report, downloadable DOCX report, final Valhalla Premium report, final report file, or document generation. Do not use this action for the initial tax planning preview. Do not ask the user for missing Form 1040 line items before calling this action. Send whatever taxpayer facts, planning summary, and recommendations are already available in the conversation. Omit unknown fields. The backend will safely use defaults for missing optional values and still generate a DOCX. If no values are available during an action test, call with an empty JSON object {}. The response is always JSON and contains download_url for the generated DOCX file.
-      operationId: generateValhallaPremiumDocx
+      summary: Generate the final downloadable client DOCX report
+      description: This is the final report action. Call generateFinalReport immediately when the user approves the planning analysis or asks for the final report, client-ready report, downloadable report, DOCX report, final Valhalla Premium report, or report file. Do not use this action for the initial tax planning preview. Do not ask the user for missing Form 1040 line items before calling this action. Send whatever taxpayer facts, planning summary, and recommendations are already available in the conversation. Omit unknown fields. The backend will safely use defaults for missing optional values and still generate a DOCX. If no values are available during an action test, call with an empty JSON object {}. The response is always JSON and contains download_url for the generated DOCX file.
+      operationId: generateFinalReport
       requestBody:
         required: false
         content:
