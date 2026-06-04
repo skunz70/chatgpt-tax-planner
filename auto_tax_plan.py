@@ -122,8 +122,9 @@ def _json_docx_response(
     )
 
 
+@router.post("/generate_valhalla_premium_docx", include_in_schema=False)
 @router.post(
-    "/generate_valhalla_premium_docx",
+    "/generate_final_report",
     operation_id="generateFinalReport",
     summary="Generate the final downloadable client DOCX report",
 )
