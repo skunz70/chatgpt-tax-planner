@@ -5,6 +5,7 @@ from docx.enum.section import WD_ORIENT
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+import base64
 import os
 import tempfile
 
@@ -29,6 +30,7 @@ LIGHT_RED = "F8ECEE"
 LIGHT_GOLD = "FFF8E6"
 SOFT_BLUE = "EDF3F8"
 WHITE = "FFFFFF"
+LOGO_ASSET = os.path.join(os.path.dirname(__file__), "assets", "valhalla_gold_logo_report.b64")
 
 
 def _money(value):
@@ -61,7 +63,7 @@ def _safe(value, fallback="Not provided"):
     return str(value)
 
 
-def _limit(text, length=380):
+def _limit(text, length=420):
     text = _safe(text, "")
     if len(text) <= length:
         return text
@@ -138,8 +140,10 @@ def _paragraph(paragraph, size=9.4, color=INK, bold=False, italic=False, before=
         run.font.name = "Aptos"
         run.font.size = Pt(size)
         run.font.color.rgb = RGBColor.from_string(color)
-        run.bold = bold
-        run.italic = italic
+        if bold:
+            run.bold = True
+        if italic:
+            run.italic = True
 
 
 def _set_widths(table, widths):
@@ -164,6 +168,35 @@ def _page_number(paragraph):
     run._r.append(end)
 
 
+def _logo_temp_path():
+    if not os.path.exists(LOGO_ASSET):
+        return None
+    try:
+        with open(LOGO_ASSET, "r", encoding="utf-8") as logo_file:
+            encoded = logo_file.read().strip()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+            tmp.write(base64.b64decode(encoded))
+            return tmp.name
+    except Exception:
+        return None
+
+
+def _add_logo(paragraph, width=3.4):
+    logo_path = _logo_temp_path()
+    if not logo_path:
+        return False
+    try:
+        paragraph.add_run().add_picture(logo_path, width=Inches(width))
+        return True
+    except Exception:
+        return False
+    finally:
+        try:
+            os.remove(logo_path)
+        except Exception:
+            pass
+
+
 def _configure(doc, data):
     section = doc.sections[0]
     section.orientation = WD_ORIENT.PORTRAIT
@@ -181,7 +214,7 @@ def _configure(doc, data):
 
     footer = section.footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer.add_run("Valhalla Tax Services | Confidential planning document | Page ")
+    footer.add_run("Valhalla Tax & Finance LLC | Confidential planning document | Page ")
     _page_number(footer)
     _paragraph(footer, size=7.3, color=TEXT_GRAY, after=0)
 
@@ -238,7 +271,7 @@ def _callout(doc, title, body, fill=LIGHT_RED, accent=BRAND_RED):
     p = body_cell.paragraphs[0]
     p.add_run(title)
     _paragraph(p, size=9.6, color=accent, bold=True, after=2)
-    p2 = body_cell.add_paragraph(_limit(body, 520))
+    p2 = body_cell.add_paragraph(_limit(body, 560))
     _paragraph(p2, size=8.9, color=INK, after=0)
     doc.add_paragraph().paragraph_format.space_after = Pt(2)
 
@@ -383,18 +416,23 @@ def _normalize_actions(data, strategy_output, roi_output):
 
 
 def _cover(doc, data, actions):
+    logo = doc.add_paragraph()
+    logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if not _add_logo(logo, width=3.55):
+        logo.add_run("VALHALLA TAX & FINANCE LLC")
+        _paragraph(logo, size=15, color=BRAND_RED, bold=True, after=3)
+    logo.paragraph_format.space_after = Pt(12)
+
     band = doc.add_table(rows=1, cols=1)
     band.alignment = WD_TABLE_ALIGNMENT.CENTER
     _set_widths(band, [7.25])
     cell = band.cell(0, 0)
     _format_cell(cell, fill=BRAND_DARK, color=WHITE, border=BRAND_DARK)
     p = cell.paragraphs[0]
-    p.add_run("VALHALLA TAX SERVICES")
-    _paragraph(p, size=10.5, color=WHITE, bold=True, after=1)
-    p2 = cell.add_paragraph("Premium tax planning report | Client advisory deliverable")
-    _paragraph(p2, size=8.4, color="D7DEE6", after=0)
+    p.add_run("Premium tax planning report | Client advisory deliverable")
+    _paragraph(p, size=9.2, color="D7DEE6", bold=True, after=0, align=WD_ALIGN_PARAGRAPH.CENTER)
 
-    doc.add_paragraph().paragraph_format.space_after = Pt(14)
+    doc.add_paragraph().paragraph_format.space_after = Pt(12)
     title = doc.add_paragraph()
     title.add_run("Tax Strategy\nImplementation Report")
     _paragraph(title, size=27, color=BRAND_RED, bold=True, after=5)
@@ -660,7 +698,7 @@ def _final_pages(doc, data):
     _set_widths(table, [3.35, 3.9])
     left = table.cell(0, 0)
     right = table.cell(0, 1)
-    left.text = "Scott Kunz, ChFC, TPCP\nEnrolled Agent and Financial Advisor\nValhalla Tax Services"
+    left.text = "Scott Kunz, ChFC, TPCP\nEnrolled Agent and Financial Advisor\nValhalla Tax & Finance LLC"
     right.text = "7055 W Bell Rd, Suite B20, Glendale, AZ 85308\n(623) 887-7921\nskunz@valhallataxservice.com\nwww.valhallataxservice.com"
     _format_cell(left, fill=LIGHT_RED, bold=True, size=8.7)
     _format_cell(right, fill=WHITE, size=8.5)
