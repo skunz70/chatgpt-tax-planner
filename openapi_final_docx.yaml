@@ -9,7 +9,7 @@ paths:
   /generate_valhalla_premium_docx:
     post:
       summary: Generate final client-ready Valhalla Premium DOCX report
-      description: This is the only action in this schema. Call generateValhallaPremiumDocx when the user approves the planning analysis or asks for the final client-ready report, downloadable DOCX report, final Valhalla Premium report, final report file, or document generation. Do not use this action for the initial tax planning preview. The response is always JSON and contains download_url for the generated DOCX file. If no values are available during an action test, call with an empty JSON object {}.
+      description: This is the final report action. Call generateValhallaPremiumDocx immediately when the user approves the planning analysis or asks for the final client-ready report, downloadable DOCX report, final Valhalla Premium report, final report file, or document generation. Do not use this action for the initial tax planning preview. Do not ask the user for missing Form 1040 line items before calling this action. Send whatever taxpayer facts, planning summary, and recommendations are already available in the conversation. Omit unknown fields. The backend will safely use defaults for missing optional values and still generate a DOCX. If no values are available during an action test, call with an empty JSON object {}. The response is always JSON and contains download_url for the generated DOCX file.
       operationId: generateValhallaPremiumDocx
       requestBody:
         required: false
@@ -28,12 +28,12 @@ components:
   schemas:
     ValhallaPremiumReportInput:
       type: object
-      description: Optional final-report inputs. In the real workflow, pass the taxpayer facts and reviewed planning data already available in the conversation. For testing, this may be omitted or sent as {}.
+      description: Optional final-report inputs. This schema has no required fields. For final report generation, do not wait for every Form 1040 line item. Pass the taxpayer facts, planning summary, and recommendations already available in the reviewed plan. Omit unknown fields; the backend fills missing optional values and generates the DOCX anyway.
       properties:
         client_name:
           type: string
           default: Test Client
-          example: Test Client
+          example: Carlos Santiago Lopez
         tax_year:
           type: integer
           default: 2025
@@ -41,23 +41,23 @@ components:
         filing_status:
           type: string
           default: MFJ
-          example: MFJ
+          example: Single
         agi:
           type: number
           default: 185000
-          example: 185000
+          example: 76530
         taxable_income:
           type: number
           default: 142000
-          example: 142000
+          example: 61000
         total_tax:
           type: number
           default: 24000
-          example: 24000
+          example: 8200
         refund:
           type: number
           default: 1200
-          example: 1200
+          example: 0
         balance_due:
           type: number
           default: 0
@@ -65,11 +65,11 @@ components:
         federal_withholding:
           type: number
           default: 22800
-          example: 22800
+          example: 0
         dependents:
           type: integer
           default: 2
-          example: 2
+          example: 1
         state:
           type: string
           default: AZ
@@ -77,31 +77,31 @@ components:
         schedule_c_gross_revenue:
           type: number
           default: 280000
-          example: 280000
+          example: 0
         schedule_c_net_profit:
           type: number
           default: 95000
-          example: 95000
+          example: 0
         contract_labor:
           type: number
           default: 107920
-          example: 107920
+          example: 0
         w2_income:
           type: number
           default: 90000
-          example: 90000
+          example: 0
         capital_gains:
           type: number
           default: 18000
-          example: 18000
+          example: 0
         dividend_income:
           type: number
           default: 3500
-          example: 3500
+          example: 0
         interest_income:
           type: number
           default: 1200
-          example: 1200
+          example: 0
         has_retirement_accounts:
           type: boolean
           default: false
@@ -114,6 +114,44 @@ components:
           type: boolean
           default: false
           example: false
+        advisor_summary:
+          type: string
+          description: Optional summary from the reviewed plan to include in the DOCX.
+        top_planning_focus:
+          type: string
+          description: Optional primary planning focus from the reviewed plan.
+        planning_summary:
+          type: string
+          description: Optional plain-text planning summary from generateTaxPlan or chat review.
+        final_recommendation:
+          type: string
+          description: Optional final advisor recommendation from the reviewed plan.
+        tax_efficiency_score:
+          type: number
+          description: Optional tax efficiency score from the reviewed plan.
+        priority_actions:
+          type: array
+          description: Optional ranked action items from the reviewed plan.
+          items:
+            type: object
+            additionalProperties: true
+        strategies:
+          type: array
+          description: Optional strategy names or recommendations from the reviewed plan.
+          items:
+            type: string
+        dynamic_sections:
+          type: array
+          description: Optional report sections from the reviewed plan.
+          items:
+            type: object
+            additionalProperties: true
+        roi_strategies:
+          type: array
+          description: Optional ROI-ranked strategies from the reviewed plan.
+          items:
+            type: object
+            additionalProperties: true
         logo_path:
           type: string
           default: valhalla_logo.jpg
@@ -140,13 +178,13 @@ components:
           example: Valhalla Premium DOCX report generated successfully.
         filename:
           type: string
-          example: valhalla_premium_Test_Client_2025.docx
+          example: valhalla_premium_Carlos_Santiago_Lopez_2025.docx
         content_type:
           type: string
           example: application/vnd.openxmlformats-officedocument.wordprocessingml.document
         download_url:
           type: string
-          example: https://chatgpt-tax-planner.onrender.com/generated_reports/valhalla_premium_Test_Client_2025.docx
+          example: https://chatgpt-tax-planner.onrender.com/generated_reports/valhalla_premium_Carlos_Santiago_Lopez_2025.docx
         download_path:
           type: string
-          example: /generated_reports/valhalla_premium_Test_Client_2025.docx
+          example: /generated_reports/valhalla_premium_Carlos_Santiago_Lopez_2025.docx
