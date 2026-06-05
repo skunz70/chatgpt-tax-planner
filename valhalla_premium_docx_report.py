@@ -57,6 +57,94 @@ def _pct(numerator, denominator):
     return f"{(_num(numerator) / denominator * 100):.1f}%"
 
 
+def _filing_key(value):
+    raw = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "single": "single",
+        "s": "single",
+        "mfj": "married_filing_jointly",
+        "married_filing_jointly": "married_filing_jointly",
+        "married_joint": "married_filing_jointly",
+        "married": "married_filing_jointly",
+        "mfs": "married_filing_separately",
+        "married_filing_separately": "married_filing_separately",
+        "hoh": "head_of_household",
+        "head_of_household": "head_of_household",
+    }
+    return aliases.get(raw, raw or "single")
+
+
+def _ordinary_brackets(filing_status):
+    brackets = {
+        "single": [
+            (0, 11925, 0.10),
+            (11925, 48475, 0.12),
+            (48475, 103350, 0.22),
+            (103350, 197300, 0.24),
+            (197300, 250525, 0.32),
+            (250525, 626350, 0.35),
+            (626350, float("inf"), 0.37),
+        ],
+        "married_filing_jointly": [
+            (0, 23850, 0.10),
+            (23850, 96950, 0.12),
+            (96950, 206700, 0.22),
+            (206700, 394600, 0.24),
+            (394600, 501050, 0.32),
+            (501050, 751600, 0.35),
+            (751600, float("inf"), 0.37),
+        ],
+        "head_of_household": [
+            (0, 17000, 0.10),
+            (17000, 64850, 0.12),
+            (64850, 103350, 0.22),
+            (103350, 197300, 0.24),
+            (197300, 250500, 0.32),
+            (250500, 626350, 0.35),
+            (626350, float("inf"), 0.37),
+        ],
+        "married_filing_separately": [
+            (0, 11925, 0.10),
+            (11925, 48475, 0.12),
+            (48475, 103350, 0.22),
+            (103350, 197300, 0.24),
+            (197300, 250525, 0.32),
+            (250525, 375800, 0.35),
+            (375800, float("inf"), 0.37),
+        ],
+    }
+    return brackets.get(_filing_key(filing_status), brackets["single"])
+
+
+def _marginal_rate(taxable_income, filing_status):
+    taxable = max(0, _num(taxable_income))
+    for lower, upper, rate in _ordinary_brackets(filing_status):
+        if lower <= taxable < upper:
+            return rate
+    return 0.37
+
+
+def _tax_on_ordinary_income(taxable_income, filing_status):
+    taxable = max(0, _num(taxable_income))
+    tax = 0
+    for lower, upper, rate in _ordinary_brackets(filing_status):
+        if taxable <= lower:
+            break
+        amount = min(taxable, upper) - lower
+        tax += max(0, amount) * rate
+    return tax
+
+
+def _ltcg_thresholds(filing_status):
+    thresholds = {
+        "single": (48350, 533400),
+        "married_filing_jointly": (96700, 600050),
+        "head_of_household": (64750, 566700),
+        "married_filing_separately": (48350, 300000),
+    }
+    return thresholds.get(_filing_key(filing_status), thresholds["single"])
+
+
 def _safe(value, fallback="Not provided"):
     if value is None or value == "":
         return fallback
@@ -456,6 +544,31 @@ def _normalize_actions(data, strategy_output, roi_output):
     return actions[:6]
 
 
+def _augment_report_actions(data, actions):
+    titles = " | ".join(_safe(action.get("title"), "").lower() for action in actions)
+    augmented = list(actions)
+    if "roth contribution" not in titles and "roth conversion" not in titles:
+        annual = _roth_projection(data)[0]["annual"]
+        augmented.append({
+            "title": "Roth contribution / conversion modeling",
+            "estimated_savings": f"1/3/5-year Roth reserve modeled from {_money(annual)} annual capacity",
+            "timeline": "Annual bracket review",
+            "reason": "Model Roth funding, conversion tax cost, and future tax-free reserve before choosing between current deductions and long-term tax diversification.",
+            "score": 88,
+        })
+    if "capital" not in titles and "gain" not in titles and "loss" not in titles:
+        plan = _capital_gain_plan(data)
+        augmented.append({
+            "title": "Capital gain and loss harvesting review",
+            "estimated_savings": f"{_money(plan['zero_room'])} estimated 0% LTCG room; {_money(plan['loss_tax_value'])} loss-harvest value",
+            "timeline": "Before taxable trades and year-end",
+            "reason": "Review unrealized gains, losses, fund distributions, and charitable gifting candidates so portfolio decisions are coordinated with tax brackets.",
+            "score": 84,
+        })
+    augmented.sort(key=lambda x: _num(x.get("score", 0)), reverse=True)
+    return augmented[:7]
+
+
 def _cover(doc, data, actions):
     logo = doc.add_paragraph()
     logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -623,6 +736,271 @@ def _business_section(doc, data):
     _callout(doc, "Business Planning Priority", "Tie Schedule C profit to clean books, documented expenses, retirement funding, quarterly tax planning, and an annual entity trigger review.", fill=LIGHT_GOLD, accent=BRAND_GOLD)
 
 
+def _roth_projection(data):
+    filing = _filing_key(data.get("filing_status"))
+    taxable = _num(data.get("taxable_income", 0))
+    age = _num(data.get("age", 0))
+    explicit = data.get("roth_contribution") or data.get("annual_roth_contribution") or data.get("roth_conversion_amount")
+    if explicit:
+        annual = max(0, _num(explicit))
+    else:
+        per_taxpayer = 8000 if age >= 50 else 7000
+        annual = per_taxpayer * (2 if filing == "married_filing_jointly" else 1)
+    annual = min(max(annual, 3500), 50000)
+    rate = _marginal_rate(taxable, filing)
+    years = [1, 3, 5]
+    growth = 0.06
+    projections = []
+    for year_count in years:
+        future_value = 0
+        for i in range(year_count):
+            future_value += annual * ((1 + growth) ** (year_count - i - 1))
+        conversion_tax = annual * rate * year_count
+        projected_tax = _tax_on_ordinary_income(taxable + annual, filing) - _tax_on_ordinary_income(taxable, filing)
+        projections.append({
+            "years": year_count,
+            "annual": annual,
+            "estimated_tax_cost": max(0, conversion_tax),
+            "first_year_tax": max(0, projected_tax),
+            "roth_reserve": future_value,
+            "tax_free_growth": max(0, future_value - (annual * year_count)),
+        })
+    return projections
+
+
+def _capital_gain_plan(data):
+    filing = _filing_key(data.get("filing_status"))
+    taxable = _num(data.get("taxable_income", data.get("agi", 0)))
+    gain = _num(data.get("capital_gains", data.get("capital_gain", data.get("net_capital_gain", 0))))
+    loss = _num(data.get("capital_losses", data.get("capital_loss", data.get("net_capital_loss", 0))))
+    if gain < 0 and not loss:
+        loss = gain
+        gain = 0
+    zero_threshold, fifteen_threshold = _ltcg_thresholds(filing)
+    zero_room = max(0, zero_threshold - taxable)
+    fifteen_room = max(0, fifteen_threshold - max(taxable, zero_threshold))
+    rate = _marginal_rate(taxable, filing)
+    deductible_loss = min(abs(loss), 3000) if loss < 0 else 3000
+    loss_tax_value = deductible_loss * rate
+    harvest_gain_value = min(max(gain, zero_room), zero_room) * 0.15 if gain > 0 else zero_room * 0.15
+    return {
+        "gain": gain,
+        "loss": loss,
+        "zero_room": zero_room,
+        "fifteen_room": fifteen_room,
+        "loss_tax_value": loss_tax_value,
+        "harvest_gain_value": harvest_gain_value,
+        "marginal_rate": rate,
+    }
+
+
+def _projection_chart(doc, title, periods, tax_costs, values, caption, width=5.95):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+        chart_path = tmp.name
+    try:
+        if not _create_projection_image(chart_path, title, periods, tax_costs, values):
+            return
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_before = Pt(1)
+        p.paragraph_format.space_after = Pt(4)
+        p.add_run().add_picture(chart_path, width=Inches(width))
+        cap = doc.add_paragraph(caption)
+        _paragraph(cap, size=7.8, color=TEXT_GRAY, italic=True, after=7, align=WD_ALIGN_PARAGRAPH.CENTER)
+    except Exception:
+        return
+    finally:
+        try:
+            os.remove(chart_path)
+        except Exception:
+            pass
+
+
+def _roth_strategy_section(doc, data):
+    projections = _roth_projection(data)
+    filing = _safe(data.get("filing_status"), "Not provided")
+    rate = _marginal_rate(data.get("taxable_income", 0), data.get("filing_status", "single"))
+    annual = projections[0]["annual"] if projections else 0
+    _section_title(doc, "Roth Contribution and Conversion Strategy", "Retirement tax leverage")
+    intro = doc.add_paragraph(
+        "This section shows the client why retirement tax planning matters now: the decision is not only the current-year deduction, but the future tax-free reserve that can be built when Roth funding or bracket-aware conversions are modeled intentionally."
+    )
+    _paragraph(intro, size=8.8, color=INK, after=5)
+    rows = [
+        ["Planning Lever", "Illustrated Amount", "Client Value"],
+        ["Annual Roth funding / conversion target", _money(annual), "Creates a visible funding target instead of a vague retirement recommendation"],
+        ["Current marginal bracket estimate", f"{rate:.0%}", f"Used only to illustrate the tax cost of filling Roth capacity for a {filing} taxpayer"],
+        ["1-year projected Roth reserve", _money(projections[0]["roth_reserve"]), "Shows immediate funded value"],
+        ["5-year projected Roth reserve", _money(projections[-1]["roth_reserve"]), "Frames long-term tax-free accumulation potential"],
+    ]
+    _simple_table(doc, rows, [2.05, 1.65, 3.55], font_size=8.15)
+    _projection_chart(
+        doc,
+        "Roth 1 / 3 / 5-Year Illustration",
+        [f"{p['years']} yr" for p in projections],
+        [p["estimated_tax_cost"] for p in projections],
+        [p["roth_reserve"] for p in projections],
+        "Illustrative model: annual Roth funding/conversion target compared with estimated ordinary-income tax cost and projected Roth reserve at a 6% growth assumption.",
+        width=5.85,
+    )
+    _callout(
+        doc,
+        "Advisor Talking Point",
+        "The Roth strategy should be reviewed alongside cash flow, contribution eligibility, conversion capacity, state tax impact, and retirement time horizon before implementation.",
+        fill=SOFT_BLUE,
+        accent="4D6F8C",
+    )
+
+
+def _capital_gain_strategy_section(doc, data):
+    plan = _capital_gain_plan(data)
+    _section_title(doc, "Capital Gain and Loss Strategy", "Investment tax planning")
+    rows = [
+        ["Planning Lever", "Amount", "Recommended Review"],
+        ["Estimated 0% LTCG bracket room", _money(plan["zero_room"]), "Harvest qualified long-term gains intentionally if the client has low-rate capacity"],
+        ["15% LTCG bracket capacity", _money(plan["fifteen_room"]), "Coordinate asset sales, income timing, and charitable strategies before year-end"],
+        ["Loss-harvesting tax value", _money(plan["loss_tax_value"]), "Use realized losses to offset gains or up to $3,000 of ordinary income when available"],
+        ["Current capital gain/loss shown", _money(plan["gain"] or plan["loss"]), "Verify brokerage statements before acting"],
+    ]
+    _simple_table(doc, rows, [2.1, 1.45, 3.7], font_size=8.15)
+    _chart(
+        doc,
+        "Capital Gain / Loss Planning Capacity",
+        ["0% gain room", "15% gain capacity", "Loss tax value"],
+        [plan["zero_room"], plan["fifteen_room"], plan["loss_tax_value"]],
+        "This chart turns portfolio tax planning into a client-visible opportunity: gain harvesting, loss harvesting, and timing should be reviewed before taxable trades are made.",
+        kind="barh",
+        width=5.85,
+    )
+    _callout(
+        doc,
+        "Capital Gains Action",
+        "Before year-end, review unrealized gains and losses, mutual fund distributions, charitable gifting candidates, and income timing so portfolio decisions are made with tax brackets in view.",
+        fill=LIGHT_GOLD,
+        accent=BRAND_GOLD,
+    )
+
+
+def _pil_font(size, bold=False):
+    try:
+        from PIL import ImageFont
+        names = ["arialbd.ttf", "arial.ttf"] if bold else ["arial.ttf", "calibri.ttf"]
+        for name in names:
+            try:
+                return ImageFont.truetype(name, size)
+            except Exception:
+                pass
+        return ImageFont.load_default()
+    except Exception:
+        return None
+
+
+def _create_pil_chart(path, title, labels, values, kind="barh"):
+    try:
+        from PIL import Image, ImageDraw
+
+        values = [_num(v) for v in values]
+        if not labels or not values:
+            return False
+        width, height = 1120, 430
+        image = Image.new("RGB", (width, height), "white")
+        draw = ImageDraw.Draw(image)
+        title_font = _pil_font(28, True)
+        label_font = _pil_font(19)
+        small_font = _pil_font(17)
+        draw.text((32, 22), title, fill="#242424", font=title_font)
+        colors = ["#981E26", "#B7892B", "#334E68", "#627D98", "#D8DEE5", "#5C6670"]
+        max_value = max(max(abs(v) for v in values), 1)
+
+        if kind == "bar":
+            left, bottom, chart_w, chart_h = 70, 342, 990, 230
+            bar_w = max(46, int(chart_w / max(len(values) * 2.2, 1)))
+            gap = (chart_w - (bar_w * len(values))) / max(len(values) + 1, 1)
+            for idx, (label, value) in enumerate(zip(labels, values)):
+                x0 = int(left + gap + idx * (bar_w + gap))
+                bar_h = int((abs(value) / max_value) * chart_h)
+                y0 = bottom - bar_h
+                draw.rectangle([x0, y0, x0 + bar_w, bottom], fill=colors[idx % len(colors)])
+                draw.text((x0 - 8, bottom + 12), str(label)[:15], fill="#1F2933", font=small_font)
+                draw.text((x0 - 8, max(70, y0 - 24)), f"{value:,.0f}", fill="#5C6670", font=small_font)
+            draw.line([left, bottom, left + chart_w, bottom], fill="#D8DEE5", width=2)
+        else:
+            left, top, bar_w, row_h = 290, 86, 735, 54
+            for idx, (label, value) in enumerate(zip(labels, values)):
+                y = top + idx * row_h
+                length = int((abs(value) / max_value) * bar_w)
+                draw.text((32, y + 10), str(label)[:24], fill="#1F2933", font=label_font)
+                draw.rectangle([left, y + 8, left + length, y + 34], fill=colors[idx % len(colors)])
+                draw.text((left + length + 12, y + 8), _money(value), fill="#5C6670", font=small_font)
+            draw.line([left, top - 8, left, top + row_h * len(values)], fill="#D8DEE5", width=2)
+
+        image.save(path, "PNG")
+        return True
+    except Exception:
+        return False
+
+
+def _create_projection_image(path, title, periods, tax_costs, values):
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as mtick
+        import numpy as np
+
+        x = np.arange(len(periods))
+        fig, ax = plt.subplots(figsize=(6.35, 2.55))
+        fig.patch.set_facecolor("white")
+        ax.set_facecolor("white")
+        ax.bar(x - 0.18, tax_costs, 0.36, label="Estimated tax cost", color="#981E26")
+        ax.bar(x + 0.18, values, 0.36, label="Projected Roth reserve", color="#B7892B")
+        ax.set_title(title, fontsize=10.4, fontweight="bold", color="#242424", pad=8)
+        ax.set_xticks(x)
+        ax.set_xticklabels(periods, fontsize=8.2, color="#1F2933")
+        ax.yaxis.set_major_formatter(mtick.StrMethodFormatter("${x:,.0f}"))
+        ax.tick_params(axis="y", labelsize=7.5, colors="#5C6670")
+        ax.grid(axis="y", color="#E6E9ED", linewidth=0.8)
+        ax.legend(loc="upper left", frameon=False, fontsize=7.4)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        fig.tight_layout(pad=1.0)
+        fig.savefig(path, dpi=175, bbox_inches="tight")
+        plt.close(fig)
+        return True
+    except Exception:
+        try:
+            from PIL import Image, ImageDraw
+
+            width, height = 1120, 455
+            image = Image.new("RGB", (width, height), "white")
+            draw = ImageDraw.Draw(image)
+            title_font = _pil_font(28, True)
+            label_font = _pil_font(19)
+            small_font = _pil_font(17)
+            draw.text((32, 22), title, fill="#242424", font=title_font)
+            max_value = max(max([_num(v) for v in list(tax_costs) + list(values)]), 1)
+            left, bottom, chart_w, chart_h = 95, 350, 930, 230
+            group_w = chart_w / max(len(periods), 1)
+            for idx, period in enumerate(periods):
+                x = int(left + idx * group_w + 46)
+                tax_h = int((_num(tax_costs[idx]) / max_value) * chart_h)
+                value_h = int((_num(values[idx]) / max_value) * chart_h)
+                draw.rectangle([x, bottom - tax_h, x + 58, bottom], fill="#981E26")
+                draw.rectangle([x + 68, bottom - value_h, x + 126, bottom], fill="#B7892B")
+                draw.text((x + 18, bottom + 12), str(period), fill="#1F2933", font=label_font)
+                draw.text((x - 8, max(70, bottom - tax_h - 24)), _money(tax_costs[idx]), fill="#981E26", font=small_font)
+                draw.text((x + 62, max(70, bottom - value_h - 24)), _money(values[idx]), fill="#B7892B", font=small_font)
+            draw.rectangle([36, 385, 58, 407], fill="#981E26")
+            draw.text((68, 384), "Estimated tax cost", fill="#5C6670", font=small_font)
+            draw.rectangle([275, 385, 297, 407], fill="#B7892B")
+            draw.text((307, 384), "Projected Roth reserve", fill="#5C6670", font=small_font)
+            draw.line([left, bottom, left + chart_w, bottom], fill="#D8DEE5", width=2)
+            image.save(path, "PNG")
+            return True
+        except Exception:
+            return False
+
+
 def _create_chart(path, title, labels, values, kind="barh"):
     try:
         import matplotlib
@@ -664,7 +1042,7 @@ def _create_chart(path, title, labels, values, kind="barh"):
         plt.close(fig)
         return True
     except Exception:
-        return False
+        return _create_pil_chart(path, title, labels, values, kind)
 
 
 def _chart(doc, title, labels, values, caption, kind="barh", width=5.95):
@@ -684,6 +1062,23 @@ def _chart(doc, title, labels, values, caption, kind="barh", width=5.95):
             os.remove(chart_path)
         except Exception:
             pass
+
+
+def _planning_value_stack(data):
+    roth = _roth_projection(data)
+    cap = _capital_gain_plan(data)
+    sched_c = max(0, _num(data.get("schedule_c_net_profit", 0)))
+    rate = _marginal_rate(data.get("taxable_income", 0), data.get("filing_status", "single"))
+    refund = _num(data.get("refund", 0))
+    balance = _num(data.get("balance_due", 0))
+    values = [
+        ("Roth reserve", roth[-1]["roth_reserve"] if roth else 0),
+        ("Cap gain room", min(cap["zero_room"], 50000)),
+        ("Loss harvest value", cap["loss_tax_value"]),
+        ("Retirement deduction", min(sched_c * rate, 12000) if sched_c > 0 else 0),
+        ("Cash-flow tuning", max(refund, balance)),
+    ]
+    return [(label, value) for label, value in values if value > 0]
 
 
 def _visuals(doc, data, actions):
@@ -716,7 +1111,19 @@ def _visuals(doc, data, actions):
     for idx, action in enumerate(actions[:5], start=1):
         raw = action.get("score")
         values.append(_num(raw, max(30, 90 - idx * 10)))
-    _chart(doc, "Priority Strategy Ranking", labels, values, "Relative ranking based on urgency, tax impact, implementation timing, and planning value.", kind="bar", width=5.75)
+    _chart(doc, "Priority Strategy Ranking", labels, values, "Relative ranking based on urgency, tax impact, implementation timing, and planning value.", kind="barh", width=5.75)
+
+    stack = _planning_value_stack(data)
+    if stack:
+        _chart(
+            doc,
+            "Planning Value Stack",
+            [label for label, _ in stack[:5]],
+            [value for _, value in stack[:5]],
+            "Client-facing value stack: this is where the report converts the return into measurable planning themes instead of generic advice.",
+            kind="barh",
+            width=5.75,
+        )
 
 
 def _strategy_cards(doc, actions, compact=False):
@@ -745,7 +1152,7 @@ def _strategy_cards(doc, actions, compact=False):
         details.add_run("   Timing: ").bold = True
         details.add_run(str(action.get("timeline", "Review")))
         _paragraph(details, size=8.4, color=TEXT_GRAY, after=2)
-        reason = body.add_paragraph(_limit(action.get("reason", "Client-specific planning opportunity."), 430 if compact else 620))
+        reason = body.add_paragraph(_limit(action.get("reason", "Client-specific planning opportunity."), 260 if compact else 390))
         _paragraph(reason, size=8.7, color=INK, after=0)
         doc.add_paragraph().paragraph_format.space_after = Pt(2)
 
@@ -833,7 +1240,7 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
     data = data or {}
     strategy_output = _build_strategy_output(data)
     roi_output = _build_roi_output(data)
-    actions = _normalize_actions(data, strategy_output, roi_output)
+    actions = _augment_report_actions(data, _normalize_actions(data, strategy_output, roi_output))
     dynamic_sections = strategy_output.get("dynamic_sections", [])
 
     doc = Document()
@@ -843,6 +1250,8 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
     _dashboard(doc, data, actions)
     _tax_position(doc, data)
     _business_section(doc, data)
+    _roth_strategy_section(doc, data)
+    _capital_gain_strategy_section(doc, data)
     _visuals(doc, data, actions)
     doc.add_page_break()
     _strategy_cards(doc, actions, compact=False)
