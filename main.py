@@ -765,7 +765,7 @@ async def generate_pdf(payload: dict):
                 "capital_gains": payload.get("capital_gains")
             },
             "planning_result": result,
-            "next_step": "After review, call generateValhallaPremiumDocx to generate the final client-ready PDF report."
+            "next_step": "After review, call generateFinalReport to generate the final client-ready DOCX report."
         }
 
     except Exception as e:
@@ -773,6 +773,7 @@ async def generate_pdf(payload: dict):
             "status": "error",
             "detail": str(e)
         }
+@app.post("/generate_final_report")
 @app.post("/generate_valhalla_premium_docx")
 def generate_valhalla_premium_docx(request: Request, payload: dict | None = Body(default=None)):
 
