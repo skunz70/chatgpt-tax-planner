@@ -236,10 +236,42 @@ def _paragraph(paragraph, size=9.4, color=INK, bold=False, italic=False, before=
 
 def _set_widths(table, widths):
     table.autofit = False
+    tbl_pr = table._tbl.tblPr
+    layout = tbl_pr.find(qn("w:tblLayout"))
+    if layout is None:
+        layout = OxmlElement("w:tblLayout")
+        tbl_pr.append(layout)
+    layout.set(qn("w:type"), "fixed")
+
+    total = sum(widths)
+    tbl_w = tbl_pr.find(qn("w:tblW"))
+    if tbl_w is None:
+        tbl_w = OxmlElement("w:tblW")
+        tbl_pr.append(tbl_w)
+    tbl_w.set(qn("w:w"), str(int(total * 1440)))
+    tbl_w.set(qn("w:type"), "dxa")
+
+    grid = table._tbl.tblGrid
+    if grid is None:
+        grid = OxmlElement("w:tblGrid")
+        table._tbl.insert(0, grid)
+    for child in list(grid):
+        grid.remove(child)
+    for width in widths:
+        col = OxmlElement("w:gridCol")
+        col.set(qn("w:w"), str(int(width * 1440)))
+        grid.append(col)
+
     for row in table.rows:
         for idx, width in enumerate(widths):
             if idx < len(row.cells):
                 row.cells[idx].width = Inches(width)
+                tc_w = row.cells[idx]._tc.get_or_add_tcPr().find(qn("w:tcW"))
+                if tc_w is None:
+                    tc_w = OxmlElement("w:tcW")
+                    row.cells[idx]._tc.get_or_add_tcPr().append(tc_w)
+                tc_w.set(qn("w:w"), str(int(width * 1440)))
+                tc_w.set(qn("w:type"), "dxa")
 
 
 def _page_number(paragraph):
