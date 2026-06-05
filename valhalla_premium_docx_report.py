@@ -321,6 +321,47 @@ def _opportunity_range(data, actions):
     return "$500", "$2,500+"
 
 
+def _tax_efficiency_score(data, actions):
+    explicit = data.get("tax_efficiency_score") or data.get("tax_efficiency")
+    if isinstance(explicit, dict):
+        explicit = explicit.get("score") or explicit.get("overall_score")
+    if explicit not in (None, ""):
+        try:
+            return max(1, min(100, int(float(explicit))))
+        except Exception:
+            pass
+
+    score = 72
+    taxable = _num(data.get("taxable_income", 0))
+    total_tax = _num(data.get("total_tax", 0))
+    agi = _num(data.get("agi", 0))
+    refund = _num(data.get("refund", 0))
+    balance = _num(data.get("balance_due", 0))
+    sched_c = _num(data.get("schedule_c_net_profit", 0))
+
+    if agi and total_tax / agi < 0.08:
+        score += 6
+    if taxable and taxable < 100000:
+        score += 4
+    if balance > 2500:
+        score -= 8
+    if refund > 4000:
+        score -= 5
+    if sched_c > 0:
+        score -= 4
+    if actions:
+        score += min(6, len(actions))
+    return max(40, min(95, int(score)))
+
+
+def _score_band(score):
+    if score >= 85:
+        return "Strong", BRAND_GOLD, "Solid tax position; focus on preserving gains and executing the highest-value actions."
+    if score >= 70:
+        return "Good with opportunities", BRAND_RED, "Planning value exists; prioritize the actions that improve cash flow, deductions, and long-term flexibility."
+    return "Needs attention", BRAND_RED, "Several controllable planning items should be addressed before year-end."
+
+
 def _default_actions(data):
     actions = []
     balance = _num(data.get("balance_due", 0))
@@ -435,29 +476,32 @@ def _cover(doc, data, actions):
     doc.add_paragraph().paragraph_format.space_after = Pt(12)
     title = doc.add_paragraph()
     title.add_run("Tax Strategy\nImplementation Report")
-    _paragraph(title, size=27, color=BRAND_RED, bold=True, after=5)
+    _paragraph(title, size=28, color=BRAND_RED, bold=True, after=4)
 
-    subtitle = doc.add_paragraph("A client-ready planning summary focused on the highest-value decisions, implementation timing, and year-round tax efficiency.")
-    _paragraph(subtitle, size=10.8, color=TEXT_GRAY, after=16)
+    subtitle = doc.add_paragraph("A premium client-facing roadmap for reducing avoidable tax drag, improving cash-flow control, and turning the tax return into an implementation plan.")
+    _paragraph(subtitle, size=10.8, color=TEXT_GRAY, after=13)
 
-    meta = doc.add_table(rows=1, cols=3)
+    meta = doc.add_table(rows=1, cols=4)
     meta.alignment = WD_TABLE_ALIGNMENT.CENTER
-    _set_widths(meta, [2.35, 2.05, 2.9])
+    _set_widths(meta, [2.15, 1.4, 1.55, 2.15])
+    score = _tax_efficiency_score(data, actions)
+    band_label, band_color, _ = _score_band(score)
     values = [
         ("Client", _safe(data.get("client_name"), "Client"), BRAND_RED),
         ("Tax Year", _safe(data.get("tax_year"), "2025"), INK),
+        ("Efficiency", f"{score}/100", band_color),
         ("Prepared By", "Scott Kunz, ChFC, TPCP, EA", INK),
     ]
     for idx, (label, value, color) in enumerate(values):
         meta_cell = meta.cell(0, idx)
         _format_cell(meta_cell, fill=LIGHT_GRAY, border=LINE_GRAY)
-        _label_value(meta_cell, label, value, color, 12.2)
+        _label_value(meta_cell, label, value, color, 11.6)
 
     low, high = _opportunity_range(data, actions)
     doc.add_paragraph().paragraph_format.space_after = Pt(4)
     _callout(
         doc,
-        "Estimated Planning Opportunity",
+        "Executive Value Thesis",
         f"The strategies in this report point to an estimated annual planning opportunity of approximately {low} to {high}, depending on contribution levels, timing, documentation, and final implementation choices.",
         fill=LIGHT_GOLD,
         accent=BRAND_GOLD,
@@ -506,7 +550,42 @@ def _dashboard(doc, data, actions):
         _paragraph(p, size=7.2, color=TEXT_GRAY, after=0)
 
     doc.add_paragraph().paragraph_format.space_after = Pt(2)
+    _tax_efficiency_panel(doc, data, actions)
     _strategy_cards(doc, actions[:3], compact=True)
+
+
+def _tax_efficiency_panel(doc, data, actions):
+    score = _tax_efficiency_score(data, actions)
+    label, color, read = _score_band(score)
+    low, high = _opportunity_range(data, actions)
+    table = doc.add_table(rows=1, cols=2)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _set_widths(table, [1.3, 5.95])
+    score_cell = table.cell(0, 0)
+    read_cell = table.cell(0, 1)
+    _format_cell(score_cell, fill=color, color=WHITE, bold=True, border=color)
+    score_cell.paragraphs[0].text = ""
+    p = score_cell.paragraphs[0]
+    r = p.add_run(f"{score}\n")
+    r.font.name = "Aptos Display"
+    r.font.size = Pt(24)
+    r.bold = True
+    r.font.color.rgb = RGBColor.from_string(WHITE)
+    label_run = p.add_run("TAX EFFICIENCY")
+    label_run.font.name = "Aptos"
+    label_run.font.size = Pt(7.4)
+    label_run.bold = True
+    label_run.font.color.rgb = RGBColor.from_string(WHITE)
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.space_after = Pt(0)
+
+    _format_cell(read_cell, fill=WHITE, border="DDE3EA")
+    h = read_cell.paragraphs[0]
+    h.add_run(f"{label} | Priority planning range: {low}-{high}")
+    _paragraph(h, size=10.0, color=INK, bold=True, after=2)
+    body = read_cell.add_paragraph(read)
+    _paragraph(body, size=8.4, color=TEXT_GRAY, after=0)
+    doc.add_paragraph().paragraph_format.space_after = Pt(2)
 
 
 def _tax_position(doc, data):
@@ -541,7 +620,7 @@ def _business_section(doc, data):
         ["Contract labor", _money(data.get("contract_labor", 0)), "Confirm worker classification, W-9 files, and 1099 documentation"],
     ]
     _simple_table(doc, rows, [1.55, 1.45, 4.25], font_size=8.3)
-    _callout(doc, "Business Planning Priority", "Schedule C profit should be tied to a year-round system: clean books, documented expenses, retirement plan funding, quarterly tax planning, and annual entity trigger review.", fill=LIGHT_GOLD, accent=BRAND_GOLD)
+    _callout(doc, "Business Planning Priority", "Tie Schedule C profit to clean books, documented expenses, retirement funding, quarterly tax planning, and an annual entity trigger review.", fill=LIGHT_GOLD, accent=BRAND_GOLD)
 
 
 def _create_chart(path, title, labels, values, kind="barh"):
@@ -554,15 +633,15 @@ def _create_chart(path, title, labels, values, kind="barh"):
         values = [_num(v) for v in values]
         colors = ["#981E26", "#B7892B", "#334E68", "#627D98", "#D8DEE5", "#5C6670"]
         plt.rcParams["font.family"] = "DejaVu Sans"
-        fig, ax = plt.subplots(figsize=(6.9, 2.75))
+        fig, ax = plt.subplots(figsize=(6.2, 2.25))
         fig.patch.set_facecolor("white")
         ax.set_facecolor("white")
 
         if kind == "donut":
             safe = [max(v, 0) for v in values]
             total = sum(safe) or 1
-            ax.pie(safe, labels=labels, startangle=90, colors=colors[: len(labels)], wedgeprops={"width": 0.42, "edgecolor": "white"}, textprops={"fontsize": 8})
-            ax.text(0, 0, _money(total), ha="center", va="center", fontsize=12, fontweight="bold", color="#981E26")
+            ax.pie(safe, labels=labels, startangle=90, colors=colors[: len(labels)], wedgeprops={"width": 0.45, "edgecolor": "white"}, textprops={"fontsize": 7.2})
+            ax.text(0, 0, _money(total), ha="center", va="center", fontsize=10, fontweight="bold", color="#981E26")
         elif kind == "bar":
             ax.bar(labels, values, color=colors[: len(labels)], width=0.56)
             ax.yaxis.set_major_formatter(mtick.StrMethodFormatter("${x:,.0f}"))
@@ -588,7 +667,7 @@ def _create_chart(path, title, labels, values, kind="barh"):
         return False
 
 
-def _chart(doc, title, labels, values, caption, kind="barh"):
+def _chart(doc, title, labels, values, caption, kind="barh", width=5.95):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
         chart_path = tmp.name
     try:
@@ -597,7 +676,7 @@ def _chart(doc, title, labels, values, caption, kind="barh"):
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p.paragraph_format.space_before = Pt(1)
             p.paragraph_format.space_after = Pt(4)
-            p.add_run().add_picture(chart_path, width=Inches(6.55))
+            p.add_run().add_picture(chart_path, width=Inches(width))
             cap = doc.add_paragraph(caption)
             _paragraph(cap, size=7.8, color=TEXT_GRAY, italic=True, after=7, align=WD_ALIGN_PARAGRAPH.CENTER)
     finally:
@@ -608,7 +687,6 @@ def _chart(doc, title, labels, values, caption, kind="barh"):
 
 
 def _visuals(doc, data, actions):
-    doc.add_page_break()
     _section_title(doc, "Planning Visuals", "Data read")
     _chart(
         doc,
@@ -617,6 +695,7 @@ def _visuals(doc, data, actions):
         [data.get("agi", 0), data.get("taxable_income", 0), data.get("total_tax", 0), data.get("federal_withholding", 0), abs(_num(data.get("balance_due", 0)) or _num(data.get("refund", 0)))],
         "This chart frames the planning baseline: income, taxable exposure, federal tax cost, payments, and the year-end cash-flow result.",
         kind="barh",
+        width=5.75,
     )
 
     gross = _num(data.get("schedule_c_gross_revenue", 0))
@@ -625,10 +704,11 @@ def _visuals(doc, data, actions):
         _chart(
             doc,
             "Schedule C Economics",
-            ["Expenses", "Net Profit"],
-            [max(gross - net, 0), net],
+            ["Gross Revenue", "Expenses", "Net Profit"],
+            [gross, max(gross - net, 0), net],
             "Business-owner planning should focus on clean records, retirement contribution modeling, and quarterly tax discipline.",
-            kind="donut",
+            kind="barh",
+            width=5.75,
         )
 
     labels = [a.get("title", "Strategy")[:24] for a in actions[:5]]
@@ -636,7 +716,7 @@ def _visuals(doc, data, actions):
     for idx, action in enumerate(actions[:5], start=1):
         raw = action.get("score")
         values.append(_num(raw, max(30, 90 - idx * 10)))
-    _chart(doc, "Priority Strategy Ranking", labels, values, "Relative ranking based on urgency, tax impact, implementation timing, and planning value.", kind="bar")
+    _chart(doc, "Priority Strategy Ranking", labels, values, "Relative ranking based on urgency, tax impact, implementation timing, and planning value.", kind="bar", width=5.75)
 
 
 def _strategy_cards(doc, actions, compact=False):
@@ -656,6 +736,10 @@ def _strategy_cards(doc, actions, compact=False):
         title.add_run(_safe(action.get("title"), "Planning action"))
         _paragraph(title, size=10.5, color=INK, bold=True, after=2)
         details = body.add_paragraph()
+        score = action.get("score")
+        if score not in (None, ""):
+            details.add_run("Score: ").bold = True
+            details.add_run(f"{int(_num(score))}/100   ")
         details.add_run("Impact: ").bold = True
         details.add_run(str(action.get("estimated_savings", "Planning value")))
         details.add_run("   Timing: ").bold = True
@@ -677,11 +761,6 @@ def _implementation(doc, actions):
         ["Annual review", "Update the plan after the next return and income changes.", "Keep the strategy recurring instead of one-time."],
     ]
     _simple_table(doc, rows, [1.05, 3.25, 3.0], font_size=8.1)
-
-    checklist = [["Status", "Implementation Item", "Why It Matters"]]
-    for action in actions[:5]:
-        checklist.append(["[ ]", action.get("title", "Planning action"), _limit(action.get("reason", "Client-specific planning opportunity."), 170)])
-    _simple_table(doc, checklist, [0.55, 2.35, 4.35], header_fill=BRAND_DARK, font_size=8.0)
 
 
 def _final_pages(doc, data):
@@ -765,9 +844,11 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
     _tax_position(doc, data)
     _business_section(doc, data)
     _visuals(doc, data, actions)
+    doc.add_page_break()
     _strategy_cards(doc, actions, compact=False)
     _dynamic_sections(doc, dynamic_sections)
     _implementation(doc, actions)
+    doc.add_page_break()
     _final_pages(doc, data)
 
     doc.save(output_path)
