@@ -158,6 +158,35 @@ def _limit(text, length=420):
     return text[: length - 3].rstrip() + "..."
 
 
+def _paragraph_chunks(text, chunk_size=950):
+    text = _safe(text, "").strip()
+    if not text:
+        return []
+    parts = [part.strip() for part in text.replace("\r\n", "\n").split("\n") if part.strip()]
+    chunks = []
+    for part in parts:
+        while len(part) > chunk_size:
+            split_at = part.rfind(". ", 0, chunk_size)
+            if split_at < chunk_size * 0.45:
+                split_at = part.rfind(" ", 0, chunk_size)
+            if split_at <= 0:
+                split_at = chunk_size
+            chunks.append(part[:split_at].strip())
+            part = part[split_at:].strip()
+        if part:
+            chunks.append(part)
+    return chunks
+
+
+def _add_narrative(doc, text, size=8.8, color=INK, max_chunks=None):
+    chunks = _paragraph_chunks(text)
+    if max_chunks:
+        chunks = chunks[:max_chunks]
+    for chunk in chunks:
+        p = doc.add_paragraph(chunk)
+        _paragraph(p, size=size, color=color, after=4)
+
+
 def _set_shading(cell, fill):
     tc_pr = cell._tc.get_or_add_tcPr()
     shd = tc_pr.find(qn("w:shd"))
@@ -542,7 +571,7 @@ def _default_actions(data):
             "timeline": "Next 30 days",
             "reason": "The return should become the starting point for proactive planning, not merely a filing record.",
         })
-    return actions[:5]
+    return actions
 
 
 def _normalize_actions(data, strategy_output, roi_output):
@@ -573,7 +602,7 @@ def _normalize_actions(data, strategy_output, roi_output):
     if not actions:
         actions = _default_actions(data)
     actions.sort(key=lambda x: _num(x.get("score", 0)), reverse=True)
-    return actions[:6]
+    return actions
 
 
 def _augment_report_actions(data, actions):
@@ -598,7 +627,7 @@ def _augment_report_actions(data, actions):
             "score": 84,
         })
     augmented.sort(key=lambda x: _num(x.get("score", 0)), reverse=True)
-    return augmented[:7]
+    return augmented
 
 
 def _cover(doc, data, actions):
@@ -1161,8 +1190,8 @@ def _visuals(doc, data, actions):
 def _strategy_cards(doc, actions, compact=False):
     if not compact:
         _section_title(doc, "Priority Strategy Recommendations", "Client action plan")
-    rows_per = 1 if compact else min(len(actions), 6)
-    for idx, action in enumerate(actions[: rows_per if compact else 6], start=1):
+    selected = actions[:1] if compact else actions
+    for idx, action in enumerate(selected, start=1):
         table = doc.add_table(rows=1, cols=2)
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
         _set_widths(table, [0.56, 6.7])
@@ -1184,9 +1213,53 @@ def _strategy_cards(doc, actions, compact=False):
         details.add_run("   Timing: ").bold = True
         details.add_run(str(action.get("timeline", "Review")))
         _paragraph(details, size=8.4, color=TEXT_GRAY, after=2)
-        reason = body.add_paragraph(_limit(action.get("reason", "Client-specific planning opportunity."), 260 if compact else 390))
+        reason_limit = 260 if compact else 900
+        reason = body.add_paragraph(_limit(action.get("reason", "Client-specific planning opportunity."), reason_limit))
         _paragraph(reason, size=8.7, color=INK, after=0)
         doc.add_paragraph().paragraph_format.space_after = Pt(2)
+        if not compact and idx % 4 == 0 and idx < len(selected):
+            doc.add_page_break()
+
+
+def _strategy_deep_dive(doc, actions):
+    if not actions:
+        return
+    doc.add_page_break()
+    _section_title(doc, "Strategy Deep Dive", "Full plan detail")
+    intro = doc.add_paragraph(
+        "The following pages preserve the full planning logic behind the recommendations. This section is intentionally detailed so the client can see the value, timing, rationale, and follow-up work connected to each strategy."
+    )
+    _paragraph(intro, size=8.9, color=TEXT_GRAY, after=8)
+    for idx, action in enumerate(actions, start=1):
+        if idx > 1:
+            doc.add_page_break()
+        title = _safe(action.get("title"), f"Strategy {idx}")
+        _section_title(doc, f"{idx}. {title}", "Strategy detail")
+        rows = [
+            ["Planning Item", "Detail"],
+            ["Estimated Impact", _safe(action.get("estimated_savings"), "Planning value to be quantified during implementation")],
+            ["Implementation Timing", _safe(action.get("timeline"), "Review")],
+            ["Priority Score", f"{int(_num(action.get('score')))} / 100" if action.get("score") not in (None, "") else "Advisor priority"],
+        ]
+        _simple_table(doc, rows, [1.75, 5.5], font_size=8.25)
+        _callout(
+            doc,
+            "Why This Matters",
+            _safe(action.get("reason"), "Client-specific planning opportunity."),
+            fill=LIGHT_GOLD if idx % 2 else SOFT_BLUE,
+            accent=BRAND_GOLD if idx % 2 else "4D6F8C",
+        )
+        details = action.get("details") or action.get("analysis") or action.get("explanation") or action.get("advisor_notes")
+        if details:
+            h = doc.add_paragraph("Advisor Detail")
+            _paragraph(h, size=9.6, color=BRAND_RED, bold=True, after=2)
+            _add_narrative(doc, details, size=8.7, color=INK)
+        steps = action.get("implementation_steps") or action.get("steps") or action.get("tasks")
+        if isinstance(steps, list) and steps:
+            rows = [["Step", "Action"]]
+            for step_idx, step in enumerate(steps, start=1):
+                rows.append([str(step_idx), _safe(step)])
+            _simple_table(doc, rows, [0.65, 6.6], font_size=8.15)
 
 
 def _implementation(doc, actions):
@@ -1202,11 +1275,70 @@ def _implementation(doc, actions):
     _simple_table(doc, rows, [1.05, 3.25, 3.0], font_size=8.1)
 
 
+def _plan_appendix(doc, data, strategy_output, roi_output):
+    appendix_items = []
+    for key, label in [
+        ("planning_preview", "Planning Preview"),
+        ("strategy_recommendations", "Strategy Recommendations"),
+        ("tax_planning_analysis", "Tax Planning Analysis"),
+        ("comprehensive_plan", "Comprehensive Plan"),
+        ("full_plan", "Full Plan"),
+        ("advisor_notes", "Advisor Notes"),
+        ("planning_summary", "Planning Summary"),
+    ]:
+        value = data.get(key) or strategy_output.get(key) or roi_output.get(key)
+        if value:
+            appendix_items.append((label, value))
+
+    for source, label in [(strategy_output.get("sections"), "Strategy Engine Section"), (data.get("sections"), "Report Section")]:
+        if isinstance(source, list):
+            for idx, item in enumerate(source, start=1):
+                if isinstance(item, dict):
+                    heading = item.get("title") or item.get("section") or f"{label} {idx}"
+                    body = item.get("body") or item.get("summary") or item.get("content") or item.get("detail")
+                    if body:
+                        appendix_items.append((heading, body))
+                elif item:
+                    appendix_items.append((f"{label} {idx}", str(item)))
+
+    if not appendix_items:
+        return
+
+    doc.add_page_break()
+    _section_title(doc, "Complete Plan Appendix", "Full capture")
+    lead = doc.add_paragraph(
+        "This appendix preserves additional planning content supplied to the report generator. It is included because the premium report should capture the complete plan rather than forcing every idea into a short executive summary."
+    )
+    _paragraph(lead, size=8.8, color=TEXT_GRAY, after=8)
+    for idx, (heading, value) in enumerate(appendix_items, start=1):
+        if idx > 1:
+            doc.add_page_break()
+        _section_title(doc, heading, f"Appendix {idx}")
+        if isinstance(value, list):
+            rows = [["Item", "Detail"]]
+            for row_idx, item in enumerate(value, start=1):
+                if isinstance(item, dict):
+                    label = item.get("title") or item.get("name") or item.get("strategy") or f"Item {row_idx}"
+                    detail = item.get("detail") or item.get("summary") or item.get("description") or item.get("recommendation") or item.get("reason") or str(item)
+                else:
+                    label = f"Item {row_idx}"
+                    detail = str(item)
+                rows.append([label, detail])
+            _simple_table(doc, rows, [2.0, 5.25], font_size=8.0)
+        elif isinstance(value, dict):
+            rows = [["Field", "Value"]]
+            for k, v in value.items():
+                if v not in (None, "", [], {}):
+                    rows.append([str(k).replace("_", " ").title(), str(v)])
+            _simple_table(doc, rows, [2.0, 5.25], font_size=8.0)
+        else:
+            _add_narrative(doc, str(value), size=8.7, color=INK)
+
+
 def _final_pages(doc, data):
     _section_title(doc, "Final Advisor Recommendation", "Recommendation")
     final = data.get("final_recommendation") or data.get("planning_summary") or "The strongest planning value comes from prioritizing the right strategies in the right order. The client should focus first on actions that improve tax efficiency, reduce compliance risk, improve cash-flow predictability, and support long-term wealth building."
-    p = doc.add_paragraph(_limit(final, 760))
-    _paragraph(p, size=9.3, color=INK, after=8)
+    _add_narrative(doc, final, size=9.1, color=INK)
 
     _callout(doc, "Client Next Step", "Review the priority actions, select the strategies to implement, and schedule a follow-up planning meeting before the next major tax deadline.", fill=LIGHT_GOLD, accent=BRAND_GOLD)
 
@@ -1254,18 +1386,32 @@ def _build_roi_output(data):
 def _dynamic_sections(doc, sections):
     if not sections:
         return
+    doc.add_page_break()
     _section_title(doc, "Client-Specific Planning Detail", "Strategy modules")
-    for item in sections[:6]:
+    for idx, item in enumerate(sections, start=1):
         if isinstance(item, dict):
             heading = item.get("section") or item.get("title") or "Planning Module"
             body = item.get("body") or item.get("summary") or ""
+            rows = item.get("rows") or item.get("items") or item.get("recommendations")
         else:
             heading = "Planning Module"
             body = str(item)
-        h = doc.add_paragraph(heading)
-        _paragraph(h, size=10.0, color=BRAND_RED, bold=True, after=2)
-        b = doc.add_paragraph(_limit(body, 650))
-        _paragraph(b, size=8.8, color=INK, after=5)
+            rows = None
+        if idx > 1:
+            doc.add_page_break()
+        _section_title(doc, heading, f"Planning module {idx}")
+        _add_narrative(doc, body, size=8.8, color=INK)
+        if isinstance(rows, list) and rows:
+            table_rows = [["Item", "Planning Detail"]]
+            for row_idx, row in enumerate(rows, start=1):
+                if isinstance(row, dict):
+                    label = row.get("title") or row.get("name") or row.get("strategy") or f"Item {row_idx}"
+                    detail = row.get("detail") or row.get("summary") or row.get("description") or row.get("recommendation") or row.get("reason") or ""
+                else:
+                    label = f"Item {row_idx}"
+                    detail = str(row)
+                table_rows.append([label, detail])
+            _simple_table(doc, table_rows, [2.0, 5.25], font_size=8.0)
 
 
 def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premium_report.docx"):
@@ -1287,8 +1433,10 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
     _visuals(doc, data, actions)
     doc.add_page_break()
     _strategy_cards(doc, actions, compact=False)
+    _strategy_deep_dive(doc, actions)
     _dynamic_sections(doc, dynamic_sections)
     _implementation(doc, actions)
+    _plan_appendix(doc, data, strategy_output, roi_output)
     doc.add_page_break()
     _final_pages(doc, data)
 
