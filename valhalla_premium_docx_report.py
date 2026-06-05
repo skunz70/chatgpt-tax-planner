@@ -30,6 +30,7 @@ LIGHT_RED = "F8ECEE"
 LIGHT_GOLD = "FFF8E6"
 SOFT_BLUE = "EDF3F8"
 WHITE = "FFFFFF"
+LOGO_IMAGE = os.path.join(os.path.dirname(__file__), "Valhalla Logo Eagle-Tax Services.jpg")
 LOGO_ASSET = os.path.join(os.path.dirname(__file__), "assets", "valhalla_gold_logo_report.b64")
 
 
@@ -169,6 +170,8 @@ def _page_number(paragraph):
 
 
 def _logo_temp_path():
+    if os.path.exists(LOGO_IMAGE):
+        return LOGO_IMAGE
     if not os.path.exists(LOGO_ASSET):
         return None
     try:
@@ -191,10 +194,11 @@ def _add_logo(paragraph, width=3.4):
     except Exception:
         return False
     finally:
-        try:
-            os.remove(logo_path)
-        except Exception:
-            pass
+        if logo_path != LOGO_IMAGE:
+            try:
+                os.remove(logo_path)
+            except Exception:
+                pass
 
 
 def _configure(doc, data):
@@ -459,10 +463,10 @@ def _normalize_actions(data, strategy_output, roi_output):
 def _cover(doc, data, actions):
     logo = doc.add_paragraph()
     logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    if not _add_logo(logo, width=3.55):
+    if not _add_logo(logo, width=1.85):
         logo.add_run("VALHALLA TAX & FINANCE LLC")
         _paragraph(logo, size=15, color=BRAND_RED, bold=True, after=3)
-    logo.paragraph_format.space_after = Pt(12)
+    logo.paragraph_format.space_after = Pt(8)
 
     band = doc.add_table(rows=1, cols=1)
     band.alignment = WD_TABLE_ALIGNMENT.CENTER
