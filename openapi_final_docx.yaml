@@ -35,7 +35,9 @@ components:
           default: Test Client
           example: Carlos Santiago Lopez
         tax_year:
-          type: integer
+          anyOf:
+            - type: integer
+            - type: string
           default: 2025
           example: 2025
         filing_status:
@@ -43,31 +45,45 @@ components:
           default: MFJ
           example: Single
         agi:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 185000
           example: 76530
         taxable_income:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 142000
           example: 61000
         total_tax:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 24000
           example: 8200
         refund:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 1200
           example: 0
         balance_due:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 0
           example: 0
         federal_withholding:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 22800
           example: 0
         dependents:
-          type: integer
+          anyOf:
+            - type: integer
+            - type: string
           default: 2
           example: 1
         state:
@@ -75,31 +91,45 @@ components:
           default: AZ
           example: AZ
         schedule_c_gross_revenue:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 280000
           example: 0
         schedule_c_net_profit:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 95000
           example: 0
         contract_labor:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 107920
           example: 0
         w2_income:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 90000
           example: 0
         capital_gains:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 18000
           example: 0
         dividend_income:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 3500
           example: 0
         interest_income:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 1200
           example: 0
         has_retirement_accounts:
@@ -107,7 +137,9 @@ components:
           default: false
           example: true
         age:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           default: 64
           example: 64
         aca_marketplace:
@@ -127,14 +159,18 @@ components:
           type: string
           description: Optional final recommendation.
         tax_efficiency_score:
-          type: number
+          anyOf:
+            - type: number
+            - type: string
           description: Optional tax efficiency score.
         priority_actions:
           type: array
-          description: Optional ranked actions.
+          description: Optional ranked actions. Items may be strategy text strings or structured objects.
           items:
-            type: object
-            additionalProperties: true
+            anyOf:
+              - type: string
+              - type: object
+                additionalProperties: true
         strategies:
           type: array
           description: Optional strategy names.
@@ -144,14 +180,18 @@ components:
           type: array
           description: Optional report sections.
           items:
-            type: object
-            additionalProperties: true
+            anyOf:
+              - type: string
+              - type: object
+                additionalProperties: true
         roi_strategies:
           type: array
           description: Optional ROI strategies.
           items:
-            type: object
-            additionalProperties: true
+            anyOf:
+              - type: string
+              - type: object
+                additionalProperties: true
         logo_path:
           type: string
           default: valhalla_logo.jpg
