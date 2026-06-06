@@ -45,11 +45,6 @@ def _money(value):
 
 def _num(value, default=0):
     try:
-        if isinstance(value, str):
-            cleaned = value.strip().replace("$", "").replace(",", "")
-            if cleaned.startswith("(") and cleaned.endswith(")"):
-                cleaned = "-" + cleaned[1:-1]
-            value = cleaned
         return float(value)
     except Exception:
         return float(default)

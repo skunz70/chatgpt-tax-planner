@@ -64,29 +64,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ValhallaPremiumDocxResponse'
 
-  /generate_report:
-    post:
-      summary: Generate the final downloadable client DOCX report now
-      description: Plain-language alias for final report generation. When the user says generate final report, generate report, create the report, or produce the downloadable report, call this action or generateFinalReport with final_report_payload and return the download_url.
-      operationId: generateReport
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ValhallaPremiumReportInput'
-      responses:
-        '200':
-          description: JSON result with generated DOCX filename and download URL.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValhallaPremiumDocxResponse'
-
   /generate_pdf:
     post:
-      summary: Generate planning preview and strategy analysis only
-      description: Primary planning workflow. Returns the comprehensive planning result. Do not generate the final DOCX report here; wait until the user explicitly asks for the final report, then call generateFinalReport.
+      summary: Planning preview and strategy analysis only, not the final report
+      description: Initial planning action only. Do not use for the final downloadable DOCX report; use generateFinalReport for final reports.
       operationId: generateTaxPlan
       requestBody:
         required: true
@@ -109,27 +90,12 @@ paths:
                     type: string
       responses:
         '200':
-          description: JSON planning result. The final report is generated later by generateFinalReport when explicitly requested.
+          description: Planning preview or strategy response. Not a final client-ready DOCX report.
           content:
-            application/json:
+            application/pdf:
               schema:
-                type: object
-                additionalProperties: true
-                properties:
-                  status:
-                    type: string
-                  report_stage:
-                    type: string
-                  planning_result:
-                    type: object
-                    additionalProperties: true
-                  ready_for_final_report:
-                    type: boolean
-                  final_report_action:
-                    type: string
-                  final_report_payload:
-                    type: object
-                    additionalProperties: true
+                type: string
+                format: binary
 
   /year_end_plan:
     post:
@@ -186,9 +152,7 @@ components:
           default: Test Client
           example: Carlos Santiago Lopez
         tax_year:
-          anyOf:
-            - type: integer
-            - type: string
+          type: integer
           default: 2025
           example: 2025
         filing_status:
@@ -196,45 +160,31 @@ components:
           default: MFJ
           example: Single
         agi:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 185000
           example: 76530
         taxable_income:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 142000
           example: 61000
         total_tax:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 24000
           example: 8200
         refund:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 1200
           example: 0
         balance_due:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 0
           example: 0
         federal_withholding:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 22800
           example: 0
         dependents:
-          anyOf:
-            - type: integer
-            - type: string
+          type: integer
           default: 2
           example: 1
         state:
@@ -242,45 +192,31 @@ components:
           default: AZ
           example: AZ
         schedule_c_gross_revenue:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 280000
           example: 0
         schedule_c_net_profit:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 95000
           example: 0
         contract_labor:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 107920
           example: 0
         w2_income:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 90000
           example: 0
         capital_gains:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 18000
           example: 0
         dividend_income:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 3500
           example: 0
         interest_income:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 1200
           example: 0
         has_retirement_accounts:
@@ -288,9 +224,7 @@ components:
           default: false
           example: true
         age:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           default: 64
           example: 64
         aca_marketplace:
@@ -310,18 +244,14 @@ components:
           type: string
           description: Optional final recommendation.
         tax_efficiency_score:
-          anyOf:
-            - type: number
-            - type: string
+          type: number
           description: Optional tax efficiency score.
         priority_actions:
           type: array
-          description: Optional ranked actions. Items may be strategy text strings or structured objects.
+          description: Optional ranked actions.
           items:
-            anyOf:
-              - type: string
-              - type: object
-                additionalProperties: true
+            type: object
+            additionalProperties: true
         strategies:
           type: array
           description: Optional strategy names.
@@ -331,18 +261,14 @@ components:
           type: array
           description: Optional report sections.
           items:
-            anyOf:
-              - type: string
-              - type: object
-                additionalProperties: true
+            type: object
+            additionalProperties: true
         roi_strategies:
           type: array
           description: Optional ROI strategies.
           items:
-            anyOf:
-              - type: string
-              - type: object
-                additionalProperties: true
+            type: object
+            additionalProperties: true
         logo_path:
           type: string
           default: valhalla_logo.jpg
