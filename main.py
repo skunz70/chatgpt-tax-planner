@@ -773,7 +773,7 @@ async def generate_pdf(payload: dict):
             "status": "error",
             "detail": str(e)
         }
-@app.post("/generate_valhalla_premium_docx")
+@app.post("/generate_valhalla_premium_docx", include_in_schema=False)
 def generate_valhalla_premium_docx(request: Request, payload: dict | None = Body(default=None)):
 
     try:
