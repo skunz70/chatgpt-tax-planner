@@ -66,8 +66,8 @@ paths:
 
   /generate_pdf:
     post:
-      summary: Generate planning preview, strategy analysis, and final DOCX report link
-      description: Primary planning workflow. Returns the comprehensive planning result and also generates the final downloadable DOCX report in final_report.download_url.
+      summary: Generate planning preview and strategy analysis only
+      description: Primary planning workflow. Returns the comprehensive planning result. Do not generate the final DOCX report here; wait until the user explicitly asks for the final report, then call generateFinalReport.
       operationId: generateTaxPlan
       requestBody:
         required: true
@@ -90,7 +90,7 @@ paths:
                     type: string
       responses:
         '200':
-          description: JSON planning result plus final downloadable DOCX report link.
+          description: JSON planning result. The final report is generated later by generateFinalReport when explicitly requested.
           content:
             application/json:
               schema:
@@ -104,9 +104,9 @@ paths:
                   planning_result:
                     type: object
                     additionalProperties: true
-                  final_report:
-                    $ref: '#/components/schemas/ValhallaPremiumDocxResponse'
-                  download_url:
+                  ready_for_final_report:
+                    type: boolean
+                  final_report_action:
                     type: string
 
   /year_end_plan:

@@ -775,25 +775,14 @@ def _build_valhalla_docx_response(request: Request, data: dict):
 
 
 @app.post("/generate_pdf")
-async def generate_pdf(request: Request, payload: dict):
+async def generate_pdf(payload: dict):
     try:
         result = await recommend(payload)
-        report_payload = dict(payload or {})
-        report_payload["planning_result"] = result
-        if isinstance(result, dict):
-            strategies = result.get("strategies") or result.get("recommendations") or result.get("strategy_recommendations")
-            if strategies and not report_payload.get("priority_actions"):
-                report_payload["priority_actions"] = strategies
-            summary = result.get("summary") or result.get("advisor_summary") or result.get("planning_summary")
-            if summary and not report_payload.get("advisor_summary"):
-                report_payload["advisor_summary"] = summary
-
-        final_report = _build_valhalla_docx_response(request, report_payload)
 
         return {
             "status": "success",
-            "report_stage": "planning_preview_and_final_report",
-            "message": "Tax plan generated successfully and the final client-ready DOCX report was generated.",
+            "report_stage": "planning_preview",
+            "message": "Tax plan generated successfully. Add or revise any data before generating the final client-ready report.",
             "input_summary": {
                 "filing_status": payload.get("filing_status"),
                 "agi": payload.get("agi"),
@@ -803,9 +792,9 @@ async def generate_pdf(request: Request, payload: dict):
                 "capital_gains": payload.get("capital_gains")
             },
             "planning_result": result,
-            "final_report": final_report,
-            "download_url": final_report.get("download_url"),
-            "next_step": "Download the generated final client-ready DOCX report from download_url."
+            "ready_for_final_report": True,
+            "final_report_action": "generateFinalReport",
+            "next_step": "When the user explicitly asks for the final report, call generateFinalReport with the confirmed taxpayer values and planning_result."
         }
 
     except Exception as e:
