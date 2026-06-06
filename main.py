@@ -778,6 +778,15 @@ def _build_valhalla_docx_response(request: Request, data: dict):
 async def generate_pdf(payload: dict):
     try:
         result = await recommend(payload)
+        final_report_payload = dict(payload or {})
+        final_report_payload["planning_result"] = result
+        if isinstance(result, dict):
+            strategies = result.get("strategies") or result.get("recommendations") or result.get("strategy_recommendations")
+            if strategies and not final_report_payload.get("priority_actions"):
+                final_report_payload["priority_actions"] = strategies
+            summary = result.get("summary") or result.get("advisor_summary") or result.get("planning_summary")
+            if summary and not final_report_payload.get("advisor_summary"):
+                final_report_payload["advisor_summary"] = summary
 
         return {
             "status": "success",
@@ -794,7 +803,8 @@ async def generate_pdf(payload: dict):
             "planning_result": result,
             "ready_for_final_report": True,
             "final_report_action": "generateFinalReport",
-            "next_step": "When the user explicitly asks for the final report, call generateFinalReport with the confirmed taxpayer values and planning_result."
+            "final_report_payload": final_report_payload,
+            "next_step": "When the user explicitly asks for the final report, call generateFinalReport with final_report_payload. Do not answer in chat instead of calling the action."
         }
 
     except Exception as e:
@@ -822,6 +832,15 @@ def generate_valhalla_premium_docx(request: Request, payload: dict | None = Body
             "download_url": "",
             "download_path": ""
         }
+
+
+@app.post(
+    "/generate_report",
+    operation_id="generateReport",
+    summary="Generate the final downloadable client DOCX report now",
+)
+def generate_report(request: Request, payload: dict | None = Body(default=None)):
+    return generate_valhalla_premium_docx(request, payload)
 
     
         

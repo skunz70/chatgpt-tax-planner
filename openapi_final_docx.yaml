@@ -24,6 +24,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValhallaPremiumDocxResponse'
+  /generate_report:
+    post:
+      summary: Generate the final downloadable client DOCX report now
+      description: Plain-language alias for final report generation. When the user says generate final report, generate report, create the report, or produce the downloadable report, call this action or generateFinalReport with final_report_payload and return the download_url.
+      operationId: generateReport
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValhallaPremiumReportInput'
+      responses:
+        '200':
+          description: JSON result with generated DOCX filename and download URL.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValhallaPremiumDocxResponse'
 components:
   schemas:
     ValhallaPremiumReportInput:
