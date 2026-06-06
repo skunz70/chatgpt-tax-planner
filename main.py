@@ -529,8 +529,15 @@ async def parse_1040(request: Request, file: UploadFile = File(...)):
 
     # keep the rest of your existing route below this line
 
-    # Try OCR first
-    text = ocr_extract_text(pdf_bytes)
+    # Try OCR first, but do not let OCR infrastructure failures prevent
+    # embedded PDF text extraction from running.
+    ocr_error = None
+    try:
+        text = ocr_extract_text(pdf_bytes)
+    except Exception as e:
+        ocr_error = str(e)
+        print("OCR EXTRACTION FAILED:", ocr_error, flush=True)
+        text = ""
 
     # Fallback: try reading embedded PDF text
     if not text or not text.strip():
@@ -542,6 +549,7 @@ async def parse_1040(request: Request, file: UploadFile = File(...)):
             return {
                 "error": "PDF text extraction failed.",
                 "detail": str(e),
+                "ocr_error": ocr_error,
                 "received_filename": received_filename,
                 "content_type": request.headers.get("content-type")
             }
