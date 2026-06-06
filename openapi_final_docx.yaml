@@ -9,7 +9,7 @@ paths:
   /generate_final_report:
     post:
       summary: Generate the final downloadable client DOCX report
-      description: Final DOCX action. Call after plan approval or report request. Use available taxpayer and plan data, omit unknown fields, and return the download_url.
+      description: Mandatory final-report action. When the planning analysis is complete and the user asks for a final report, downloadable report, client-ready report, Valhalla Premium report, or says to call generateFinalReport, call this operation. Use taxpayer and plan values already available in the conversation, omit unknown optional fields, and return/display the download_url. Do not use generateTaxPlan for the final report.
       operationId: generateFinalReport
       requestBody:
         required: false
