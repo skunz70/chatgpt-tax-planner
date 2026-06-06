@@ -510,20 +510,38 @@ def ocr_extract_text(pdf_bytes: bytes) -> str:
     return text
 
 @app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF with OCR fallback")
-async def parse_1040(request: Request, file: UploadFile = File(...)):
+async def parse_1040(request: Request, body: dict = Body(default=None)):
     print("====== /parse_1040 HIT ======", flush=True)
     print("CONTENT TYPE:", request.headers.get("content-type"), flush=True)
 
-    received_filename = file.filename
-    pdf_bytes = await file.read()
-    print("FILE FOUND VIA FILE PARAM", flush=True)
+    pdf_bytes = None
+    received_filename = None
+
+    try:
+        form = await request.form()
+        for value in form.values():
+            if hasattr(value, "filename") and hasattr(value, "read"):
+                received_filename = value.filename
+                pdf_bytes = await value.read()
+                print("FILE FOUND VIA FORM", flush=True)
+                break
+    except Exception as e:
+        print("FORM PARSE FAILED:", str(e), flush=True)
+
+    if pdf_bytes is None and body:
+        print("BODY RECEIVED:", body, flush=True)
+
+        if "file_base64" in body:
+            import base64
+            pdf_bytes = base64.b64decode(body["file_base64"])
+            print("FILE FOUND VIA BASE64", flush=True)
 
     if not pdf_bytes:
         return {
             "error": "No file detected",
             "debug": {
                 "content_type": request.headers.get("content-type"),
-                "filename": received_filename
+                "body": body
             }
         }
 
@@ -543,7 +561,7 @@ async def parse_1040(request: Request, file: UploadFile = File(...)):
                 "error": "PDF text extraction failed.",
                 "detail": str(e),
                 "received_filename": received_filename,
-                "content_type": request.headers.get("content-type")
+                "content_type": content_type
             }
 
     lines = extract_1040_lines_from_text(text)
