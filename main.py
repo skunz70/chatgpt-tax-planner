@@ -747,15 +747,53 @@ class PDFReport(FPDF):
 
 from fastapi.responses import Response
 from report_generator import generate_tax_plan_pdf
+
+def _build_valhalla_docx_response(request: Request, data: dict):
+    from valhalla_premium_docx_report import generate_valhalla_docx_report
+
+    data = data or {}
+    client_name = str(data.get("client_name") or "Test Client")
+    tax_year = str(data.get("tax_year") or "2025")
+    safe_client_name = re.sub(r"[^A-Za-z0-9_-]+", "_", client_name).strip("_") or "Client"
+    safe_tax_year = re.sub(r"[^0-9A-Za-z_-]+", "_", tax_year).strip("_") or "2025"
+    filename = f"valhalla_premium_{safe_client_name}_{safe_tax_year}.docx"
+    file_path = GENERATED_REPORTS_DIR.joinpath(filename)
+
+    generate_valhalla_docx_report(data, output_path=str(file_path))
+
+    download_path = f"/generated_reports/{filename}"
+    download_url = str(request.base_url).rstrip("/") + download_path
+
+    return {
+        "status": "success",
+        "message": "Valhalla Premium DOCX report generated successfully.",
+        "filename": filename,
+        "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "download_url": download_url,
+        "download_path": download_path
+    }
+
+
 @app.post("/generate_pdf")
-async def generate_pdf(payload: dict):
+async def generate_pdf(request: Request, payload: dict):
     try:
         result = await recommend(payload)
+        report_payload = dict(payload or {})
+        report_payload["planning_result"] = result
+        if isinstance(result, dict):
+            strategies = result.get("strategies") or result.get("recommendations") or result.get("strategy_recommendations")
+            if strategies and not report_payload.get("priority_actions"):
+                report_payload["priority_actions"] = strategies
+            summary = result.get("summary") or result.get("advisor_summary") or result.get("planning_summary")
+            if summary and not report_payload.get("advisor_summary"):
+                report_payload["advisor_summary"] = summary
+
+        final_report = _build_valhalla_docx_response(request, report_payload)
 
         return {
             "status": "success",
-            "report_stage": "planning_preview",
-            "message": "Tax plan generated successfully. Review or revise this plan before generating the final client-ready report.",
+            "report_stage": "planning_preview_and_final_report",
+            "message": "Tax plan generated successfully and the final client-ready DOCX report was generated.",
             "input_summary": {
                 "filing_status": payload.get("filing_status"),
                 "agi": payload.get("agi"),
@@ -765,7 +803,9 @@ async def generate_pdf(payload: dict):
                 "capital_gains": payload.get("capital_gains")
             },
             "planning_result": result,
-            "next_step": "After review, call generateFinalReport to generate the final client-ready DOCX report."
+            "final_report": final_report,
+            "download_url": final_report.get("download_url"),
+            "next_step": "Download the generated final client-ready DOCX report from download_url."
         }
 
     except Exception as e:
@@ -782,29 +822,7 @@ async def generate_pdf(payload: dict):
 def generate_valhalla_premium_docx(request: Request, payload: dict | None = Body(default=None)):
 
     try:
-        from valhalla_premium_docx_report import generate_valhalla_docx_report
-
-        data = payload or {}
-        client_name = str(data.get("client_name") or "Test Client")
-        tax_year = str(data.get("tax_year") or "2025")
-        safe_client_name = re.sub(r"[^A-Za-z0-9_-]+", "_", client_name).strip("_") or "Client"
-        safe_tax_year = re.sub(r"[^0-9A-Za-z_-]+", "_", tax_year).strip("_") or "2025"
-        filename = f"valhalla_premium_{safe_client_name}_{safe_tax_year}.docx"
-        file_path = GENERATED_REPORTS_DIR.joinpath(filename)
-
-        generate_valhalla_docx_report(data, output_path=str(file_path))
-
-        download_path = f"/generated_reports/{filename}"
-        download_url = str(request.base_url).rstrip("/") + download_path
-
-        return {
-            "status": "success",
-            "message": "Valhalla Premium DOCX report generated successfully.",
-            "filename": filename,
-            "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "download_url": download_url,
-            "download_path": download_path
-        }
+        return _build_valhalla_docx_response(request, payload or {})
 
     except Exception as e:
         return {
