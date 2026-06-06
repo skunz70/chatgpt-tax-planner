@@ -603,7 +603,7 @@ async def parse_1040(request: Request, file: UploadFile = File(...)):
     return {
         "status": "success",
         "received_filename": received_filename,
-        "content_type": request.headers.get("content-type"),
+        "content_type": content_type,
         "filing_status": "unknown",
         "agi": agi,
         "taxable_income": taxable_income,
