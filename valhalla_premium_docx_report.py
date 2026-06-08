@@ -21,7 +21,9 @@ except Exception:
 
 BRAND_RED = "981E26"
 BRAND_DARK = "242424"
+BRAND_BLACK = "18181B"
 BRAND_GOLD = "B7892B"
+DEEP_GOLD = "8A651D"
 INK = "1F2933"
 TEXT_GRAY = "5C6670"
 LIGHT_GRAY = "F3F5F7"
@@ -29,6 +31,8 @@ LINE_GRAY = "D8DEE5"
 LIGHT_RED = "F8ECEE"
 LIGHT_GOLD = "FFF8E6"
 SOFT_BLUE = "EDF3F8"
+SOFT_GREEN = "ECF6F0"
+SOFT_SLATE = "EEF2F6"
 WHITE = "FFFFFF"
 LOGO_ASSET = os.path.join(os.path.dirname(__file__), "assets", "valhalla_gold_logo_report.b64")
 
@@ -96,6 +100,20 @@ def _set_border(cell, color=LINE_GRAY, size="4"):
         element.set(qn("w:color"), color)
 
 
+def _clear_border(cell):
+    tc_pr = cell._tc.get_or_add_tcPr()
+    borders = tc_pr.first_child_found_in("w:tcBorders")
+    if borders is None:
+        borders = OxmlElement("w:tcBorders")
+        tc_pr.append(borders)
+    for edge in ("top", "left", "bottom", "right"):
+        element = borders.find(qn("w:" + edge))
+        if element is None:
+            element = OxmlElement("w:" + edge)
+            borders.append(element)
+        element.set(qn("w:val"), "nil")
+
+
 def _cell_margins(cell, top=120, start=140, bottom=120, end=140):
     tc_pr = cell._tc.get_or_add_tcPr()
     tc_mar = tc_pr.first_child_found_in("w:tcMar")
@@ -114,7 +132,10 @@ def _cell_margins(cell, top=120, start=140, bottom=120, end=140):
 def _format_cell(cell, fill=None, color=INK, bold=False, size=8.8, align=None, border=LINE_GRAY):
     if fill:
         _set_shading(cell, fill)
-    _set_border(cell, border)
+    if border is None:
+        _clear_border(cell)
+    else:
+        _set_border(cell, border)
     _cell_margins(cell)
     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
     for paragraph in cell.paragraphs:
@@ -152,6 +173,14 @@ def _set_widths(table, widths):
         for idx, width in enumerate(widths):
             if idx < len(row.cells):
                 row.cells[idx].width = Inches(width)
+
+
+def _add_cell_text(cell, text, size=8.8, color=INK, bold=False, after=0, align=None):
+    p = cell.paragraphs[0] if cell.paragraphs else cell.add_paragraph()
+    p.text = ""
+    run = p.add_run(str(text))
+    _paragraph(p, size=size, color=color, bold=bold, after=after, align=align)
+    return p
 
 
 def _page_number(paragraph):
@@ -202,10 +231,10 @@ def _configure(doc, data):
     section.orientation = WD_ORIENT.PORTRAIT
     section.page_width = Inches(8.5)
     section.page_height = Inches(11)
-    section.top_margin = Inches(0.58)
-    section.bottom_margin = Inches(0.62)
-    section.left_margin = Inches(0.62)
-    section.right_margin = Inches(0.62)
+    section.top_margin = Inches(0.62)
+    section.bottom_margin = Inches(0.68)
+    section.left_margin = Inches(0.68)
+    section.right_margin = Inches(0.68)
 
     header = section.header.paragraphs[0]
     header.text = f"Valhalla Premium Tax Strategy Report | {_safe(data.get('client_name'), 'Client')} | {_safe(data.get('tax_year'), 'Tax Year')}"
@@ -219,7 +248,7 @@ def _configure(doc, data):
     _paragraph(footer, size=7.3, color=TEXT_GRAY, after=0)
 
     doc.styles["Normal"].font.name = "Aptos"
-    doc.styles["Normal"].font.size = Pt(9.4)
+    doc.styles["Normal"].font.size = Pt(9.6)
 
 
 def _section_title(doc, title, kicker=None):
@@ -242,6 +271,36 @@ def _section_title(doc, title, kicker=None):
     bottom.set(qn("w:color"), LINE_GRAY)
     border.append(bottom)
     p._p.get_or_add_pPr().append(border)
+
+
+def _section_band(doc, title, subtitle=""):
+    table = doc.add_table(rows=1, cols=1)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _set_widths(table, [7.15])
+    cell = table.cell(0, 0)
+    _format_cell(cell, fill=BRAND_BLACK, color=WHITE, border=BRAND_BLACK)
+    p = cell.paragraphs[0]
+    p.text = ""
+    k = p.add_run(title.upper())
+    k.font.name = "Aptos Display"
+    k.font.size = Pt(12.2)
+    k.font.bold = True
+    k.font.color.rgb = RGBColor.from_string(WHITE)
+    if subtitle:
+        sub = cell.add_paragraph(subtitle)
+        _paragraph(sub, size=8.2, color="D7DEE6", after=0)
+    doc.add_paragraph().paragraph_format.space_after = Pt(5)
+
+
+def _divider(doc, color=LINE_GRAY):
+    table = doc.add_table(rows=1, cols=1)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _set_widths(table, [7.15])
+    cell = table.cell(0, 0)
+    _format_cell(cell, fill=color, border=color)
+    _cell_margins(cell, 12, 0, 12, 0)
+    cell.paragraphs[0].text = ""
+    doc.add_paragraph().paragraph_format.space_after = Pt(4)
 
 
 def _label_value(cell, label, value, value_color=INK, value_size=14.0):
@@ -459,27 +518,27 @@ def _normalize_actions(data, strategy_output, roi_output):
 def _cover(doc, data, actions):
     logo = doc.add_paragraph()
     logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    if not _add_logo(logo, width=3.55):
+    if not _add_logo(logo, width=3.25):
         logo.add_run("VALHALLA TAX & FINANCE LLC")
         _paragraph(logo, size=15, color=BRAND_RED, bold=True, after=3)
-    logo.paragraph_format.space_after = Pt(12)
+    logo.paragraph_format.space_after = Pt(10)
 
     band = doc.add_table(rows=1, cols=1)
     band.alignment = WD_TABLE_ALIGNMENT.CENTER
     _set_widths(band, [7.25])
     cell = band.cell(0, 0)
-    _format_cell(cell, fill=BRAND_DARK, color=WHITE, border=BRAND_DARK)
+    _format_cell(cell, fill=BRAND_BLACK, color=WHITE, border=BRAND_BLACK)
     p = cell.paragraphs[0]
-    p.add_run("Premium tax planning report | Client advisory deliverable")
-    _paragraph(p, size=9.2, color="D7DEE6", bold=True, after=0, align=WD_ALIGN_PARAGRAPH.CENTER)
+    p.add_run("Premium tax strategy | Client advisory deliverable | Implementation roadmap")
+    _paragraph(p, size=9.0, color="D7DEE6", bold=True, after=0, align=WD_ALIGN_PARAGRAPH.CENTER)
 
-    doc.add_paragraph().paragraph_format.space_after = Pt(12)
+    doc.add_paragraph().paragraph_format.space_after = Pt(10)
     title = doc.add_paragraph()
     title.add_run("Tax Strategy\nImplementation Report")
-    _paragraph(title, size=28, color=BRAND_RED, bold=True, after=4)
+    _paragraph(title, size=29, color=BRAND_RED, bold=True, after=3)
 
     subtitle = doc.add_paragraph("A premium client-facing roadmap for reducing avoidable tax drag, improving cash-flow control, and turning the tax return into an implementation plan.")
-    _paragraph(subtitle, size=10.8, color=TEXT_GRAY, after=13)
+    _paragraph(subtitle, size=10.4, color=TEXT_GRAY, after=10)
 
     meta = doc.add_table(rows=1, cols=4)
     meta.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -494,10 +553,26 @@ def _cover(doc, data, actions):
     ]
     for idx, (label, value, color) in enumerate(values):
         meta_cell = meta.cell(0, idx)
-        _format_cell(meta_cell, fill=LIGHT_GRAY, border=LINE_GRAY)
+        _format_cell(meta_cell, fill=SOFT_SLATE, border="DDE3EA")
         _label_value(meta_cell, label, value, color, 11.6)
 
     low, high = _opportunity_range(data, actions)
+    doc.add_paragraph().paragraph_format.space_after = Pt(3)
+    proof = doc.add_table(rows=1, cols=3)
+    proof.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _set_widths(proof, [2.35, 2.35, 2.35])
+    proof_items = [
+        ("What this plan does", "Ranks the highest-value planning moves and turns them into a client action sequence."),
+        ("What the client sees", "Clear dollars, timing, priority, and why each strategy matters."),
+        ("How to use it", "Use this report as the agenda for the implementation meeting."),
+    ]
+    for idx, (label, body) in enumerate(proof_items):
+        proof_cell = proof.cell(0, idx)
+        _format_cell(proof_cell, fill=WHITE if idx != 1 else LIGHT_GOLD, border="E2E8F0")
+        _add_cell_text(proof_cell, label.upper(), size=7.2, color=DEEP_GOLD, bold=True)
+        p_body = proof_cell.add_paragraph(body)
+        _paragraph(p_body, size=8.2, color=INK, after=0)
+
     doc.add_paragraph().paragraph_format.space_after = Pt(4)
     _callout(
         doc,
@@ -510,15 +585,16 @@ def _cover(doc, data, actions):
     summary = data.get("advisor_summary") or data.get("planning_summary") or data.get("top_planning_focus") or "This report turns the reviewed return into an implementation plan: what matters most, why it matters, and what the client should act on first."
     _callout(doc, "Advisor Summary", summary, fill=LIGHT_RED, accent=BRAND_RED)
 
-    toc = doc.add_table(rows=5, cols=2)
+    toc = doc.add_table(rows=6, cols=2)
     toc.alignment = WD_TABLE_ALIGNMENT.CENTER
     _set_widths(toc, [0.52, 6.72])
     items = [
         ("01", "Executive opportunity dashboard"),
         ("02", "Confirmed tax position and planning read"),
-        ("03", "Visual planning analysis"),
-        ("04", "Priority strategies and action plan"),
-        ("05", "Implementation roadmap and advisor notes"),
+        ("03", "Client decision matrix"),
+        ("04", "Visual planning analysis"),
+        ("05", "Priority strategies and action plan"),
+        ("06", "Implementation roadmap and advisor notes"),
     ]
     for row, (num, label) in zip(toc.rows, items):
         row.cells[0].text = num
@@ -529,7 +605,7 @@ def _cover(doc, data, actions):
 
 
 def _dashboard(doc, data, actions):
-    _section_title(doc, "Executive Opportunity Dashboard", "Client snapshot")
+    _section_band(doc, "Executive Opportunity Dashboard", "The planning conversation starts here: current position, cash-flow issue, priority range, and top actions.")
     low, high = _opportunity_range(data, actions)
     refund_label, refund_value, refund_color = _refund_or_due(data)
     cards = [
@@ -552,6 +628,63 @@ def _dashboard(doc, data, actions):
     doc.add_paragraph().paragraph_format.space_after = Pt(2)
     _tax_efficiency_panel(doc, data, actions)
     _strategy_cards(doc, actions[:3], compact=True)
+    _divider(doc, "E8EDF3")
+
+
+def _decision_matrix(doc, data, actions):
+    _section_title(doc, "Client Decision Matrix", "What to approve")
+    intro = doc.add_paragraph("This page turns the plan into decisions. It is designed to help the client see which strategies deserve approval, what each one affects, and when the work should begin.")
+    _paragraph(intro, size=8.9, color=TEXT_GRAY, after=6)
+
+    rows = [["Priority", "Strategy", "Client Value", "Timing", "Decision"]]
+    for idx, action in enumerate(actions[:5], start=1):
+        rows.append([
+            f"#{idx}",
+            _safe(action.get("title"), "Planning action"),
+            _limit(action.get("estimated_savings", "Planning value"), 90),
+            _safe(action.get("timeline"), "Review"),
+            "Approve / Model / Defer",
+        ])
+    _simple_table(doc, rows, [0.72, 2.15, 1.75, 1.25, 1.38], header_fill=BRAND_BLACK, font_size=7.9)
+
+    grid = doc.add_table(rows=1, cols=3)
+    grid.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _set_widths(grid, [2.35, 2.35, 2.35])
+    cells = [
+        ("Approve", "Move forward when the tax impact, timing, and documentation are clear."),
+        ("Model", "Run a scenario when the strategy depends on income, contribution level, or entity timing."),
+        ("Defer", "Park the item when the facts are incomplete or the cost outweighs current-year value."),
+    ]
+    fills = [SOFT_GREEN, SOFT_BLUE, LIGHT_GOLD]
+    accents = ["2F7D4A", "4D6F8C", DEEP_GOLD]
+    for idx, (label, body) in enumerate(cells):
+        cell = grid.cell(0, idx)
+        _format_cell(cell, fill=fills[idx], border="DDE3EA")
+        _add_cell_text(cell, label.upper(), size=8.0, color=accents[idx], bold=True)
+        p = cell.add_paragraph(body)
+        _paragraph(p, size=8.0, color=INK, after=0)
+    doc.add_paragraph().paragraph_format.space_after = Pt(4)
+
+
+def _value_roadmap(doc, data, actions):
+    _section_title(doc, "Planning Value Roadmap", "How value becomes action")
+    rows = [["Stage", "Purpose", "Client-Facing Result"]]
+    roadmap = [
+        ("1. Diagnose", "Confirm the tax baseline, cash-flow issue, and bracket position.", "Client understands what the return is telling them."),
+        ("2. Prioritize", "Rank strategies by impact, urgency, timing, and implementation friction.", "Client sees where the first dollars of effort should go."),
+        ("3. Model", "Quantify selected strategies before implementation.", "Client can approve strategies with clearer expectations."),
+        ("4. Implement", "Execute approved actions with documentation and deadlines.", "Client receives a plan that turns into measurable work."),
+    ]
+    rows.extend(roadmap)
+    _simple_table(doc, rows, [1.1, 3.05, 3.1], header_fill=BRAND_RED, font_size=8.0)
+
+    _callout(
+        doc,
+        "Advisor Positioning Note",
+        "This report is intentionally structured as an implementation document rather than a tax summary. The goal is to move the client from return review to approved planning decisions.",
+        fill=SOFT_BLUE,
+        accent="4D6F8C",
+    )
 
 
 def _tax_efficiency_panel(doc, data, actions):
@@ -687,7 +820,7 @@ def _chart(doc, title, labels, values, caption, kind="barh", width=5.95):
 
 
 def _visuals(doc, data, actions):
-    _section_title(doc, "Planning Visuals", "Data read")
+    _section_band(doc, "Planning Visuals", "Charts give the client a faster way to see the tax position, business economics, and priority order.")
     _chart(
         doc,
         "Current Federal Tax Position",
@@ -721,7 +854,7 @@ def _visuals(doc, data, actions):
 
 def _strategy_cards(doc, actions, compact=False):
     if not compact:
-        _section_title(doc, "Priority Strategy Recommendations", "Client action plan")
+        _section_band(doc, "Priority Strategy Recommendations", "Each recommendation is presented as an action card with impact, timing, and advisor rationale.")
     rows_per = 1 if compact else min(len(actions), 6)
     for idx, action in enumerate(actions[: rows_per if compact else 6], start=1):
         table = doc.add_table(rows=1, cols=2)
@@ -747,11 +880,16 @@ def _strategy_cards(doc, actions, compact=False):
         _paragraph(details, size=8.4, color=TEXT_GRAY, after=2)
         reason = body.add_paragraph(_limit(action.get("reason", "Client-specific planning opportunity."), 430 if compact else 620))
         _paragraph(reason, size=8.7, color=INK, after=0)
+        if not compact:
+            decision = body.add_paragraph()
+            decision.add_run("Client decision: ").bold = True
+            decision.add_run("Approve, model, or defer after advisor review.")
+            _paragraph(decision, size=8.1, color=DEEP_GOLD, after=0)
         doc.add_paragraph().paragraph_format.space_after = Pt(2)
 
 
 def _implementation(doc, actions):
-    _section_title(doc, "Implementation Roadmap", "Do this now")
+    _section_band(doc, "Implementation Roadmap", "The plan should leave the meeting with owners, timing, and next steps.")
     first = actions[0].get("title", "highest-value planning item") if actions else "highest-value planning item"
     rows = [
         ["Timing", "Client Action", "Advisor Follow-Up"],
@@ -764,7 +902,7 @@ def _implementation(doc, actions):
 
 
 def _final_pages(doc, data):
-    _section_title(doc, "Final Advisor Recommendation", "Recommendation")
+    _section_band(doc, "Final Advisor Recommendation", "The closing page gives the client a clear next move and keeps the plan actionable.")
     final = data.get("final_recommendation") or data.get("planning_summary") or "The strongest planning value comes from prioritizing the right strategies in the right order. The client should focus first on actions that improve tax efficiency, reduce compliance risk, improve cash-flow predictability, and support long-term wealth building."
     p = doc.add_paragraph(_limit(final, 760))
     _paragraph(p, size=9.3, color=INK, after=8)
@@ -842,8 +980,10 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
     _cover(doc, data, actions)
     _dashboard(doc, data, actions)
     _tax_position(doc, data)
+    _decision_matrix(doc, data, actions)
     _business_section(doc, data)
     _visuals(doc, data, actions)
+    _value_roadmap(doc, data, actions)
     doc.add_page_break()
     _strategy_cards(doc, actions, compact=False)
     _dynamic_sections(doc, dynamic_sections)
