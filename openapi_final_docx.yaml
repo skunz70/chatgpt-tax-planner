@@ -8,7 +8,7 @@ servers:
 paths:
   /generate_final_report:
     post:
-      summary: Generate the final downloadable client DOCX report
+      summary: MUST CALL to create the final report DOCX download
       description: Mandatory final-report action. After planning, call this when the user asks for a final, downloadable, client-ready, or Valhalla Premium report. Use available taxpayer values, omit unknown fields, and return the download_url.
       operationId: generateFinalReport
       requestBody:
