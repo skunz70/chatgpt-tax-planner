@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Tax Planner Upload API
   description: Upload a tax return PDF, generate planning output, and create final Valhalla client reports.
-  version: "1.1.0"
+  version: "1.1.1"
 servers:
   - url: https://chatgpt-tax-planner.onrender.com
 paths:
