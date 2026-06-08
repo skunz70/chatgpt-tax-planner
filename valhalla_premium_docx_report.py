@@ -30,8 +30,6 @@ LIGHT_GRAY = "F3F5F7"
 LINE_GRAY = "D8DEE5"
 LIGHT_RED = "F8ECEE"
 LIGHT_GOLD = "FFF8E6"
-SOFT_BLUE = "EDF3F8"
-SOFT_GREEN = "ECF6F0"
 SOFT_SLATE = "EEF2F6"
 WHITE = "FFFFFF"
 LOGO_ASSET = os.path.join(os.path.dirname(__file__), "assets", "valhalla_gold_logo_report.b64")
@@ -61,6 +59,13 @@ def _pct(numerator, denominator):
     return f"{(_num(numerator) / denominator * 100):.1f}%"
 
 
+def _rate(value):
+    try:
+        return f"{float(value) * 100:.1f}%"
+    except Exception:
+        return "0.0%"
+
+
 def _safe(value, fallback="Not provided"):
     if value is None or value == "":
         return fallback
@@ -72,6 +77,75 @@ def _limit(text, length=420):
     if len(text) <= length:
         return text
     return text[: length - 3].rstrip() + "..."
+
+
+def _filing_key(status):
+    status = str(status or "").strip().lower().replace("-", " ").replace("_", " ")
+    if status in ("mfj", "married filing jointly", "married joint", "joint"):
+        return "mfj"
+    if status in ("hoh", "head of household"):
+        return "hoh"
+    if status in ("mfs", "married filing separately", "separate"):
+        return "mfs"
+    return "single"
+
+
+def _ordinary_brackets(status):
+    key = _filing_key(status)
+    if key == "mfj":
+        return [(23850, 0.10), (96950, 0.12), (206700, 0.22), (394600, 0.24), (501050, 0.32), (751600, 0.35), (10**12, 0.37)]
+    if key == "hoh":
+        return [(17000, 0.10), (64850, 0.12), (103350, 0.22), (197300, 0.24), (250500, 0.32), (626350, 0.35), (10**12, 0.37)]
+    if key == "mfs":
+        return [(11925, 0.10), (48475, 0.12), (103350, 0.22), (197300, 0.24), (250525, 0.32), (375800, 0.35), (10**12, 0.37)]
+    return [(11925, 0.10), (48475, 0.12), (103350, 0.22), (197300, 0.24), (250525, 0.32), (626350, 0.35), (10**12, 0.37)]
+
+
+def _ordinary_tax(taxable_income, status):
+    taxable = max(0, _num(taxable_income))
+    total = 0
+    last = 0
+    for top, rate in _ordinary_brackets(status):
+        if taxable <= last:
+            break
+        amount = min(taxable, top) - last
+        total += amount * rate
+        last = top
+    return total
+
+
+def _marginal_rate(taxable_income, status):
+    taxable = max(0, _num(taxable_income))
+    for top, rate in _ordinary_brackets(status):
+        if taxable <= top:
+            return rate
+    return 0.37
+
+
+def _ltcg_thresholds(status):
+    key = _filing_key(status)
+    if key == "mfj":
+        return 96700, 600050
+    if key == "hoh":
+        return 64750, 566700
+    if key == "mfs":
+        return 48350, 300000
+    return 48350, 533400
+
+
+def _estimate_ltcg_tax(ordinary_base, preferred_income, status):
+    ordinary_base = max(0, _num(ordinary_base))
+    remaining = max(0, _num(preferred_income))
+    zero_top, fifteen_top = _ltcg_thresholds(status)
+    zero_room = max(0, zero_top - ordinary_base)
+    at_zero = min(remaining, zero_room)
+    remaining -= at_zero
+    fifteen_room = max(0, fifteen_top - max(ordinary_base + at_zero, zero_top))
+    at_fifteen = min(remaining, fifteen_room)
+    remaining -= at_fifteen
+    at_twenty = max(0, remaining)
+    tax = at_fifteen * 0.15 + at_twenty * 0.20
+    return at_zero, at_fifteen, at_twenty, tax
 
 
 def _set_shading(cell, fill):
@@ -592,9 +666,9 @@ def _cover(doc, data, actions):
         ("01", "Executive opportunity dashboard"),
         ("02", "Confirmed tax position and planning read"),
         ("03", "Client decision matrix"),
-        ("04", "Visual planning analysis"),
-        ("05", "Priority strategies and action plan"),
-        ("06", "Implementation roadmap and advisor notes"),
+        ("04", "Roth conversion and capital gain scenarios"),
+        ("05", "Visual tax snapshot"),
+        ("06", "Priority strategies and action roadmap"),
     ]
     for row, (num, label) in zip(toc.rows, items):
         row.cells[0].text = num
@@ -655,8 +729,8 @@ def _decision_matrix(doc, data, actions):
         ("Model", "Run a scenario when the strategy depends on income, contribution level, or entity timing."),
         ("Defer", "Park the item when the facts are incomplete or the cost outweighs current-year value."),
     ]
-    fills = [SOFT_GREEN, SOFT_BLUE, LIGHT_GOLD]
-    accents = ["2F7D4A", "4D6F8C", DEEP_GOLD]
+    fills = [LIGHT_GOLD, LIGHT_GRAY, LIGHT_RED]
+    accents = [DEEP_GOLD, BRAND_BLACK, BRAND_RED]
     for idx, (label, body) in enumerate(cells):
         cell = grid.cell(0, idx)
         _format_cell(cell, fill=fills[idx], border="DDE3EA")
@@ -682,8 +756,8 @@ def _value_roadmap(doc, data, actions):
         doc,
         "Advisor Positioning Note",
         "This report is intentionally structured as an implementation document rather than a tax summary. The goal is to move the client from return review to approved planning decisions.",
-        fill=SOFT_BLUE,
-        accent="4D6F8C",
+        fill=LIGHT_GRAY,
+        accent=BRAND_BLACK,
     )
 
 
@@ -735,7 +809,7 @@ def _tax_position(doc, data):
     _simple_table(doc, rows, [1.52, 1.78, 3.95], font_size=8.4)
 
     focus = data.get("top_planning_focus") or "The return should be used as a planning baseline for retirement funding, withholding, deductions, and state-specific opportunities."
-    _callout(doc, "Advisor Read", focus, fill=SOFT_BLUE, accent="4D6F8C")
+    _callout(doc, "Advisor Read", focus, fill=LIGHT_GRAY, accent=BRAND_BLACK)
 
 
 def _business_section(doc, data):
@@ -756,6 +830,122 @@ def _business_section(doc, data):
     _callout(doc, "Business Planning Priority", "Tie Schedule C profit to clean books, documented expenses, retirement funding, quarterly tax planning, and an annual entity trigger review.", fill=LIGHT_GOLD, accent=BRAND_GOLD)
 
 
+def _roth_conversion_section(doc, data):
+    taxable = _num(data.get("taxable_income", 0))
+    if taxable <= 0:
+        return
+    status = data.get("filing_status", "single")
+    explicit = data.get("roth_conversion_amount") or data.get("recommended_roth_conversion")
+    if explicit not in (None, ""):
+        target = max(0, _num(explicit))
+    else:
+        rate = _marginal_rate(taxable, status)
+        if rate <= 0.12:
+            target = 60000
+        elif rate <= 0.22:
+            target = 50000
+        elif rate <= 0.24:
+            target = 30000
+        else:
+            target = 20000
+    if target <= 0:
+        return
+
+    _section_title(doc, "Roth Conversion Tax Cost Scenarios", "1, 3, and 5 year view")
+    note = doc.add_paragraph("The table below illustrates federal tax cost if the same total Roth conversion target is completed all at once or spread across multiple years. It is a report illustration only; final conversion sizing should be modeled with actual current-year income, state tax, IRMAA exposure, and cash available to pay the tax.")
+    _paragraph(note, size=8.4, color=TEXT_GRAY, after=6)
+
+    rows = [["Scenario", "Annual Conversion", "Estimated Annual Federal Tax", "Total Federal Tax", "Effective Rate"]]
+    for years in (1, 3, 5):
+        annual = target / years
+        annual_tax = max(0, _ordinary_tax(taxable + annual, status) - _ordinary_tax(taxable, status))
+        total_tax = annual_tax * years
+        rows.append([
+            f"{years} year" if years == 1 else f"{years} years",
+            _money(annual),
+            _money(annual_tax),
+            _money(total_tax),
+            _rate(total_tax / target if target else 0),
+        ])
+    _simple_table(doc, rows, [1.0, 1.55, 1.85, 1.45, 1.4], header_fill=BRAND_BLACK, font_size=8.0)
+
+    _chart(
+        doc,
+        "Roth Conversion Federal Tax Cost by Timing",
+        ["1 year", "3 years", "5 years"],
+        [max(0, _ordinary_tax(taxable + target, status) - _ordinary_tax(taxable, status)),
+         max(0, _ordinary_tax(taxable + target / 3, status) - _ordinary_tax(taxable, status)) * 3,
+         max(0, _ordinary_tax(taxable + target / 5, status) - _ordinary_tax(taxable, status)) * 5],
+        "Compares estimated federal tax cost for the same conversion target under different implementation timelines. Lower bars indicate lower projected federal tax cost under this simplified illustration.",
+        kind="bar",
+        width=5.65,
+    )
+
+    _callout(
+        doc,
+        "Roth Planning Read",
+        "A multi-year conversion schedule can smooth tax cost and may preserve bracket flexibility. The preferred option is usually the one that converts enough to improve long-term tax diversification without pushing the client into avoidable higher-rate or premium-surcharge territory.",
+        fill=LIGHT_GOLD,
+        accent=BRAND_GOLD,
+    )
+
+
+def _capital_gain_section(doc, data):
+    gains = _num(data.get("capital_gains", data.get("capital_gain", 0)))
+    dividends = _num(data.get("qualified_dividends", data.get("dividend_income", 0)))
+    losses = abs(min(0, gains))
+    preferred = max(0, gains) + max(0, dividends)
+    taxable = _num(data.get("taxable_income", 0))
+    if not preferred and not losses and not taxable:
+        return
+
+    status = data.get("filing_status", "single")
+    ordinary_base = max(0, taxable - preferred)
+    zero_top, fifteen_top = _ltcg_thresholds(status)
+    zero_room = max(0, zero_top - ordinary_base)
+    fifteen_room = max(0, fifteen_top - max(ordinary_base, zero_top))
+    at_zero, at_fifteen, at_twenty, preferred_tax = _estimate_ltcg_tax(ordinary_base, preferred, status)
+
+    _section_title(doc, "Capital Gain and Loss Planning", "Investment tax review")
+    rows = [
+        ["Planning Item", "Amount", "Client Meaning"],
+        ["Long-term gains reported", _money(gains), "Use gain harvesting or loss harvesting intentionally rather than reactively"],
+        ["Dividend income", _money(dividends), "Confirm qualified vs. ordinary dividend character before final tax modeling"],
+        ["Estimated ordinary taxable base", _money(ordinary_base), "Preferred income is stacked on top of ordinary income for capital gain bracket purposes"],
+        ["0% LTCG bracket room", _money(zero_room), "Potential room where qualified dividends or long-term gains may be taxed at 0% federally"],
+        ["15% LTCG bracket room", _money(fifteen_room), "Room before the federal 20% long-term capital gain bracket begins"],
+        ["Estimated federal tax on preferred income", _money(preferred_tax), "Approximate federal tax on reported gains and dividends in this illustration"],
+    ]
+    _simple_table(doc, rows, [1.85, 1.35, 4.05], header_fill=BRAND_BLACK, font_size=8.0)
+
+    bracket_rows = [
+        ["Capital Gain Bracket", "Income Assigned", "Estimated Tax"],
+        ["0% bracket", _money(at_zero), "$0"],
+        ["15% bracket", _money(at_fifteen), _money(at_fifteen * 0.15)],
+        ["20% bracket", _money(at_twenty), _money(at_twenty * 0.20)],
+        ["Total preferred income", _money(preferred), _money(preferred_tax)],
+    ]
+    _simple_table(doc, bracket_rows, [1.8, 1.75, 1.55], header_fill=BRAND_RED, font_size=8.0)
+
+    _chart(
+        doc,
+        "Preferred Income by Capital Gain Bracket",
+        ["0% LTCG", "15% LTCG", "20% LTCG"],
+        [at_zero, at_fifteen, at_twenty],
+        "Shows where reported long-term gains and dividend income fall after ordinary taxable income is considered. This is a bracket-stacking view, not a strategy ranking chart.",
+        kind="bar",
+        width=5.65,
+    )
+
+    _callout(
+        doc,
+        "Capital Gain Planning Read",
+        "If taxable investments exist, review unrealized gains and losses before year-end. The planning goal is to coordinate gain harvesting, loss harvesting, charitable gifting of appreciated assets, and bracket management before trades are placed.",
+        fill=LIGHT_RED if gains > 0 else LIGHT_GOLD,
+        accent=BRAND_RED if gains > 0 else BRAND_GOLD,
+    )
+
+
 def _create_chart(path, title, labels, values, kind="barh"):
     try:
         import matplotlib
@@ -764,7 +954,7 @@ def _create_chart(path, title, labels, values, kind="barh"):
         import matplotlib.ticker as mtick
 
         values = [_num(v) for v in values]
-        colors = ["#981E26", "#B7892B", "#334E68", "#627D98", "#D8DEE5", "#5C6670"]
+        colors = ["#981E26", "#B7892B", "#242424", "#9CA3AF", "#D8DEE5", "#5C6670"]
         plt.rcParams["font.family"] = "DejaVu Sans"
         fig, ax = plt.subplots(figsize=(6.2, 2.25))
         fig.patch.set_facecolor("white")
@@ -812,6 +1002,8 @@ def _chart(doc, title, labels, values, caption, kind="barh", width=5.95):
             p.add_run().add_picture(chart_path, width=Inches(width))
             cap = doc.add_paragraph(caption)
             _paragraph(cap, size=7.8, color=TEXT_GRAY, italic=True, after=7, align=WD_ALIGN_PARAGRAPH.CENTER)
+        else:
+            _chart_fallback_table(doc, title, labels, values, caption)
     finally:
         try:
             os.remove(chart_path)
@@ -819,14 +1011,35 @@ def _chart(doc, title, labels, values, caption, kind="barh", width=5.95):
             pass
 
 
+def _chart_fallback_table(doc, title, labels, values, caption):
+    heading = doc.add_paragraph(title)
+    _paragraph(heading, size=10.0, color=BRAND_BLACK, bold=True, after=4, align=WD_ALIGN_PARAGRAPH.CENTER)
+    numeric_values = [_num(v) for v in values]
+    max_value = max([abs(v) for v in numeric_values] or [1]) or 1
+    rows = [["Item", "Amount", "Relative View"]]
+    for label, value in zip(labels, numeric_values):
+        blocks = max(1, int(abs(value) / max_value * 12)) if value else 0
+        bar = ("|" * blocks) if blocks else "-"
+        rows.append([label, _money(value), bar])
+    _simple_table(doc, rows, [2.25, 1.55, 3.1], header_fill=BRAND_BLACK, font_size=8.0)
+    cap = doc.add_paragraph(caption)
+    _paragraph(cap, size=7.8, color=TEXT_GRAY, italic=True, after=7, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+
 def _visuals(doc, data, actions):
-    _section_band(doc, "Planning Visuals", "Charts give the client a faster way to see the tax position, business economics, and priority order.")
+    _section_band(doc, "Tax Return Snapshot Charts", "These charts summarize return facts only. Strategy tax costs are shown separately in the Roth and capital gain sections.")
+    guide_rows = [
+        ["Chart", "What It Means"],
+        ["Tax return dollar snapshot", "Compares AGI, taxable income, total tax, withholding, and refund or balance due from the return."],
+        ["Schedule C economics", "Shows gross revenue, estimated expenses, and net profit or loss when business activity exists."],
+    ]
+    _simple_table(doc, guide_rows, [2.15, 5.1], header_fill=BRAND_BLACK, font_size=8.0)
     _chart(
         doc,
-        "Current Federal Tax Position",
+        "Tax Return Dollar Snapshot",
         ["AGI", "Taxable Income", "Total Tax", "Withholding", _refund_or_due(data)[0]],
         [data.get("agi", 0), data.get("taxable_income", 0), data.get("total_tax", 0), data.get("federal_withholding", 0), abs(_num(data.get("balance_due", 0)) or _num(data.get("refund", 0)))],
-        "This chart frames the planning baseline: income, taxable exposure, federal tax cost, payments, and the year-end cash-flow result.",
+        "This chart is not a savings projection. It simply shows the major dollar amounts from the return so the client can see the planning baseline.",
         kind="barh",
         width=5.75,
     )
@@ -839,17 +1052,10 @@ def _visuals(doc, data, actions):
             "Schedule C Economics",
             ["Gross Revenue", "Expenses", "Net Profit"],
             [gross, max(gross - net, 0), net],
-            "Business-owner planning should focus on clean records, retirement contribution modeling, and quarterly tax discipline.",
+            "This chart explains the business income picture: gross revenue, estimated deductions, and the resulting net profit or loss.",
             kind="barh",
             width=5.75,
         )
-
-    labels = [a.get("title", "Strategy")[:24] for a in actions[:5]]
-    values = []
-    for idx, action in enumerate(actions[:5], start=1):
-        raw = action.get("score")
-        values.append(_num(raw, max(30, 90 - idx * 10)))
-    _chart(doc, "Priority Strategy Ranking", labels, values, "Relative ranking based on urgency, tax impact, implementation timing, and planning value.", kind="bar", width=5.75)
 
 
 def _strategy_cards(doc, actions, compact=False):
@@ -982,6 +1188,8 @@ def generate_valhalla_docx_report(data: dict, output_path: str = "valhalla_premi
     _tax_position(doc, data)
     _decision_matrix(doc, data, actions)
     _business_section(doc, data)
+    _roth_conversion_section(doc, data)
+    _capital_gain_section(doc, data)
     _visuals(doc, data, actions)
     _value_roadmap(doc, data, actions)
     doc.add_page_break()
