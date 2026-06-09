@@ -738,6 +738,10 @@ from report_generator import generate_tax_plan_pdf
 async def generate_pdf(payload: dict):
     try:
         result = await recommend(payload)
+        final_report_payload = dict(payload or {})
+        if isinstance(result, dict):
+            if result.get("strategies") and not final_report_payload.get("strategies"):
+                final_report_payload["strategies"] = result.get("strategies")
 
         return {
             "status": "success",
@@ -752,7 +756,13 @@ async def generate_pdf(payload: dict):
                 "capital_gains": payload.get("capital_gains")
             },
             "planning_result": result,
-            "next_step": "After review, call generateFinalReport to generate the final client-ready DOCX report."
+            "next_step": "After review, call generateFinalReport to generate the final client-ready DOCX report.",
+            "final_report_action": {
+                "operationId": "generateFinalReport",
+                "trigger": "Use this action only after the user asks for the final report.",
+                "payload": final_report_payload,
+                "display_field": "download_url"
+            }
         }
 
     except Exception as e:

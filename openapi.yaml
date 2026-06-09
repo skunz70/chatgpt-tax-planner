@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Tax Planner Upload API
   description: Upload a tax return PDF, generate planning output, and create final Valhalla client reports.
-  version: "1.1.1"
+  version: "1.1.2"
 servers:
   - url: https://chatgpt-tax-planner.onrender.com
 paths:
@@ -94,10 +94,28 @@ paths:
         '200':
           description: Planning preview or strategy response. Not a final client-ready DOCX report.
           content:
-            application/pdf:
+            application/json:
               schema:
-                type: string
-                format: binary
+                type: object
+                properties:
+                  status:
+                    type: string
+                  report_stage:
+                    type: string
+                  message:
+                    type: string
+                  input_summary:
+                    type: object
+                    additionalProperties: true
+                  planning_result:
+                    type: object
+                    additionalProperties: true
+                  next_step:
+                    type: string
+                  final_report_action:
+                    type: object
+                    description: Use this object to call generateFinalReport after the user asks for the final report.
+                    additionalProperties: true
 
   /year_end_plan:
     post:
