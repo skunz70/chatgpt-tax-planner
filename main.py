@@ -510,12 +510,18 @@ def ocr_extract_text(pdf_bytes: bytes) -> str:
     return text
 
 @app.post("/parse_1040", summary="Extract data from uploaded 1040 PDF with OCR fallback")
-async def parse_1040(request: Request, body: dict = Body(default=None)):
+async def parse_1040(request: Request, file: UploadFile | None = File(default=None), body: dict = Body(default=None)):
     print("====== /parse_1040 HIT ======", flush=True)
     print("CONTENT TYPE:", request.headers.get("content-type"), flush=True)
+    content_type = request.headers.get("content-type")
 
     pdf_bytes = None
     received_filename = None
+
+    if file is not None:
+        received_filename = file.filename
+        pdf_bytes = await file.read()
+        print("FILE FOUND VIA FILE PARAM", flush=True)
 
     try:
         form = await request.form()
@@ -548,7 +554,11 @@ async def parse_1040(request: Request, body: dict = Body(default=None)):
     # keep the rest of your existing route below this line
 
     # Try OCR first
-    text = ocr_extract_text(pdf_bytes)
+    try:
+        text = ocr_extract_text(pdf_bytes)
+    except Exception as e:
+        print("OCR EXTRACTION FAILED:", str(e), flush=True)
+        text = ""
 
     # Fallback: try reading embedded PDF text
     if not text or not text.strip():
